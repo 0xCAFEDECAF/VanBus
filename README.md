@@ -32,16 +32,20 @@ There are various possibilities to hook up a ESP8266 based board to your vehicle
 1. Use a [MCP2551] transceiver, connected with its CANH and CANL pins to the vehicle's VAN bus.
    As the MCP2551 has 5V logic, a 5V <-> 3.3V [level converter] is needed to connect the RXD pin of the transceiver to
    a GPIO of your ESP8266 board.
+   ![schema](extras/schematics/Schematic%20using%20MCP2551_bb.png)
 
 2. Use a [SN65HVD230] transceiver, connected with its CANH and CANL pins to the vehicle's VAN bus.
    The SN65HVD230 transceiver already has 3.3V logic, so it is possible to directly connect the CRX / RXD / R pin of
    the transceiver to a GPIO pin of your ESP8266 board.
-
+   ![schema](extras/schematics/Schematic%20using%20SN65HVD230_bb.png)
+   
 3. The simplest schematic is not to use a transceiver at all, but connect the VAN DATA line to GrouND using
    two 4.7 kOhm resistors. Connect the GPIO pin of your ESP8266 board to the 1:2 [voltage divider] that is thus
    formed by the two resistors. Results may vary.
-   --> Note: I used this schematic during many long debugging hours, but I cannot guarantee that it won't ultimately
-       cause your car to explode! (or anything less catastrofic)
+   ![schema](extras/schematics/Schematic%20using%20voltage%20divider_bb.png)
+   
+   👉 Note: I used this schematic during many long debugging hours, but I cannot guarantee that it won't ultimately
+      cause your car to explode! (or anything less catastrofic)
 
 ## 🚀 Usage<a name = "usage"></a>
 
