@@ -20,12 +20,12 @@
  *    (in this example) GPIO pin 2 (RECV_PIN) of your ESP8266 board.
  *
  * 2. Use a SN65HVD230 transceiver, connected with its CANH and CANL pins to the vehicle's VAN bus.
- *    The SN65HVD230 transceiver already has 3.3V logic, so it is possible to directly connect the CRX pin of the
- *    transceiver to GPIO pin 2 (RECV_PIN) of your ESP8266 board.
+ *    The SN65HVD230 transceiver already has 3.3V logic, so it is possible to directly connect the CRX / RXD / R pin of
+ *    the transceiver to a GPIO pin of your ESP8266 board.
  *
  * 3. The simplest schematic is not to use a transceiver at all, but connect the VAN DATA line to GrouND using
  *    two 4.7 kOhm resistors. Connect the GPIO pin of your ESP8266 board to the 1:2 voltage divider that is thus
- *    formed by the two resistors.
+ *    formed by the two resistors. Results may vary.
  *    --> Note: I used this schematic during many long debugging hours, but I cannot guarantee that it won't ultimately
  *        cause your car to explode! (or anything less catastrofic)
  *
@@ -59,7 +59,7 @@
 
 #include <VanBus.h>
 
-int RECV_PIN = 2; // Set to GPIO pin connected to VAN bus transciever output
+int RECV_PIN = D2; // Set to GPIO pin connected to VAN bus transciever output
 
 void setup()
 {
