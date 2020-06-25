@@ -82,13 +82,13 @@ The following methods are available for the ```VanBus``` object:<a name = "funct
 
 ### 1. ```void Setup(uint8_t rxPin)``` <a name = "Setup"></a>
 
-Start the receiver listening on GPIO pin ```rxPin```
+Start the receiver listening on GPIO pin ```rxPin```.
 
 ### 2. ```bool Available()``` <a name = "Available"></a>
 
 Returns ```true``` if a VAN packet is available in the receive queue.
 
-### 3. ```bool Receive(TVanPacketRxDesc& pkt)``` <a name = "Available"></a>
+### 3. ```bool Receive(TVanPacketRxDesc& pkt)``` <a name = "Receive"></a>
 
 Copy a VAN packet out of the receive queue, if available. Otherwise, returns ```false```.
 
@@ -109,6 +109,8 @@ For background reading:
 - https://en.wikipedia.org/wiki/Vehicle_Area_Network
 - http://graham.auld.me.uk/projects/vanbus/lineprotocol.html
 - http://graham.auld.me.uk/projects/vanbus/datasheets/
+- http://www.educauto.org/files/file_fields/2013/11/18/mux1.pdf
+- http://www.educauto.org/files/file_fields/2013/11/18/mux3.pdf
 - http://www.i3s.unice.fr/~map/Cours/MASTER_STIC_SE/COURS32007.pdf
 - http://ebajic.free.fr/Ecole%20Printemps%20Reseau%20Mars%202006/Supports/J%20MERCKLE%20CANopen.pdf
 - http://igm.univ-mlv.fr/~duris/NTREZO/20042005/Guerrin-Guers-Guinchard-VAN-CAN-rapport.pdf
@@ -148,9 +150,12 @@ An overview of known IDEN values can be found e.g. at:
 
 Returns the "command" FLAGS field of the VAN packet. Each VAN packet has 4 "command" flags:
 - EXT : always 1
-- RAK : 1 = Request AcKnowledge
-- R/W : 1 = Read, 0 = Write
+- RAK : 1 = Requesting AcKnowledge
+- R/W : 1 = Read operation, 0 = Write operation
 - RTR : 1 = Remote Transmit Request
+
+A thorough explanation is found (in French) on page 6 and 7 of
+http://www.educauto.org/files/file_fields/2013/11/18/mux3.pdf#page=6 .
 
 ### 3. ```const uint8_t* Data()``` <a name = "Data"></a>
 
