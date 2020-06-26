@@ -200,6 +200,12 @@ Returns the ACK field of the VAN packet as a string, either "ACK" or "NO_ACK".
 
 Returns the RESULT field of the VAN packet as a string, either "OK" or a string starting with "ERROR_".
 
+## ⚠️ Limitations, Caveats
+
+The library times the incoming bits using an interrupt service routine (ISR) that triggers on pin "change" events (see the internal function ```PinChangeIsr``` in [VanBus.cpp](https://github.com/0xCAFEDECAF/VanBus/blob/master/VanBus.cpp#L319)). It seems that the invocation of the ISR is often quite late (or maybe the bits are wobbly on the line already).
+
+I had to do a bit of tweaking to be able to reconstruct the real bits from the number of CPU cycles that have elapsed between the ISR invocations. Still, not all packets are received error-free. Even after trying to "repair" a packet (see function [```bool CheckCrcAndRepair()```](#CheckCrcAndRepair)), the long-term average packet loss is around 0.05% (1 in 2000), which is ok(-ish). I am investigating how to improve on this.
+
 ## 👷 Work to be done
 
 Currently I am writing a VAN packet parser that will be able to send WebSocket messages to a browser, for real-time
