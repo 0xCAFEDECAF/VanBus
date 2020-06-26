@@ -58,7 +58,7 @@ Add the following line to your ```.ino``` sketch:
 
 Add the following lines to your initialisation block ```void setup()```:
 ```
-int RECV_PIN = D2; // Set to GPIO pin connected to VAN bus transciever output
+int RECV_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
 VanBus.Setup(RECV_PIN);
 ```
 

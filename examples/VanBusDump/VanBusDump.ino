@@ -59,7 +59,7 @@
 
 #include <VanBus.h>
 
-int RECV_PIN = D2; // Set to GPIO pin connected to VAN bus transciever output
+int RECV_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
 
 void setup()
 {
