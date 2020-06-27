@@ -207,6 +207,13 @@ I had to do a bit of tweaking to be able to reconstruct the real bits from the n
 
 ## 👷 Work to be done
 
+### Near future
+
+Currently the library supports only 125 kbit/s VAN bus. Need to add support for different rate, like 62.5 kbit/s, which can be
+passed as an optional parameter to ```VanBus.Setup(...)```.
+
+### Looking forward
+
 Currently I am writing a VAN packet parser that will be able to send WebSocket messages to a browser, for real-time
 updates on a "virtual dashboard" web page that is served by the ESP8266 based board. I am looking for volunteers who
 can draw a nice skin for this "virtual dashboard" 😁. Inspiration? Have a look e.g. at
