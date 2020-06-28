@@ -1,4 +1,4 @@
-<h3 align="center">PSA VAN bus reader for Arduino-ESP8266 / ESP32</h3>
+<h3 align="center">PSA VAN bus reader for Arduino-ESP8266</h3>
 
 ---
 
