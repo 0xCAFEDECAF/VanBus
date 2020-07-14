@@ -22,6 +22,9 @@ In the beginning of 2000's the PSA group (Peugeot and Citroen) used VAN bus as a
 between the various comfort-related equipment. Later, around 2005, they started to replace this protocol
 in their newer cars with the CAN bus protocol, however some models had VAN bus inside them until 2009.
 
+Only ESP8266 / ESP8285 is supported. ESP32 is NOT supported by this library; for boards with those MCUs there is this
+excellent library: [ESP32 RMT peripheral Vehicle Area Network (VAN bus) reader].
+
 ## 🔌 Schematics <a name = "schematics"></a>
 
 You can usually find the VAN bus on pins 2 and 3 of ISO block "A" of your head unit (car radio). See 
@@ -229,3 +232,4 @@ Do whatever you like with it, but contributions are appreciated!
 [level converter]: https://www.tinytronics.nl/shop/en/dc-dc-converters/level-converters/i2c-uart-bi-directional-logic-level-converter-5v-3.3v-2-channel-with-supply
 [SN65HVD230]: https://www.ti.com/lit/ds/symlink/sn65hvd230.pdf?ts=1592992149874&ref_url=https%253A%252F%252Fwww.google.nl%252F
 [voltage divider]: https://www.quora.com/How-many-pins-on-Arduino-Uno-give-a3-3v-pin-output
+[ESP32 RMT peripheral Vehicle Area Network (VAN bus) reader]: https://github.com/morcibacsi/esp32_rmt_van_rx
