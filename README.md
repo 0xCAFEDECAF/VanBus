@@ -28,12 +28,12 @@ excellent library: [ESP32 RMT peripheral Vehicle Area Network (VAN bus) reader].
 ## 🔌 Schematics <a name = "schematics"></a>
 
 You can usually find the VAN bus on pins 2 and 3 of ISO block "A" of your head unit (car radio). See 
-https://en.wikipedia.org/wiki/Connectors_for_car_audio and https://github.com/morcibacsi/esp32_rmt_van_rx .
+https://en.wikipedia.org/wiki/Connectors_for_car_audio and https://github.com/morcibacsi/esp32_rmt_van_rx#schematics .
 
 There are various possibilities to hook up a ESP8266 based board to your vehicle's VAN bus:
 
 1. Use a [MCP2551] transceiver, connected with its CANH and CANL pins to the vehicle's VAN bus.
-   As the MCP2551 has 5V logic, a 5V <-> 3.3V [level converter] is needed to connect the RXD pin of the transceiver to
+   As the MCP2551 has 5V logic, a 5V ↔️ 3.3V [level converter] is needed to connect the RXD pin of the transceiver to
    a GPIO of your ESP8266 board.
    ![schema](extras/schematics/Schematic%20using%20MCP2551_bb.png)
 
