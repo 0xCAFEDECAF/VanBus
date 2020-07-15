@@ -33,8 +33,8 @@ https://en.wikipedia.org/wiki/Connectors_for_car_audio and https://github.com/mo
 There are various possibilities to hook up a ESP8266 based board to your vehicle's VAN bus:
 
 1. Use a [MCP2551] transceiver, connected with its CANH and CANL pins to the vehicle's VAN bus.
-   As the MCP2551 has 5V logic, a 5V ↔️ 3.3V [level converter] is needed to connect the RXD pin of the transceiver to
-   a GPIO of your ESP8266 board.
+   As the MCP2551 has 5V logic, a 5V ↔️ 3.3V [level converter] is needed to connect the CRX / RXD / R pin of the
+   transceiver to a GPIO pin of your ESP8266 board.
    ![schema](extras/schematics/Schematic%20using%20MCP2551_bb.png)
 
 2. Use a [SN65HVD230] transceiver, connected with its CANH and CANL pins to the vehicle's VAN bus.
@@ -183,6 +183,14 @@ packet is OK (either before or after the repair).
 ### 8. ```void DumpRaw(Stream& s)``` <a name = "DumpRaw"></a>
 
 Dumps the raw packet bytes to a stream.
+
+Example of invocation:
+
+    pkt.DumpRaw(Serial);
+
+Example of output:
+
+    Raw: #0002 (2/15) 16 0E 4D4 RA0 82-0C-01-00-11-00-3F-3F-3F-3F-82-7B-A4 ACK OK 7BA4 CRC_OK
 
 ### 9. ```const TIsrDebugPacket& getIsrDebugPacket()``` <a name = "getIsrDebugPacket"></a>
 
