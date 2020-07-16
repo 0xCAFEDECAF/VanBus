@@ -131,7 +131,7 @@ The following methods are available for ```TVanPacketRxDesc``` packet objects as
 5. [```uint16_t Crc()```](#Crc)
 6. [```bool CheckCrc()```](#CheckCrc)
 7. [```bool CheckCrcAndRepair()```](#CheckCrcAndRepair)
-8. [```void DumpRaw(Stream& s)```](#DumpRaw)
+8. [```void DumpRaw(Stream& s, char last = '\n')```](#DumpRaw)
 9. [```const TIsrDebugPacket& getIsrDebugPacket()```](#getIsrDebugPacket)
 10. [```const char* FlagsStr()```](#FlagsStr)
 11. [```const char* AckStr()```](#AckStr)
