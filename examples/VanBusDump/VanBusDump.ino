@@ -16,8 +16,8 @@
  * There are various possibilities to hook up a ESP8266 based board to your vehicle's VAN bus:
  *
  * 1. Use a MCP2551 transceiver, connected with its CANH and CANL pins to the vehicle's VAN bus.
- *    As the MCP2551 has 5V logic, a 5V <-> 3.3V level converter is needed to connect the RXD pin of the transceiver to
- *    (in this example) GPIO pin 2 (RECV_PIN) of your ESP8266 board.
+ *    As the MCP2551 has 5V logic, a 5V <-> 3.3V level converter is needed to connect the  CRX / RXD / R pin of the
+ *    transceiver to (in this example) GPIO pin 2 (RECV_PIN) of your ESP8266 board.
  *
  * 2. Use a SN65HVD230 transceiver, connected with its CANH and CANL pins to the vehicle's VAN bus.
  *    The SN65HVD230 transceiver already has 3.3V logic, so it is possible to directly connect the CRX / RXD / R pin of
@@ -43,7 +43,8 @@
  * Legend:
  *
  * Raw: #0002 (2/15) 16 0E 4D4 RA0 82-0C-01-00-11-00-3F-3F-3F-3F-82-7B-A4 ACK OK 7BA4 CRC_OK
- *         |     |    |  |  |   |   |                             |   |    |   |   |
+ *         |     |    |  |  |   |   |                             |   |    |   |   |    |
+ *         |     |    |  |  |   |   |                             |   |    |   |   |    +-- Packet CRC value is correct
  *         |     |    |  |  |   |   |                             |   |    |   |   +-- Calculated CRC value
  *         |     |    |  |  |   |   |                             |   |    |   +-- Packet read result is OK
  *         |     |    |  |  |   |   |                             |   |    +-- Packet was ACKnowledged by receiver

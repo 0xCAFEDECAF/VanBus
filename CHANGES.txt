@@ -1,6 +1,6 @@
 
 0.1.1
-    * Removed mentioning E32 as supported hardware
+    * Removed mentioning ESP32 as supported hardware
 
 0.1
     * Initial version

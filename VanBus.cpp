@@ -122,21 +122,16 @@ bool TVanPacketRxDesc::CheckCrcAndRepair()
     return false;
 } // TVanPacketRxDesc::CheckCrcAndRepair
 
-// Dumps the raw packet bytes to a stream
-void TVanPacketRxDesc::DumpRaw(Stream& s) const
+// Dumps the raw packet bytes to a stream.
+// Optionally specify the last character; default is "\n" (newline).
+void TVanPacketRxDesc::DumpRaw(Stream& s, char last) const
 {
     s.printf("Raw: #%04u (%u/%u) %d ", seqNo % 10000, isrDebugPacket.samples[0].slot, RX_QUEUE_SIZE, size);
 
     if (size >= 1) s.printf("%02X ", bytes[0]);  // SOF
-    if (size >= 3)
-    {
-        s.printf("%03X %s ", Iden(), FlagsStr());
-    } // if
+    if (size >= 3) s.printf("%03X %s ", Iden(), FlagsStr());
 
-    for (int i = 3; i < size; i++)
-    {
-        s.printf("%02X%c", bytes[i], i < size - 1 ? '-' : ' ');
-    } // for
+    for (int i = 3; i < size; i++) s.printf("%02X%c", bytes[i], i < size - 1 ? '-' : ' ');
 
     s.print(AckStr());
     s.print(" ");
@@ -144,7 +139,7 @@ void TVanPacketRxDesc::DumpRaw(Stream& s) const
     s.printf(" %04X", Crc());
     s.printf(" %s", CheckCrc() ? "CRC_OK" : "CRC_ERROR");
 
-    s.println();
+    s.print(last);
 } // TVanPacketRxDesc::DumpRaw
 
 // Initializes the VAN packet receiver

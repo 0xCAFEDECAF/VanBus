@@ -180,9 +180,9 @@ Checks the CRC value of the VAN packet.
 Checks the CRC value of the VAN packet. If not, tries to repair it by flipping each bit. Returns ```true``` if the
 packet is OK (either before or after the repair).
 
-### 8. ```void DumpRaw(Stream& s)``` <a name = "DumpRaw"></a>
+### 8. ```void DumpRaw(Stream& s, char last = '\n')``` <a name = "DumpRaw"></a>
 
-Dumps the raw packet bytes to a stream.
+Dumps the raw packet bytes to a stream. Optionally specify the last character; default is "\n" (newline).
 
 Example of invocation:
 

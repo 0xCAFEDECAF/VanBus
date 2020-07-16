@@ -112,7 +112,7 @@ class TVanPacketRxDesc
     uint16_t Crc() const;
     bool CheckCrc() const;
     bool CheckCrcAndRepair();  // Yes, we can sometimes repair a packet by flipping a single bit
-    void DumpRaw(Stream& s) const;
+    void DumpRaw(Stream& s, char last = '\n') const;
     const TIsrDebugPacket& getIsrDebugPacket() const { return isrDebugPacket; }
     const char* FlagsStr() const
     {
