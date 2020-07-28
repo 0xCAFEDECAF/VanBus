@@ -3,7 +3,7 @@
  *
  * Written by Erik Tromp
  *
- * Version 0.1.1 - June, 2020
+ * Version 0.1.2 - June, 2020
  *
  * MIT license, all text above must be included in any redistribution.   
  */
@@ -126,7 +126,12 @@ bool TVanPacketRxDesc::CheckCrcAndRepair()
 // Optionally specify the last character; default is "\n" (newline).
 void TVanPacketRxDesc::DumpRaw(Stream& s, char last) const
 {
-    s.printf("Raw: #%04u (%u/%u) %d ", seqNo % 10000, isrDebugPacket.samples[0].slot, RX_QUEUE_SIZE, size);
+    s.printf("Raw: #%04u (%*u/%u) %d ",
+        seqNo % 10000,
+        RX_QUEUE_SIZE > 100 ? 3 : RX_QUEUE_SIZE > 10 ? 2 : 1,  // All compile-time stuff
+        isrDebugPacket.samples[0].slot,
+        RX_QUEUE_SIZE,
+        size);
 
     if (size >= 1) s.printf("%02X ", bytes[0]);  // SOF
     if (size >= 3) s.printf("%03X %s ", Iden(), FlagsStr());
@@ -153,13 +158,16 @@ void TVanPacketRxQueue::Setup(uint8_t rxPin)
     timer1_attachInterrupt(WaitAckIsr);
 } // TVanPacketRxQueue::Setup
 
-// Receives a VAN bus packet by copying it into 'pkt'
-bool TVanPacketRxQueue::Receive(TVanPacketRxDesc& pkt)
+// Receives a VAN bus packet by copying it into 'pkt'.
+// Optionally, passes queue overrun condition into 'isQueueOverrun'.
+bool TVanPacketRxQueue::Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun)
 {
     if (! Available()) return false;
 
     // Copy the whole packet descriptor out (including the debug info)
     pkt = *tail;
+
+    if (isQueueOverrun) *isQueueOverrun = _IsQueueOverrun();
 
     // Instead of copying out, we could also just pass the pointer to the descriptor. However, then we would have to
     // wait with freeing the descriptor, thus keeping one precious queue slot allocated. It is better to copy the
@@ -167,26 +175,22 @@ bool TVanPacketRxQueue::Receive(TVanPacketRxDesc& pkt)
     // caller can now keep the packet as long as needed.
 
     // Indicate packet buffer is available for next packet
-    // TODO - not really necessary to do this
     tail->Init();
 
     // Free the descriptor
     noInterrupts();
-    tail++;
-    if (tail == end) tail = pool;  // roll over
-    _full = false;  // One packet processed, so there is always space now
+    if (++tail == end) tail = pool;  // roll over if needed
+    _overrun = false;  // One packet processed, so there is always space now
     interrupts();
 
     return true;
 } // TVanPacketRxQueue::Receive
 
 // Simple function to generate a string representation of a float value.
-// Note: uses a statically allocated buffer, so don't call twice within the same printf invocation.
-char* FloatToStr(float f, int prec)
+// Note: passed buffer size must be (at least) MAX_FLOAT_SIZE bytes, e.g. declare like this:
+//   char buffer[MAX_FLOAT_SIZE];
+char* FloatToStr(char* buffer, float f, int prec)
 {
-    #define MAX_FLOAT_SIZE 12
-    static char buffer[MAX_FLOAT_SIZE];
-
     dtostrf(f, MAX_FLOAT_SIZE - 1, prec, buffer);
 
     // Strip leading spaces
@@ -201,21 +205,23 @@ void TVanPacketRxQueue::DumpStats(Stream& s) const
 {
     uint32_t pktCount = GetCount();
 
-    // FloatToStr() uses a shared buffer, so only one invocation per printf
+   char floatBuf[MAX_FLOAT_SIZE];
+
+    // Using shared buffer floatBuf, so only one invocation per printf
     s.printf_P(
         PSTR("received pkts: %lu, corrupt: %lu (%s%%)"),
         pktCount,
         nCorrupt,
         pktCount == 0
             ? "-.---"
-            : FloatToStr(100.0 * nCorrupt / pktCount, 3));
+            : FloatToStr(floatBuf, 100.0 * nCorrupt / pktCount, 3));
 
     s.printf_P(
         PSTR(", repaired: %lu (%s%%)"),
         nRepaired,
         nCorrupt == 0
             ? "---" 
-            : FloatToStr(100.0 * nRepaired / nCorrupt, 0));
+            : FloatToStr(floatBuf, 100.0 * nRepaired / nCorrupt, 0));
 
     uint32_t overallCorrupt = nCorrupt - nRepaired;
     s.printf_P(
@@ -223,7 +229,7 @@ void TVanPacketRxQueue::DumpStats(Stream& s) const
         overallCorrupt,
         pktCount == 0
             ? "-.---" 
-            : FloatToStr(100.0 * overallCorrupt / pktCount, 3));
+            : FloatToStr(floatBuf, 100.0 * overallCorrupt / pktCount, 3));
 } // TVanPacketRxQueue::DumpStats
 
 // F_CPU is set by the Arduino IDE option as chosen in menu Tools > CPU Frequency. It is always a multiple of 80000000.
@@ -297,7 +303,8 @@ inline unsigned int ICACHE_RAM_ATTR nBitsFromCycles(uint32_t nCycles, uint32_t& 
     //unsigned int nBits = (nCycles + 335) / 640; // ( 305...944==1; 945...1584==2; 1585...2224==3; 2225...2864==4, ...
     //unsigned int nBits = (nCycles + 347) / 660;
     //unsigned int nBits = (nCycles + 250) / 640;
-    unsigned int nBits = (nCycles + 300 * CPU_F_FACTOR) / 640 * CPU_F_FACTOR;
+    //unsigned int nBits = (nCycles + 300 * CPU_F_FACTOR) / 640 * CPU_F_FACTOR;
+    unsigned int nBits = (nCycles + 300 * CPU_F_FACTOR) / 650 * CPU_F_FACTOR;
 
     return nBits;
 } // nBitsFromCycles
@@ -314,9 +321,8 @@ void ICACHE_RAM_ATTR WaitAckIsr()
 static void ICACHE_RAM_ATTR PinChangeIsr()
 {
     // The logic is:
-    // - if pinLevelChangedTo == LOGICAL_HIGH, we've just had a series of LOGICAL_LOW bits.
+    // - if pinLevelChangedTo == LOGICAL_HIGH, so we've just had a series of LOGICAL_LOW bits.
     // - if pinLevelChangedTo == LOGICAL_LOW, so we've just had a series of LOGICAL_HIGH bits.
-    //int pinLevelChangedTo = digitalRead(VanBus.pin);
     int pinLevelChangedTo = GPIP(VanBus.pin);  // GPIP() is faster than digitalRead()?
     static int prevPinLevelChangedTo = LOW;
     
@@ -326,7 +332,8 @@ static void ICACHE_RAM_ATTR PinChangeIsr()
 
     // Return quickly when it is a spurious interrupt (pin level not changed).
     // If been away for a long time (~ 15 bit times) then skip this check.
-    if (nCycles < 10000 && pinLevelChangedTo == prevPinLevelChangedTo) return;
+    //if (nCycles < 10000 && pinLevelChangedTo == prevPinLevelChangedTo) return;
+    if (pinLevelChangedTo == prevPinLevelChangedTo) return;
     prevPinLevelChangedTo = pinLevelChangedTo;
 
     prev = curr;
@@ -334,9 +341,6 @@ static void ICACHE_RAM_ATTR PinChangeIsr()
     static uint32_t jitter = 0;
     unsigned int nBits = nBitsFromCycles(nCycles, jitter);
  
-    // Is there space in the circular buffer?
-    if (VanBus._IsFull()) return;
-
     TVanPacketRxDesc* head = VanBus._head;
     PacketReadState_t state = head->state;
 
@@ -389,13 +393,18 @@ static void ICACHE_RAM_ATTR PinChangeIsr()
     {
         head->ack = VAN_ACK;
 
-        // The timer ISR will do this
+        // The timer ISR 'WaitAckIsr' will do this
         //VanBus._AdvanceHead();
 
         return;
     } // if
 
-    if (state != SEARCHING && state != LOADING) return;
+    // If the current head packet is already DONE, the circular buffer is completely full
+    if (state != SEARCHING && state != LOADING)
+    {
+        VanBus._overrun = true;
+        return;
+    } // if
 
     // During packet reception, the "Enhanced Manchester" encoding guarantees at most 5 bits are the same,
     // except during EOD when it can be 6.
@@ -507,7 +516,7 @@ static void ICACHE_RAM_ATTR PinChangeIsr()
 
     return;
 
-#undef return
+    #undef return
 
 } // PinChangeIsr
 
@@ -523,7 +532,7 @@ void TIsrDebugPacket::Dump(Stream& s) const
     int size = 0;
     int i = 0;
 
-    #define resetBuffer() \
+    #define reset() \
     { \
         atBit = 0; \
         readBits = 0; \
@@ -541,7 +550,7 @@ void TIsrDebugPacket::Dump(Stream& s) const
             s.printf_P(PSTR("%sSlot # CPU nCycles -> nBits pinLVLs data\n"), tailBuffer->slot >= 10 ? " " : "");
         } // if
 
-        if (i <= 1) resetBuffer();
+        if (i <= 1) reset();
 
         s.printf("#%d", tailBuffer->slot);
 
@@ -608,20 +617,31 @@ void TIsrDebugPacket::Dump(Stream& s) const
         } // if
 */
 
-        if (nBits > 6)
+        // During packet reception, the "Enhanced Manchester" encoding guarantees at most 5 bits are the same,
+        // except during EOD when it can be 6.
+        // However, sometimes the Manchester bit is missed (bug in driver chip?). Let's be tolerant with that, and just
+        // pretend it was there, by accepting up to 9 equal bits.
+        if (nBits > 9)
         {
             // Show we just had a long series of 1's (shown as '1.....') or 0's (shown as '-.....')
             s.print(pinLevelChangedTo == LOGICAL_LOW ? "1....." : "-.....");
             s.println();
 
-            resetBuffer();
+            reset();
             i++;
             continue;
         } // if
 
         // Print the read bits one by one, in a column of 6
-        for (int i = 0; i < nBits; i++) s.print(pinLevelChangedTo == LOGICAL_LOW ? "1" : "-");
-        for (int i = nBits; i < 6; i++) s.print(" ");
+        if (nBits > 6)
+        {
+            s.print(pinLevelChangedTo == LOGICAL_LOW ? "1....1" : "-....-");
+        }
+        else
+        {
+            for (int i = 0; i < nBits; i++) s.print(pinLevelChangedTo == LOGICAL_LOW ? "1" : "-");
+            for (int i = nBits; i < 6; i++) s.print(" ");
+        } // if
 
         // Print current value
         s.printf(" %04X << %1u", readBits, nBits);
@@ -643,7 +663,7 @@ void TIsrDebugPacket::Dump(Stream& s) const
             if (pinLevelChangedTo == LOGICAL_LOW && nBits == 1)
             {
                 s.print(" ACK");
-                resetBuffer();
+                reset();
             }
         } // if
 
@@ -695,6 +715,9 @@ void TIsrDebugPacket::Dump(Stream& s) const
 
         i++;
     } // while
+
+    #undef reset()
+
 } // TIsrDebugPacket::Dump
 
 TVanPacketRxQueue VanBus;

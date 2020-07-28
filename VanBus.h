@@ -3,7 +3,7 @@
  *
  * Written by Erik Tromp
  *
- * Version 0.1.1 - June, 2020
+ * Version 0.1.2- June, 2020
  *
  * MIT license, all text above must be included in any redistribution.   
  */
@@ -47,7 +47,8 @@
 static void PinChangeIsr();
 void WaitAckIsr();
 
-char* FloatToStr(float f, int prec = 1);
+#define MAX_FLOAT_SIZE 12
+char* FloatToStr(char* buffer, float f, int prec = 1);
 
 // ISR invocation data, for debugging purposes
 
@@ -179,16 +180,16 @@ class TVanPacketRxQueue
         : _head(pool)
         , tail(pool)
         , end(pool + RX_QUEUE_SIZE)
-        , _full(false)
-        , _count(0)
+        , _overrun(false)
+        , count(0)
         , nCorrupt(0)
         , nRepaired(0)
     { }
 
     void Setup(uint8_t rxPin);
     bool Available() const { ISR_SAFE_GET(bool, tail->state == DONE); }
-    bool Receive(TVanPacketRxDesc& pkt);
-    uint32_t GetCount() const { ISR_SAFE_GET(uint32_t, _count); }
+    bool Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun = NULL);
+    uint32_t GetCount() const { ISR_SAFE_GET(uint32_t, count); }
     void DumpStats(Stream& s) const;
 
   private:
@@ -198,22 +199,21 @@ class TVanPacketRxQueue
     TVanPacketRxDesc* volatile _head;
     TVanPacketRxDesc* tail;
     TVanPacketRxDesc* end;
-    volatile bool _full;
+    volatile bool _overrun;
 
     // Some statistics. Numbers can roll over.
-    uint32_t _count;
+    uint32_t count;
     uint32_t nCorrupt;
     uint32_t nRepaired;
 
+    bool _IsQueueOverrun() const { ISR_SAFE_GET(bool, _overrun); }
+
     // Only to be called from ISR, unsafe otherwise
-    bool ICACHE_RAM_ATTR _IsFull() const { return _head == tail && _full; }
     void ICACHE_RAM_ATTR _AdvanceHead()
     {
         _head->state = DONE;
-        _head->seqNo = _count++;
-        _head++;
-        if (_head == end) _head = pool;  // roll over
-        if (_head == tail) _full = true;
+        _head->seqNo = count++;
+        if (++_head == end) _head = pool;  // roll over if needed
     } // _AdvanceHead
 
     friend void PinChangeIsr();

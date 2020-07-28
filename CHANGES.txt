@@ -1,4 +1,16 @@
 
+0.1.2
+    Various small improvements, including:
+    * FloatToStr(...) - save 12 statically allocated bytes of precious RAM.
+    * TVanPacketRxQueue::Receive(...) - Optionally, passes queue overrun condition.
+    * nBitsFromCycles(...) - Small correction seems to decrease number of CRC errors.
+    * TIsrDebugPacket::Dump(...) - Fix to be in line with the parsing by PinChangeIsr().
+    * TVanPacketRxDesc::DumpRaw - right-align printed slot number
+    * class TVanPacketRxQueue -
+      - '_full' flag not really necessary.
+      - Added private method _IsQueueOverrun()
+      - Removed private method _IsFull()
+
 0.1.1
     * Removed mentioning ESP32 as supported hardware
 
