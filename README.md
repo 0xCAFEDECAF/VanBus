@@ -94,7 +94,7 @@ Returns ```true``` if a VAN packet is available in the receive queue.
 ### 3. ```bool Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun = NULL)``` <a name = "Receive"></a>
 
 Copy a VAN packet out of the receive queue, if available. Otherwise, returns ```false```.
-Optionally, passes queue overrun condition into 'isQueueOverrun'.
+Optionally, passes queue overrun condition into ```isQueueOverrun```.
 
 ### 4. ```uint32_t GetCount()``` <a name = "GetCount"></a>
 
