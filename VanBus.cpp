@@ -158,7 +158,7 @@ void TVanPacketRxQueue::Setup(uint8_t rxPin)
     timer1_attachInterrupt(WaitAckIsr);
 } // TVanPacketRxQueue::Setup
 
-// Receives a VAN bus packet by copying it into 'pkt'.
+// Copy a VAN packet out of the receive queue, if available. Otherwise, returns ```false```.
 // Optionally, passes queue overrun condition into 'isQueueOverrun'.
 bool TVanPacketRxQueue::Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun)
 {

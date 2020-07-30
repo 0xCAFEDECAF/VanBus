@@ -77,7 +77,7 @@ The following methods are available for the ```VanBus``` object:<a name = "funct
 
 1. [```void Setup(uint8_t rxPin)```](#Setup)
 2. [```bool Available()```](#Available)
-3. [```bool Receive(TVanPacketRxDesc& pkt)```](#Receive)
+3. [```bool Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun = NULL)```](#Receive)
 4. [```uint32_t GetCount()```](#GetCount)
 5. [```void DumpStats(Stream& s)```](#DumpStats)
 
@@ -91,9 +91,10 @@ Start the receiver listening on GPIO pin ```rxPin```.
 
 Returns ```true``` if a VAN packet is available in the receive queue.
 
-### 3. ```bool Receive(TVanPacketRxDesc& pkt)``` <a name = "Receive"></a>
+### 3. ```bool Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun = NULL)``` <a name = "Receive"></a>
 
 Copy a VAN packet out of the receive queue, if available. Otherwise, returns ```false```.
+Optionally, passes queue overrun condition into 'isQueueOverrun'.
 
 ### 4. ```uint32_t GetCount()``` <a name = "GetCount"></a>
 
