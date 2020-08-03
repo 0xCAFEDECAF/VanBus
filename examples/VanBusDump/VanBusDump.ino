@@ -35,10 +35,10 @@
  * Raw packets will be printed line by line on the serial port, e.g. like this:
  *
  * Starting VAN bus receiver
- * Raw: #0000 (0/15) 5 0E 7CE RA1 21-14 NO_ACK OK 2114 CRC_OK
- * Raw: #0001 (1/15) 5 0E 4EC RA1 97-68 NO_ACK OK 9768 CRC_OK
- * Raw: #0002 (2/15) 16 0E 4D4 RA0 82-0C-01-00-11-00-3F-3F-3F-3F-82-7B-A4 ACK OK 7BA4 CRC_OK
- * Raw: #0003 (3/15) 7 0E 5E4 WA0 00-FF-1F-F8 NO_ACK OK 1FF8 CRC_OK
+ * Raw: #0000 ( 0/15)  5 0E 7CE RA1 21-14 NO_ACK OK 2114 CRC_OK
+ * Raw: #0001 ( 1/15)  5 0E 4EC RA1 97-68 NO_ACK OK 9768 CRC_OK
+ * Raw: #0002 ( 2/15) 16 0E 4D4 RA0 82-0C-01-00-11-00-3F-3F-3F-3F-82-7B-A4 ACK OK 7BA4 CRC_OK
+ * Raw: #0003 ( 3/15)  7 0E 5E4 WA0 00-FF-1F-F8 NO_ACK OK 1FF8 CRC_OK
  *
  * Legend:
  *
