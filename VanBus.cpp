@@ -126,7 +126,7 @@ bool TVanPacketRxDesc::CheckCrcAndRepair()
 // Optionally specify the last character; default is "\n" (newline).
 void TVanPacketRxDesc::DumpRaw(Stream& s, char last) const
 {
-    s.printf("Raw: #%04u (%*u/%u) %d ",
+    s.printf("Raw: #%04u (%*u/%u) %2d ",
         seqNo % 10000,
         RX_QUEUE_SIZE > 100 ? 3 : RX_QUEUE_SIZE > 10 ? 2 : 1,  // All compile-time stuff
         isrDebugPacket.samples[0].slot,
