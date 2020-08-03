@@ -70,7 +70,7 @@ int RECV_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
 #define TIME_IDEN 0x984
 #define AUDIO_SETTINGS_IDEN 0x4D4
 #define MFD_STATUS_IDEN 0x5E4
-#define STALK_OR_SATNAV_IDEN 0x9CE
+#define SATNAV_GUIDANCE_IDEN 0x9CE
 #define AIRCON_IDEN 0x464
 #define AIRCON2_IDEN 0x4DC
 #define CDCHANGER_IDEN 0x4EC
@@ -111,17 +111,27 @@ const char* RadioBandStr(uint8_t data)
 const char* SatNavRequestStr(uint8_t data)
 {
     char buffer[5];
-    sprintf_P(buffer, PSTR("0x%02"), data);
+    sprintf_P(buffer, PSTR("0x%02X"), data);
 
     return
-        data == 0x02 ? "ENTERING_CITY" :
-            data == 0x08 ? "PLACES_OF_INTEREST" :
+        data == 0x00 ? "ENTER_COUNTRY" :  // Never seen, just guessing
+            data == 0x01 ? "ENTER_PROVINCE" :  // Never seen, just guessing
+            data == 0x02 ? "ENTER_CITY" :
+            data == 0x03 ? "ENTER_DISTRICT" :  // Never seen, just guessing
+            data == 0x04 ? "ENTER_NEIGHBORHOOD" :  // Never seen, just guessing
+            data == 0x05 ? "ENTER_STREET" :
+            data == 0x06 ? "ENTER_HOUSE_NUMBER" :
+            data == 0x07 ? "ENTER_HOUSE_NUMBER_LETTER" :  // Never seen, just guessing
+            data == 0x08 ? "PLACE_OF_INTEREST_CATEGORIES" :
+            data == 0x09 ? "PLACE_OF_INTEREST_CATEGORY" :
             data == 0x0E ? "GPS_FOR_PLACE_OF_INTEREST" :
+            data == 0x0F ? "CURRENT_DESTINATION" :
             data == 0x10 ? "CURRENT_ADDRESS" :
-            data == 0x11 ? "LAST_DESTINATION" :
-            data == 0x13 ? "MODULE_VERSIONS" :
-            data == 0x1B ? "PRIVATE_ADDRESSES" :
-            data == 0x1C ? "BUSINESS_ADDRESSES" :
+            data == 0x11 ? "PRIVATE_ADDRESS" :
+            data == 0x12 ? "BUSINESS_ADDRESS" :
+            data == 0x13 ? "SOFTWARE_MODULE_VERSIONS" :
+            data == 0x1B ? "PRIVATE_ADDRESS_LIST" :
+            data == 0x1C ? "BUSINESS_ADDRESS_LIST" :
             data == 0x1D ? "GPS_CHOOSE_DESTINATION" :
             buffer;
 } // SatNavRequestStr
@@ -193,8 +203,9 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
             char floatBuf[3][MAX_FLOAT_SIZE];
             SERIAL.printf(
-                "dashboard_brightness=%u; contact=%s; ignition=%s; engine=%s; door=%s; "
-                "economy_mode=%s; in_reverse=%s; trailer=%s; water_temp=%s; odometer=%s; ext_temp=%s\n",
+                "dashboard_light=%s, dashboard_actual_brightness=%u; contact=%s; ignition=%s; engine=%s; door=%s;\n"
+                "    economy_mode=%s; in_reverse=%s; trailer=%s; water_temp=%s; odometer=%s; ext_temp=%s\n",
+                data[0] & 0x80 ? "FULL" : "DIMMED (LIGHTS ON)",
                 data[0] & 0x0F,
                 data[1] & 0x01 ? "ACC" : "OFF",
                 data[1] & 0x02 ? "ON" : "OFF",
@@ -264,12 +275,16 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
             // Cars made until 2002?
 
-            SERIAL.printf("\nInstrument cluster: %sENABLED\n", data[0] & 0x80 ? "" : "NOT ");
-            SERIAL.printf("Speed regulator wheel: %s\n", data[0] & 0x40 ? "ON" : "OFF");
-            SERIAL.printf("%s", data[0] & 0x20 ? "Warning LED ON\n" : "");
-            SERIAL.printf("%s", data[0] & 0x04 ? "Pre-heater or Hazard warning ON\n" : "");  // TODO
-            SERIAL.printf("%s", data[1] & 0x01 ? "Door OPEN\n" : "");
-            SERIAL.printf("Remaing km to service: %u\n", ((uint16_t)data[2] << 8 | data[3]) * 20);
+            SERIAL.printf("\n    - Instrument cluster: %sENABLED\n", data[0] & 0x80 ? "" : "NOT ");
+            SERIAL.printf("    - Speed regulator wheel: %s\n", data[0] & 0x40 ? "ON" : "OFF");
+            SERIAL.printf("%s", data[0] & 0x20 ? "    - Warning LED ON\n" : "");
+            SERIAL.printf("%s", data[0] & 0x04 ? "    - Pre-heater or Hazard warning ON\n" : "");  // TODO
+            SERIAL.printf("%s", data[1] & 0x01 ? "    - Door OPEN\n" : "");
+            SERIAL.printf(
+                "    - Remaing km to service: %u (dashboard shows: %u)\n",
+                ((uint16_t)data[2] << 8 | data[3]) * 20,
+                (((uint16_t)data[2] << 8 | data[3]) * 20) / 100 * 100
+            );
 
             SERIAL.printf("Automatic gearbox: %s%s%s%s\n",
                 (data[4] & 0x70) == 0x00 ? "P" :
@@ -381,16 +396,29 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
+                // Possible bits in data[1]:
+                // 0x01 - Audio settings info
+                // 0x02 - Button press info
+                // 0x04 - Searching (CD track or radio station)
+                // 0x08 - 
+                // 0xF0 - 0x20 = Radio
+                //      - 0x30 = CD track found
+                //      - 0x40 = Radio preset
+                //      - 0xC0 = Internal CD info
+                //      - 0xD0 = CD track info
+
                 SERIAL.printf(
                     "%s\n",
-                    data[1] == 0x20 && data[2] == 0x40 ? "RADIO INFO (BACKGROUND)" :
-                    data[1] == 0x21 && data[2] == 0x40 ? "AUDIO SETTINGS" :
-                    data[1] == 0x24 && data[2] == 0x40 ? "RADIO INFO (FOREGROUND)" :
-                    data[1] == 0x30 && data[2] == 0x40 ? "CD PRESENT" :
-                    data[1] == 0xC0 && data[2] == 0x40 ? "CD TRACK INFO" :
-                    data[1] == 0xC1 && data[2] == 0x40 ? "CD/TAPE AUDIO SETTINGS" :
-                    data[1] == 0xC4 && data[2] == 0x40 ? "CD SEARCHING" :
-                    data[1] == 0xD0 && data[2] == 0x40 ? "CD TRACK INFO" :
+                    data[1] == 0x20 ? "RADIO_INFO" :
+                    data[1] == 0x21 ? "AUDIO_SETTINGS" :
+                    data[1] == 0x22 ? "BUTTON_PRESS_INFO" :
+                    data[1] == 0x24 ? "RADIO_SEARCHING" :
+                    data[1] == 0x30 ? "CD_TRACK_FOUND" :
+                    data[1] == 0x40 ? "RADIO_PRESET_INFO" :
+                    data[1] == 0xC0 ? "CD_INFO" :
+                    data[1] == 0xC1 ? "CD_TAPE_AUDIO_SETTINGS" :
+                    data[1] == 0xC4 ? "CD_SEARCHING" :
+                    data[1] == 0xD0 ? "CD_TRACK_INFO" :
                     "??"
                 );
 
@@ -400,13 +428,13 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     sprintf_P(buffer, PSTR("0x%02X"), data[2]);
 
                     SERIAL.printf(
-                        "    Head unit button pressed: %s - %s %s\n",
+                        "    Head unit button pressed: %s%s%s\n",
                         (data[2] & 0x1F) == 0x01 ? "1" :
-                            (data[2] & 0x1F) == 0x02 ? "2" :
-                            (data[2] & 0x1F) == 0x03 ? "3" :
-                            (data[2] & 0x1F) == 0x04 ? "4" :
-                            (data[2] & 0x1F) == 0x05 ? "5" :
-                            (data[2] & 0x1F) == 0x06 ? "6" :
+                            (data[2] & 0x1F) == 0x02 ? "'2'" :
+                            (data[2] & 0x1F) == 0x03 ? "'3'" :
+                            (data[2] & 0x1F) == 0x04 ? "'4'" :
+                            (data[2] & 0x1F) == 0x05 ? "'5'" :
+                            (data[2] & 0x1F) == 0x06 ? "'6'" :
                             (data[2] & 0x1F) == 0x11 ? "AUDIO_DOWN" :
                             (data[2] & 0x1F) == 0x12 ? "AUDIO_UP" :
                             (data[2] & 0x1F) == 0x13 ? "SEEK_BACKWARD" :
@@ -415,17 +443,72 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                             (data[2] & 0x1F) == 0x17 ? "MAN" :
                             (data[2] & 0x1F) == 0x1B ? "RADIO" :
                             (data[2] & 0x1F) == 0x1C ? "TAPE" :
-                            (data[2] & 0x1F) == 0x1D ? "CD" :
-                            (data[2] & 0x1F) == 0x1E ? "CD changer" :
+                            (data[2] & 0x1F) == 0x1D ? "INTERNAL_CD" :
+                            (data[2] & 0x1F) == 0x1E ? "CD_CHANGER" :
                             buffer,
-                        data[2] & 0x40 ? "released" : "",
-                        data[2] & 0x80 ? "repeat" : ""
+                        data[2] & 0x40 ? " (released)" : "",
+                        data[2] & 0x80 ? " (repeat)" : ""
                     );
                 } // if
             }
             else if (data[0] == 0x96)
             {
-                SERIAL.print("CD-changer info\n");
+                if (dataLen != 1)
+                {
+                    SERIAL.println("[unexpected packet length]");
+                    return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
+                } // if
+
+                SERIAL.print("CD-changer info done\n");
+            }
+            else if (data[0] == 0x07)
+            {
+                if (dataLen != 3)
+                {
+                    SERIAL.println("[unexpected packet length]");
+                    return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
+                } // if
+
+                // Unknown what this is. MFD reporting what it is showing??
+                // 
+                // data[1] seems a bit pattern. Bits seen:
+                //  & 0x01
+                //  & 0x02
+                //  & 0x04
+                //  & 0x10
+                //  & 0x20
+                //  & 0x40
+                //
+                // data[2] is usually 0x00, sometimes 0x01
+
+                SERIAL.printf(
+                    "0x%02X 0x%02X 0x%02X [to be decoded]\n",
+                    data[0],
+                    data[1],
+                    data[2]
+                );
+
+                return VAN_PACKET_PARSE_TO_BE_DECODED_IDEN;
+            }
+            else if (data[0] == 0x52)
+            {
+                if (dataLen != 2)
+                {
+                    SERIAL.println("[unexpected packet length]");
+                    return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
+                } // if
+
+                // Unknown what this is
+                //
+                // data[1] is usually 0x08, sometimes 0x20
+
+                SERIAL.printf(
+                    "0x%02X 0x%02X [to be decoded]\n",
+                    data[0],
+                    data[1]
+                );
+
+                return VAN_PACKET_PARSE_TO_BE_DECODED_IDEN;
             }
             else
             {
@@ -459,7 +542,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             char floatBuf[3][MAX_FLOAT_SIZE];
             SERIAL.printf(
                 "seq=%u; doors=%s,%s,%s,%s,%s; right_stalk_button=%s; avg_speed_1=%u; avg_speed_2=%u; "
-                "fuel_level=%u%%; range_1=%u; avg_consumption_1=%s;\n  range_2=%u; avg_consumption_2=%s; "
+                "fuel_level=%u litre;\n    range_1=%u; avg_consumption_1=%s; range_2=%u; avg_consumption_2=%s; "
                 "inst_consumption=%s; mileage=%u\n",
                 data[0] & 0x07,
                 data[7] & 0x80 ? "FR" : "",
@@ -620,7 +703,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     {
                         char buffer[80];  // Make sure this is large enough for the largest string it must hold
                         strcpy_P(buffer, (char *)pgm_read_dword(&(msgTable[byte * 8 + bit])));
-                        SERIAL.print("   - ");
+                        SERIAL.print("    - ");
                         SERIAL.println(buffer);
                     } // if
                 } // for
@@ -649,8 +732,12 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             char floatBuf[2][MAX_FLOAT_SIZE];
             SERIAL.printf(
                 "rpm=%s /min; speed=%s km/h; seq=%lu\n",
-                FloatToStr(floatBuf[0], ((uint16_t)data[0] << 8 | data[1]) / 8.0, 1),
-                FloatToStr(floatBuf[1], ((uint16_t)data[2] << 8 | data[3]) / 100.0, 2),
+                data[0] == 0xFF && data[1] == 0xFF ?
+                    "---.-" :
+                    FloatToStr(floatBuf[0], ((uint16_t)data[0] << 8 | data[1]) / 8.0, 1),
+                data[2] == 0xFF && data[3] == 0xFF ?
+                    "---.--" :
+                    FloatToStr(floatBuf[1], ((uint16_t)data[2] << 8 | data[3]) / 100.0, 2),
                 (uint32_t)data[4] << 16 | (uint32_t)data[5] << 8 | data[6]
             );
         }
@@ -676,7 +763,8 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
             char floatBuf[2][MAX_FLOAT_SIZE];
             SERIAL.printf(
-                "hazard_lights=%s; door=%s; dashboard_brightness=%u, esp=%s, fuel_level_filtered=%s litre, fuel_level_raw=%s litre\n",
+                "hazard_lights=%s; door=%s; dashboard_programmed_brightness=%u, esp=%s,\n"
+                "    fuel_level_filtered=%s litre, fuel_level_raw=%s litre\n",
                 data[0] & 0x02 ? "ON" : "OFF",
                 data[2] & 0x40 ? "LOCKED" : "UNLOCKED",
                 data[2] & 0x0F,
@@ -737,14 +825,24 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
                     uint16_t freq_1 = (uint16_t)data[5] << 8 | data[4];
 
-                    // data[8] and data[9] I think have to do with RDS codes (PTY, PI code, ...)
+                    // data[6] & 0x1F - seems to contain PTY code
+                    // data[6] & 0x80 - bit indicating no or unknown PTY ?
+                    uint8_t ptyCode = data[6] & 0x1F;
+
+                    // data[8] and data[9] contain PI code
                     // See also:
                     // - https://en.wikipedia.org/wiki/Radio_Data_System#Program_Identification_Code_(PI_Code),
                     // - https://radio-tv-nederland.nl/rds/rds.html
-                    // - https://radio-tv-nederland.nl/rds/PI%20codes%20Europe.jpg
+                    // - https://people.uta.fi/~jk54415/dx/pi-codes.html
+                    uint16_t piCode = (uint16_t)data[8] << 8 | data[9];
+                    uint8_t countryCode = data[8] >> 4 & 0x0F;
+
+                    // data[10] - Always 0xA1 ?
+                    // data[11] - Just before or after RDS text is received, switches from 0x00 to 0x03, 0x07, 0x09, 0x0A, 0x0E
 
                     char floatBuf[MAX_FLOAT_SIZE];
-                    SERIAL.printf("position=%u, band=%s, scanning=%s, %smanual_scan=%s%s, %s %s, %s, %s, %s, %s, \"%s\"%s\n",
+                    SERIAL.printf("position=%u, band=%s, scanning=%s, %smanual_scan=%s%s, %s %s, PTY=%u(%s), PI=%04X (country=%s),\n"
+                        "    %s, %s, %s, %s, \"%s\"%s\n",
                         data[2] >> 3 & 0x0F,
                         RadioBandStr(data[2]),
                         data[3] & 0x10 ? "YES" : "NO",  // scanning
@@ -756,6 +854,64 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                                 ? FloatToStr(floatBuf, freq_1, 0)  // AM, LW
                                 : FloatToStr(floatBuf, freq_1 / 20.0 + 50.0, 2),  // FM
                         (data[2] & 0x07) == 5 ? "KHz" : "MHz",
+
+                        // See also:
+                        // https://www.electronics-notes.com/articles/audio-video/broadcast-audio/rds-radio-data-system-pty-codes.php
+                        ptyCode,
+                        ptyCode == 0 ? "Not defined" :
+                            ptyCode == 1 ? "News" :
+                            ptyCode == 2 ? "Current affairs" :
+                            ptyCode == 3 ? "Information" :
+                            ptyCode == 4 ? "Sport" :
+                            ptyCode == 5 ? "Education" :
+                            ptyCode == 6 ? "Drama" :
+                            ptyCode == 7 ? "Culture" :
+                            ptyCode == 8 ? "Science" :
+                            ptyCode == 9 ? "Varied" :
+                            ptyCode == 10 ? "Popular Music (Pop)" :
+                            ptyCode == 11 ? "Rock Music" :
+                            ptyCode == 12 ? "Easy Listening" :
+                            ptyCode == 13 ? "Light Classical" :
+                            ptyCode == 14 ? "Serious Classical" :
+                            ptyCode == 15 ? "Other Music" :
+                            ptyCode == 16 ? "Weather" :
+                            ptyCode == 17 ? "Finance" :
+                            ptyCode == 18 ? "Children's Programmes" :
+                            ptyCode == 19 ? "Social Affairs" :
+                            ptyCode == 20 ? "Religion" :
+                            ptyCode == 21 ? "Phone-in" :
+                            ptyCode == 22 ? "Travel" :
+                            ptyCode == 23 ? "Leisure" :
+                            ptyCode == 24 ? "Jazz Music" :
+                            ptyCode == 25 ? "Country Music" :
+                            ptyCode == 26 ? "National Music" :
+                            ptyCode == 27 ? "Oldies Music" :
+                            ptyCode == 28 ? "Folk Music" :
+                            ptyCode == 29 ? "Documentary" :
+                            ptyCode == 30 ? "Alarm Test" :
+                            ptyCode == 31 ? "Alarm" :
+                            "??",
+
+                        piCode,
+
+                        // https://radio-tv-nederland.nl/rds/PI%20codes%20Europe.jpg
+                        // More than one country is assigned to the same code, just listing the most likely.
+                        countryCode == 0x01 || countryCode == 0x0D ? "Germany" :
+                            countryCode == 0x02 ? "Ireland" :
+                            countryCode == 0x03 ? "Poland" :
+                            countryCode == 0x04 ? "Switzerland" :
+                            countryCode == 0x05 ? "Italy" :
+                            countryCode == 0x06 ? "Belgium" :
+                            countryCode == 0x07 ? "Luxemburg" :
+                            countryCode == 0x08 ? "Netherlands" :
+                            countryCode == 0x09 ? "Denmark" :
+                            countryCode == 0x0A ? "Austria" :
+                            countryCode == 0x0B ? "Hungary" :
+                            countryCode == 0x0C ? "UK" :
+                            countryCode == 0x0E ? "Spain" :
+                            countryCode == 0x0F ? "France" :
+                            "???",
+
                         (data[2] & 0x07) == 5 ? "TA N/A" : data[7] & 0x40 ? "TA avaliable" : "NO TA availabe",
                         (data[2] & 0x07) == 5 ? "RDS N/A" : data[7] & 0x20 ? "RDS available" : "NO RDS available",
                         (data[2] & 0x07) == 5 ? "TA N/A" : data[7] & 0x02 ? "TA ON" : "TA OFF",
@@ -934,8 +1090,13 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 data[4] & 0x20 ? "PRESENT" : "NOT PRESENT",
                 data[4] & 0x40 ? "PRESENT" : "NOT PRESENT",
                 (data[4] & 0x0F) == 0x01 ? "RADIO" :
-                    (data[4] & 0x0F) == 0x02 ? "TAPE_OR_CD" :
+                    (data[4] & 0x0F) == 0x02 ? "INTERNAL_CD_OR_TAPE" :
                     (data[4] & 0x0F) == 0x03 ? "CD_CHANGER" :
+
+                    // TODO - or OFF? Check! I think this is the "default" mode for the head unit, to sit there and
+                    // listen to the navigation audio. Check by setting a specific volume for the navigation.
+                    (data[4] & 0x0F) == 0x05 ? "NAVIGATION_AUDIO" :
+
                     "???",
                 data[5] & 0x7F,
                 data[5] & 0x80 ? "<UPD>" : "",
@@ -985,14 +1146,29 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
         }
         break;
 
-        case STALK_OR_SATNAV_IDEN:
+        case SATNAV_GUIDANCE_IDEN:
         {
             // http://graham.auld.me.uk/projects/vanbus/packets.html#9CE
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#9CE
 
-            SERIAL.print("--> Stalk or remote access to SatNav: ");
-            SERIAL.println("[to be decoded]");
-            return VAN_PACKET_PARSE_TO_BE_DECODED_IDEN;
+            SERIAL.print("--> SatNav guidance instruction: ");
+
+            if (dataLen != 16)
+            {
+                SERIAL.println("[unexpected packet length]");
+                return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
+            } // if
+
+            // This packet precedes a packet with IDEN value 0x64E (SATNAV2_IDEN).
+            // I think this packet contains direction instructions during guidance.
+            //
+            // Possible meanings of data:
+            // - data[0] & 0x0F , data[15] & 0x0F = sequence number
+            // - data[9] << 8 | data[10] = number of meters before turn
+
+            uint16_t metersBeforeTurn = (uint16_t)data[9] << 8 | data[10];
+
+            SERIAL.printf("meters=%u\n", metersBeforeTurn);
         }
         break;
 
@@ -1112,8 +1288,10 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 {
                     SERIAL.print("--> CD Changer: ");
 
+                    char floatBuf[2][MAX_FLOAT_SIZE];
+
                     SERIAL.printf(
-                        "random=%s; state=%s; cartridge=%s; %um:%us in track %u/%u on CD %u; "
+                        "random=%s; state=%s; cartridge=%s; %s min:%s sec in track %u/%u on CD %u; "
                         "presence=%s-%s-%s-%s-%s-%s\n",
                         data[1] == 0x01 ? "ON" : "OFF",
 
@@ -1129,8 +1307,8 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                             data[3] == 0x06 ? "OUT" :
                             "UNKNOWN",
 
-                        GetBcd(data[4]),
-                        GetBcd(data[5]),
+                        data[4] == 0xFF ? "--" : FloatToStr(floatBuf[0], GetBcd(data[4]), 0),
+                        data[5] == 0xFF ? "--" : FloatToStr(floatBuf[1], GetBcd(data[5]), 0),
                         GetBcd(data[6]),
                         GetBcd(data[8]),
                         GetBcd(data[7]),
@@ -1187,7 +1365,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     status == 0x0301 ? "GUIDANCE_STARTED" :
                     status == 0x4000 ? "GUIDANCE_STOPPED" :
                     status == 0x0400 ? "TERMS_AND_CONDITIONS_ACCEPTED" :
-                    status == 0x0800 ? "WELCOME_MESSAGE_SPOKEN" :
+                    status == 0x0800 ? "PLAYING_AUDIO_MESSAGE" :
                     status == 0x9000 ? "READING_DISC" :
                     buffer
             );
@@ -1203,13 +1381,27 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
             SERIAL.print("--> SatNav 2: ");
 
-            if (dataLen != 6)
+            if (dataLen != 4)
             {
                 SERIAL.println("[unexpected packet length]");
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
-            SERIAL.println("Destination entered [to be decoded]");
+            // Packet appears as soon as the first guidance instruction is given.
+            // Just before this packet there is always a packet with IDEN value 0x9CE (SATNAV_GUIDANCE_IDEN).
+            //
+            // Possible meanings of data:
+            // - data[0] & 0x0F , data[3] & 0x0F = sequence number
+            // - data[1] = always 0x05
+            // - data[2] = 0x01 or 0x02 - I think this is the direction icon to be shown in the MFD
+            //   Possible meanings:
+            //   0x01 = turn right
+
+            char buffer[10];
+            sprintf_P(buffer, PSTR("0x%02X-0x%02X"), data[1], data[2]);
+
+            SERIAL.printf("%s\n", buffer);
+
             return VAN_PACKET_PARSE_TO_BE_DECODED_IDEN;
         }
         break;
@@ -1241,7 +1433,16 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             //     - Special characters:
             //       * 0x81 = '+' in solid circle, means: this destination cannot be selected with the current
             //         navigation disc.
-
+            //
+            // Address format:
+            // - Always starts with "V" (Ville?)
+            // - Country
+            // - Province
+            // - City
+            // - District (or empty)
+            // - String "G" which can be followed by text that is not important for searching on, e.g. "GRue de"
+            // - Street name
+            // - House number (or "0" if unknown)
 
             #define MAX_SATNAV_STRING_SIZE 128
             static char buffer[128];
@@ -1323,9 +1524,32 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 (uint16_t)data[4] << 8 | data[5]
             );
 
-            // TODO - available letters are bit-coded in bytes 17...20 (and numbers in bytes 20...22?)
+            // Available letters are bit-coded in bytes 17...20
+            for (int byte = 0; byte <= 3; byte++)
+            {
+                for (int bit = 0; bit < (byte == 3 ? 2 : 8); bit++)
+                {
+                    SERIAL.printf("%c ", data[byte + 17] >> bit & 0x01 ? 65 + 8 * byte + bit : '.');
+                } // for
+            } // for
+
+            // Special character '
+            SERIAL.printf("%c ", data[21] >> 6 & 0x01 ? '\'' : '.');
+
+            // Available numbers are bit-coded in bytes 20...21, starting with '0' at bit 2 of byte 20, ending
+            // with '9' at bit 3 of byte 21
+            for (int byte = 0; byte <= 1; byte++)
+            {
+                for (int bit = (byte == 0 ? 2 : 0); bit < (byte == 1 ? 3 : 8); bit++)
+                {
+                    SERIAL.printf("%c ", data[byte + 20] >> bit & 0x01 ? 48 + 8 * byte + bit - 2 : '.');
+                } // for
+            } // for
+
+            // <Space>, printed as '_'
+            SERIAL.printf("%c ", data[22] >> 1 & 0x01 ? '_' : '.');
+
             SERIAL.println();
-            
         }
         break;
 
@@ -1420,8 +1644,8 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             {
                 uint16_t status = (uint16_t)data[0] << 8 | data[1];
 
-                char buffer[10];
-                sprintf_P(buffer, PSTR("0x%02X-0x%02X"), data[0], data[1]);
+                char buffer[7];
+                sprintf_P(buffer, PSTR("0x%04X"), status);
 
                 // TODO - check; total guess
                 SERIAL.printf(
@@ -1438,6 +1662,8 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             }
             else if (dataLen == 17 && data[0] == 0x20)
             {
+                SERIAL.print("disc_id=");
+
                 int at = 1;
 
                 // Max 28 data bytes, minus header (1), plus terminating 0
@@ -1453,8 +1679,6 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
                 SERIAL.println();
             } // if
-
-            return VAN_PACKET_PARSE_TO_BE_DECODED_IDEN;
         }
         break;
 
@@ -1471,15 +1695,72 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
-            char buf[2];
-            sprintf_P(buf, PSTR("%c"), data[3]);
+            uint16_t request = (uint16_t)data[0] << 8 | data[1];
+
+            char buffer[2];
+            sprintf_P(buffer, PSTR("%c"), data[3]);
+
             SERIAL.printf(
-                "request=%s, select_from_list=%d, letter=%s\n",
+                "request=%s (0x%04X) (%s?), command=%d, letter=%s",
                 SatNavRequestStr(data[0]),
+                request,
+                request == 0x021D ? "ENTER_CITY" : // 4, 9 or 11 bytes
+                    request == 0x051D ? "ENTER_STREET" : // 4, 9 or 11 bytes
+                    request == 0x061D ? "ENTER_HOUSE_NUMBER" : // 9 or 11 bytes
+                    request == 0x080D && dataLen == 4 ? "REQUEST_LIST_SIZE_OF_CATEGORIES" :
+                    request == 0x080D && dataLen == 9 ? "CHOOSE_CATEGORY" :
+
+                    // Strange: when starting a SatNav session, the MFD seems to always start by asking the number of
+                    // items in the list of categories. It gets the correct answer (38) but just ignores that.
+                    request == 0x08FF && dataLen == 4 ? "START_SATNAV" :
+
+                    request == 0x08FF && dataLen == 9 ? "REQUEST_LIST_OF_CATEGORIES" :
+                    request == 0x090D ? "CHOOSE_CATEGORY":
+                    request == 0x0E0D ? "CHOOSE_ADDRESS_FOR_PLACES_OF_INTEREST" :
+                    request == 0x0EFF ? "REQUEST_ADDRESS_FOR_PLACES_OF_INTEREST" :
+                    request == 0x0FFF ? "SHOW_CURRENT_DESTINATION" :
+                    request == 0x100D ? "CHOOSE_CURRENT_ADDRESS" :
+                    request == 0x10FF ? "REQUEST_CURRENT_ADDRESS" :
+                    request == 0x110E ? "CHOOSE_PRIVATE_ADDRESS" :
+                    request == 0x11FF ? "REQUEST_PRIVATE_ADDRESS" :
+                    request == 0x120E ? "CHOOSE_BUSINESS_ADDRESS" :
+                    request == 0x12FF ? "REQUEST_BUSINESS_ADDRESS" :
+                    request == 0x13FF ? "REQUEST_SOFTWARE_MODULE_VERSIONS" :
+                    request == 0x1BFF && dataLen == 4 ? "REQUEST_LIST_SIZE_OF_PRIVATE_ADDRESSES" :
+                    request == 0x1BFF && dataLen == 9 ? "REQUEST_PRIVATE_ADDRESSES" :
+                    request == 0x1CFF && dataLen == 4 ? "REQUEST_LIST_SIZE_OF_BUSINESS_ADDRESSES" :
+                    request == 0x1CFF && dataLen == 9 ? "REQUEST_BUSINESS_ADDRESSES" :
+                    request == 0x1D0E ? "SELECT_FASTEST_ROUTE?" :
+                    request == 0x1DFF ? "CHOOSE_DESTINATION_SHOW_CURRENT_ADDRESS" :
+                    "??",
+
+                // Possible meanings:
+                // * request == 0x021D:
+                //   - command = 1: request list starting at data[5] << 8 | data[6], length in data[7] << 8 | data[8]
+                //   - command = 2: choose line in data[5] << 8 | data[6]
+                // * request == 0x080D:
+                //   - command = 2: choose line in data[5] << 8 | data[6]
+                // * request == 0x08FF:
+                //   - command = 1: request list starting at data[5] << 8 | data[6], length in data[7] << 8 | data[8]
+
                 data[2],
-                data[3] >= 'A' && data[3] <= 'Z' ? buf :
+
+                (data[3] >= 'A' && data[3] <= 'Z') || (data[3] >= '0' && data[3] <= '9') || data[3] == '\'' ? buffer :
+                    data[3] == ' ' ? "_" : // Space
                     data[3] == 0x01 ? "Esc" :
-                    "??");
+                    "??"
+            );
+
+            if (dataLen >= 9)
+            {
+                SERIAL.printf(
+                    ", select_from_list=%u, length=%u",
+                    (uint16_t)data[5] << 8 | data[6],
+                    (uint16_t)data[7] << 8 | data[8]
+                );
+            } // if
+
+            SERIAL.println();
         }
         break;
 
@@ -1648,10 +1929,12 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
+                // data[1] & 0x03 == 0x02 --> ON/OFF
+                // data[1] & 0x03 == 0x03 --> MUTE
                 SERIAL.printf(
                     "command=HEAD_UNIT_UPDATE_SETTINGS, param=%s\n",
                     data[1] == 0x02 ? "POWER_OFF" :
-                    data[1] == 0x80 ? "0x80" :
+                    data[1] == 0x80 ? "0x80" : // ??
                     data[1] == 0x82 ? "POWER_OFF" :
                     data[1] == 0x83 ? "MUTE" :
                     data[1] == 0xC0 ? "LOUDNESS_ON" :  // Never seen
@@ -1675,9 +1958,13 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 SERIAL.printf(
                     "command=HEAD_UNIT_SWITCH_TO, param=%s\n",
                     data[1] == 0x01 ? "RADIO" :
-                    data[1] == 0x02 ? "TAPE_OR_CD" :
+                    data[1] == 0x02 ? "INTERNAL_CD_OR_TAPE" :
                     data[1] == 0x03 ? "CD_CHANGER" :
-                    data[1] == 0x05 ? "RADIO + CD_CHANGER" :
+
+                    // TODO - or OFF? Check! I think this is the "default" mode for the head unit, to sit there and
+                    // listen to the navigation audio. Check by setting a specific volume for the navigation.
+                    data[1] == 0x05 ? "NAVIGATION_AUDIO" :
+
                     buffer
                 );
 
@@ -1688,7 +1975,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                         "    volume=%u%s, balance=%d%s, fader=%d%s, bass=%d%s, treble=%d%s\n",
                         data[2] & 0x01 ? "ON" : "OFF",
                         data[4] & 0x04 ? "CD_CHANGER" : "",
-                        data[4] & 0x02 ? "TAPE_OR_CD" : "",
+                        data[4] & 0x02 ? "INTERNAL_CD_OR_TAPE" : "",
                         data[4] & 0x01 ? "RADIO" : "",
                         data[5] & 0x7F,
                         data[5] & 0x80 ? "<UPD>" : "",
@@ -1735,7 +2022,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     "command=REQUEST_CD, param=%s\n",
                     data[1] == 0x03 ? "PLAY" :
                         data[3] == 0xFF ? "NEXT" :
-                        data[3] == 0xFF ? "PREV" :
+                        data[3] == 0xFE ? "PREV" :
                         "??"
                 );
             }
@@ -1763,13 +2050,21 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     "command=REQUEST_CD_TRACK_INFO\n"
                 );
             }
-            else // if (data[0] == 0x27)
+            else if (data[0] == 0x27)
             {
                 SERIAL.printf("preset_request band=%s, preset=%u\n",
                     //data[1] >> 4 & 0x0F,
                     RadioBandStr(data[1] >> 4),
                     data[1] & 0x0F
                 );
+            }
+            else
+            {
+                SERIAL.printf(
+                    "0x%02X [to be decoded]\n",
+                    data[0]);
+
+                return VAN_PACKET_PARSE_TO_BE_DECODED_IDEN;
             } // if
         }
         break;
@@ -1842,7 +2137,7 @@ void loop()
             // || iden == TIME_IDEN
             // || iden == AUDIO_SETTINGS_IDEN
             // || iden == MFD_STATUS_IDEN
-            // || iden == STALK_OR_SATNAV_IDEN
+            // || iden == SATNAV_GUIDANCE_IDEN
             // || iden == AIRCON_IDEN
             // || iden == AIRCON2_IDEN
             // || iden == CDCHANGER_IDEN
@@ -1882,7 +2177,7 @@ void loop()
             // && iden != TIME_IDEN
             // && iden != AUDIO_SETTINGS_IDEN
             // && iden != MFD_STATUS_IDEN
-            // && iden != STALK_OR_SATNAV_IDEN
+            // && iden != SATNAV_GUIDANCE_IDEN
             // && iden != AIRCON_IDEN
             // && iden != AIRCON2_IDEN
             // && iden != CDCHANGER_IDEN
@@ -1910,7 +2205,7 @@ void loop()
         int parseResult = ParseVanPacket(&pkt);
 
         // Show byte content only for packets that are not a duplicate of a previously received packet
-        //if (parseResult != VAN_PACKET_DUPLICATE) pkt.DumpRaw(SERIAL);
+        if (parseResult != VAN_PACKET_DUPLICATE) pkt.DumpRaw(SERIAL);
 
         // Process at most 30 packets at a time
         if (++n >= 30) break;
