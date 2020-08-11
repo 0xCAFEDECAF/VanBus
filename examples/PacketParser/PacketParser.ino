@@ -201,16 +201,19 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
+            // TODO - Always "CLOSE", even if open. Actual status of LED on dash is in packet with IDEN 0x4FC
+            // (LIGHTS_STATUS_IDEN)
+            //data[1] & 0x08 ? "door=OPEN" : "door=CLOSE",
+
             char floatBuf[3][MAX_FLOAT_SIZE];
             SERIAL.printf(
-                "dashboard_light=%s, dashboard_actual_brightness=%u; contact=%s; ignition=%s; engine=%s; door=%s;\n"
+                "dashboard_light=%s, dashboard_actual_brightness=%u; contact=%s; ignition=%s; engine=%s;\n"
                 "    economy_mode=%s; in_reverse=%s; trailer=%s; water_temp=%s; odometer=%s; ext_temp=%s\n",
                 data[0] & 0x80 ? "FULL" : "DIMMED (LIGHTS ON)",
                 data[0] & 0x0F,
                 data[1] & 0x01 ? "ACC" : "OFF",
                 data[1] & 0x02 ? "ON" : "OFF",
                 data[1] & 0x04 ? "RUNNING" : "OFF",
-                data[1] & 0x08 ? "OPEN" : "CLOSE",
                 data[1] & 0x10 ? "ON" : "OFF",
                 data[1] & 0x20 ? "YES" : "NO",
                 data[1] & 0x40 ? "PRESENT" : "NOT_PRESENT",
@@ -278,7 +281,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             SERIAL.printf("\n    - Instrument cluster: %sENABLED\n", data[0] & 0x80 ? "" : "NOT ");
             SERIAL.printf("    - Speed regulator wheel: %s\n", data[0] & 0x40 ? "ON" : "OFF");
             SERIAL.printf("%s", data[0] & 0x20 ? "    - Warning LED ON\n" : "");
-            SERIAL.printf("%s", data[0] & 0x04 ? "    - Pre-heater or Hazard warning ON\n" : "");  // TODO
+            SERIAL.printf("%s", data[0] & 0x04 ? "    - Diesel glow plugs ON\n" : "");  // TODO
             SERIAL.printf("%s", data[1] & 0x01 ? "    - Door OPEN\n" : "");
             SERIAL.printf(
                 "    - Remaing km to service: %u (dashboard shows: %u)\n",
@@ -286,39 +289,49 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 (((uint16_t)data[2] << 8 | data[3]) * 20) / 100 * 100
             );
 
-            SERIAL.printf("Automatic gearbox: %s%s%s%s\n",
-                (data[4] & 0x70) == 0x00 ? "P" :
-                    (data[4] & 0x70) == 0x10 ? "R" :
-                    (data[4] & 0x70) == 0x20 ? "N" :
-                    (data[4] & 0x70) == 0x30 ? "D" :
-                    (data[4] & 0x70) == 0x40 ? "4" :
-                    (data[4] & 0x70) == 0x50 ? "3" :
-                    (data[4] & 0x70) == 0x60 ? "2" :
-                    (data[4] & 0x70) == 0x70 ? "1" :
-                    "??",
-                data[4] & 0x08 ? " - Snow" : "",
-                data[4] & 0x04 ? " - Sport" : "",
-                data[4] & 0x80 ? " (blinking)" : ""
-            );
+            SERIAL.printf("%s", data[5] & 0x02 ? "    - Automatic gearbox ENABLED\n" : "");
+
+            if (data[5] & 0x02)
+            {
+                SERIAL.printf("    - Automatic gearbox: %s%s%s%s\n",
+                    (data[4] & 0x70) == 0x00 ? "P" :
+                        (data[4] & 0x70) == 0x10 ? "R" :
+                        (data[4] & 0x70) == 0x20 ? "N" :
+                        (data[4] & 0x70) == 0x30 ? "D" :
+                        (data[4] & 0x70) == 0x40 ? "4" :
+                        (data[4] & 0x70) == 0x50 ? "3" :
+                        (data[4] & 0x70) == 0x60 ? "2" :
+                        (data[4] & 0x70) == 0x70 ? "1" :
+                        "??",
+                    data[4] & 0x08 ? " - Snow" : "",
+                    data[4] & 0x04 ? " - Sport" : "",
+                    data[4] & 0x80 ? " (blinking)" : ""
+                );
+            } // if
 
             SERIAL.printf(
-                "Lights: %s,%s,%s,%s,%s,%s\n",
-                data[5] & 0x80 ? "DIPPED_BEAM" : "",
-                data[5] & 0x40 ? "HIGH_BEAM" : "",
-                data[5] & 0x20 ? "FOG_FRONT" : "",
-                data[5] & 0x10 ? "FOG_REAR" : "",
-                data[5] & 0x08 ? "INDICATOR_RIGHT" : "",
-                data[5] & 0x04 ? "INDICATOR_LEFT" : "");
+                "    - Lights: %s%s%s%s%s%s\n",
+                data[5] & 0x80 ? "DIPPED_BEAM " : "",
+                data[5] & 0x40 ? "HIGH_BEAM " : "",
+                data[5] & 0x20 ? "FOG_FRONT " : "",
+                data[5] & 0x10 ? "FOG_REAR " : "",
+                data[5] & 0x08 ? "INDICATOR_RIGHT " : "",
+                data[5] & 0x04 ? "INDICATOR_LEFT " : "");
 
-            SERIAL.printf("%s", data[5] & 0x02 ? "Automatic gearbox ENABLED\n" : "");
+            if (data[6] != 0xFF)
+            {
+                // If you see "29.2 Â°C", then set 'Remote character set' to 'UTF-8' in
+                // PuTTY setting 'Window' --> 'Translation'
+                SERIAL.printf("    - Oil temperature: %d °C\n", (int)data[6] - 40);
+            } // if
+            //SERIAL.printf("    - Oil temperature (2): %d °C\n", (int)data[9] - 50);  // Other possibility?
 
-            // If you see "29.2 Â°C", then set 'Remote character set' to 'UTF-8' in
-            // PuTTY setting 'Window' --> 'Translation'
-            SERIAL.printf("Oil temperature: %d °C\n", (int)data[6] - 40);  // TODO - always 0xFF
+            if (data[7] != 0xFF)
+            {
+                SERIAL.printf("Fuel level: %u %%\n", data[7]);
+            } // if
 
-            SERIAL.printf("Fuel level: %u %%\n", data[7]);  // TODO - always 0xFF
-
-            SERIAL.printf("Oil level: %s\n",
+            SERIAL.printf("    - Oil level: %s\n",
                 data[8] <= 0x0B ? "------" :
                 data[8] <= 0x19 ? "O-----" :
                 data[8] <= 0x27 ? "OO----" :
@@ -328,15 +341,18 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 "OOOOOO"
             );
 
-            SERIAL.printf("LPG fuel level: %s\n",
-                data[10] <= 0x08 ? "1" :
-                data[10] <= 0x11 ? "2" :
-                data[10] <= 0x21 ? "3" :
-                data[10] <= 0x32 ? "4" :
-                data[10] <= 0x43 ? "5" :
-                data[10] <= 0x53 ? "6" :
-                "7"
-            );
+            if (data[10] != 0xFF)
+            {
+                SERIAL.printf("LPG fuel level: %s\n",
+                    data[10] <= 0x08 ? "1" :
+                    data[10] <= 0x11 ? "2" :
+                    data[10] <= 0x21 ? "3" :
+                    data[10] <= 0x32 ? "4" :
+                    data[10] <= 0x43 ? "5" :
+                    data[10] <= 0x53 ? "6" :
+                    "7"
+                );
+            } // if
 
             if (dataLen == 14)
             {
@@ -764,7 +780,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             char floatBuf[2][MAX_FLOAT_SIZE];
             SERIAL.printf(
                 "hazard_lights=%s; door=%s; dashboard_programmed_brightness=%u, esp=%s,\n"
-                "    fuel_level_filtered=%s litre, fuel_level_raw=%s litre\n",
+                "    fuel_level_filtered=%s litre, fuel_level_raw=%s litre\n", // TODO - I think fuel level here is in % ?
                 data[0] & 0x02 ? "ON" : "OFF",
                 data[2] & 0x40 ? "LOCKED" : "UNLOCKED",
                 data[2] & 0x0F,
@@ -823,11 +839,10 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     strncpy(rdsTxt, (const char*) data + 12, 8);
                     rdsTxt[8] = 0;
 
-                    uint16_t freq_1 = (uint16_t)data[5] << 8 | data[4];
+                    uint16_t frequency = (uint16_t)data[5] << 8 | data[4];
 
-                    // data[6] & 0x1F - seems to contain PTY code
-                    // data[6] & 0x80 - bit indicating no or unknown PTY ?
-                    uint8_t ptyCode = data[6] & 0x1F;
+                    // data[11] - seems to contain PTY code
+                    uint8_t ptyCode = data[11] & 0x1F;
 
                     // data[8] and data[9] contain PI code
                     // See also:
@@ -838,26 +853,38 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     uint8_t countryCode = data[8] >> 4 & 0x0F;
 
                     // data[10] - Always 0xA1 ?
-                    // data[11] - Just before or after RDS text is received, switches from 0x00 to 0x03, 0x07, 0x09, 0x0A, 0x0E
 
-                    char floatBuf[MAX_FLOAT_SIZE];
-                    SERIAL.printf("position=%u, band=%s, scanning=%s, %smanual_scan=%s%s, %s %s, PTY=%u(%s), PI=%04X (country=%s),\n"
-                        "    %s, %s, %s, %s, \"%s\"%s\n",
-                        data[2] >> 3 & 0x0F,
-                        RadioBandStr(data[2]),
-                        data[3] & 0x10 ? "YES" : "NO",  // scanning
-                        (data[3] & 0x10) == 0 ?  "" : data[3] & 0x80 ? "scan_direction=UP, " : "scan_direction=DOWN, ",
-                        data[3] & 0x08 ? "YES" : "NO",  // manual_scan
-                        (data[2] & 0x07) != 5 ? "" : data[3] & 0x02 ? " (Dx)" : " (Lo)",  // Distant or Local (AM only)
-                        freq_1 == 0x07FF ? "---" :
-                            (data[2] & 0x07) == 5
-                                ? FloatToStr(floatBuf, freq_1, 0)  // AM, LW
-                                : FloatToStr(floatBuf, freq_1 / 20.0 + 50.0, 2),  // FM
-                        (data[2] & 0x07) == 5 ? "KHz" : "MHz",
+                    char piBuffer[40];
+                    sprintf_P(piBuffer, PSTR("%04X (country=%s)"),
+
+                        piCode,
+
+                        // https://radio-tv-nederland.nl/rds/PI%20codes%20Europe.jpg
+                        // More than one country is assigned to the same code, just listing the most likely.
+                        countryCode == 0x01 || countryCode == 0x0D ? "Germany" :
+                            countryCode == 0x02 ? "Ireland" :
+                            countryCode == 0x03 ? "Poland" :
+                            countryCode == 0x04 ? "Switzerland" :
+                            countryCode == 0x05 ? "Italy" :
+                            countryCode == 0x06 ? "Belgium" :
+                            countryCode == 0x07 ? "Luxemburg" :
+                            countryCode == 0x08 ? "Netherlands" :
+                            countryCode == 0x09 ? "Denmark" :
+                            countryCode == 0x0A ? "Austria" :
+                            countryCode == 0x0B ? "Hungary" :
+                            countryCode == 0x0C ? "UK" :
+                            countryCode == 0x0E ? "Spain" :
+                            countryCode == 0x0F ? "France" :
+                            "???"
+                        );
+
+                    char ptyBuffer[40];
+                    sprintf_P(ptyBuffer, PSTR("%u(%s)"),
+
+                        ptyCode,
 
                         // See also:
                         // https://www.electronics-notes.com/articles/audio-video/broadcast-audio/rds-radio-data-system-pty-codes.php
-                        ptyCode,
                         ptyCode == 0 ? "Not defined" :
                             ptyCode == 1 ? "News" :
                             ptyCode == 2 ? "Current affairs" :
@@ -890,34 +917,35 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                             ptyCode == 29 ? "Documentary" :
                             ptyCode == 30 ? "Alarm Test" :
                             ptyCode == 31 ? "Alarm" :
-                            "??",
+                            "??"
+                    );
 
-                        piCode,
+                    char floatBuf[MAX_FLOAT_SIZE];
+                    SERIAL.printf("position=%u, band=%s, scanning=%s%s, %smanual_scan=%s, %s %s, PTY=%s, PI=%s,\n"
+                        "    %s, %s, %s, %s, \"%s\"%s\n",
+                        data[2] >> 3 & 0x0F,
+                        RadioBandStr(data[2]),
+                        data[3] & 0x10 ? "YES" : "NO",  // scanning
 
-                        // https://radio-tv-nederland.nl/rds/PI%20codes%20Europe.jpg
-                        // More than one country is assigned to the same code, just listing the most likely.
-                        countryCode == 0x01 || countryCode == 0x0D ? "Germany" :
-                            countryCode == 0x02 ? "Ireland" :
-                            countryCode == 0x03 ? "Poland" :
-                            countryCode == 0x04 ? "Switzerland" :
-                            countryCode == 0x05 ? "Italy" :
-                            countryCode == 0x06 ? "Belgium" :
-                            countryCode == 0x07 ? "Luxemburg" :
-                            countryCode == 0x08 ? "Netherlands" :
-                            countryCode == 0x09 ? "Denmark" :
-                            countryCode == 0x0A ? "Austria" :
-                            countryCode == 0x0B ? "Hungary" :
-                            countryCode == 0x0C ? "UK" :
-                            countryCode == 0x0E ? "Spain" :
-                            countryCode == 0x0F ? "France" :
-                            "???",
+                        // Distant (Dx) or Local (Lo) for AM.
+                        // TODO - there seems to be also a bit for Lo/Dx reception for FM. Which one?
+                        (data[2] & 0x07) != 5 ? "" : data[3] & 0x02 ? " (Dx)" : " (Lo)",
 
+                        (data[3] & 0x10) == 0 ? "" : data[3] & 0x80 ? "scan_direction=UP, " : "scan_direction=DOWN, ",
+                        data[3] & 0x08 ? "YES" : "NO",  // manual_scan
+                        frequency == 0x07FF ? "---" :
+                            (data[2] & 0x07) == 5
+                                ? FloatToStr(floatBuf, frequency, 0)  // AM, LW
+                                : FloatToStr(floatBuf, frequency / 20.0 + 50.0, 2),  // FM
+                        (data[2] & 0x07) == 5 ? "KHz" : "MHz",
+                        piCode == 0xFFFF ? "---" : ptyBuffer,
+                        piCode == 0xFFFF ? "---" : piBuffer,
                         (data[2] & 0x07) == 5 ? "TA N/A" : data[7] & 0x40 ? "TA avaliable" : "NO TA availabe",
                         (data[2] & 0x07) == 5 ? "RDS N/A" : data[7] & 0x20 ? "RDS available" : "NO RDS available",
                         (data[2] & 0x07) == 5 ? "TA N/A" : data[7] & 0x02 ? "TA ON" : "TA OFF",
                         (data[2] & 0x07) == 5 ? "RDS N/A" : data[7] & 0x01 ? "RDS ON" : "RDS OFF",
                         rdsTxt,
-                        data[7] & 0x80 ? " --> Info Trafic!" : ""
+                        data[7] & 0x80 ? "\n    --> Info Trafic!" : ""
                     );
 
                 }
@@ -1078,8 +1106,8 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             } // if
 
             SERIAL.printf(
-                "seq=%u, audio_menu=%s, loudness=%s, auto_volume=%s, ext_mute=%s, mute=%s, power=%s, tape=%s,\n"
-                "    cd=%s, source=%s, volume=%u%s, balance=%d%s, fader=%d%s, bass=%d%s, treble=%d%s\n",
+                "seq=%u, audio_menu=%s, loudness=%s, auto_volume=%s, ext_mute=%s, mute=%s, power=%s,\n"
+                "    tape=%s, cd=%s, source=%s, volume=%u%s, balance=%d%s, fader=%d%s, bass=%d%s, treble=%d%s\n",
                 data[0] & 0x07,
                 data[1] & 0x20 ? "OPEN" : "CLOSED",
                 data[1] & 0x10 ? "ON" : "OFF",
@@ -1087,14 +1115,15 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 data[1] & 0x02 ? "ON" : "OFF",
                 data[1] & 0x01 ? "ON" : "OFF",
                 data[2] & 0x01 ? "ON" : "OFF",
-                data[4] & 0x20 ? "PRESENT" : "NOT PRESENT",
-                data[4] & 0x40 ? "PRESENT" : "NOT PRESENT",
+                data[4] & 0x20 ? "PRESENT" : "NOT_PRESENT",
+                data[4] & 0x40 ? "PRESENT" : "NOT_PRESENT",
                 (data[4] & 0x0F) == 0x01 ? "RADIO" :
                     (data[4] & 0x0F) == 0x02 ? "INTERNAL_CD_OR_TAPE" :
                     (data[4] & 0x0F) == 0x03 ? "CD_CHANGER" :
 
-                    // TODO - or OFF? Check! I think this is the "default" mode for the head unit, to sit there and
-                    // listen to the navigation audio. Check by setting a specific volume for the navigation.
+                    // This is the "default" mode for the head unit, to sit there and listen to the navigation
+                    // audio. The navigation audio volume is also always set (usually a lot higher than the radio)
+                    // whenever this source is chosen.
                     (data[4] & 0x0F) == 0x05 ? "NAVIGATION_AUDIO" :
 
                     "???",
@@ -1164,6 +1193,8 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             //
             // Possible meanings of data:
             // - data[0] & 0x0F , data[15] & 0x0F = sequence number
+            // - data[2] = number of icon to be shown on MFD ??
+            //   - 0x81 : turn right
             // - data[9] << 8 | data[10] = number of meters before turn
 
             uint16_t metersBeforeTurn = (uint16_t)data[9] << 8 | data[10];
@@ -1245,8 +1276,8 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
             char floatBuf[2][MAX_FLOAT_SIZE];
             SERIAL.printf(
-                "auto=%s; enabled=%s; rear_window=%s; aircon_compressor=%s; air_con_key=%s; interiorTemperature=%s, "
-                "evaporatorTemperature=%s\n",
+                "auto=%s; enabled=%s; rear_window=%s; aircon_compressor=%s; air_con_key=%s;\n"
+                "    interiorTemperature=%s, evaporatorTemperature=%s\n",
                 data[0] & 0x80 ? "AUTO" : "MANUAL",
                 data[0] & 0x40 ? "YES" : "NO",
                 data[0] & 0x20 ? "ON" : "OFF",
@@ -1432,17 +1463,27 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             //   - Strings: terminated with '\0'
             //     - Special characters:
             //       * 0x81 = '+' in solid circle, means: this destination cannot be selected with the current
-            //         navigation disc.
+            //         navigation disc. Something from UTF-8 ?
+            //         See also U+2A01 (UTF-8 0xe2 0xa8 0x81) at:
+            //         https://www.utf8-chartable.de/unicode-utf8-table.pl?start=10752&number=1024&utf8=0x&htmlent=1
+            //
+            // Character set is "Extended ASCII/Windows-1252"; e.g. ë is 0xEB.
+            // See also: https://bytetool.web.app/en/ascii/
             //
             // Address format:
-            // - Always starts with "V" (Ville?)
+            // - Atarts with "V" (Ville?) or "C" (Country?)
             // - Country
             // - Province
             // - City
             // - District (or empty)
             // - String "G" which can be followed by text that is not important for searching on, e.g. "GRue de"
             // - Street name
-            // - House number (or "0" if unknown)
+            // - Either:
+            //   - House number (or "0" if unknown), or
+            //   - GPS coordinates (e.g. "+495456", "+060405"). Note that these coordinates are in degrees, NOT in
+            //     decimal notation. So the just given example would translate to: 49°54'56"N 6°04'05"E. There
+            //     seems to be however some offset, because the shown GPS coordinates do not exactly match the
+            //     destination.
 
             #define MAX_SATNAV_STRING_SIZE 128
             static char buffer[128];
@@ -1529,12 +1570,12 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             {
                 for (int bit = 0; bit < (byte == 3 ? 2 : 8); bit++)
                 {
-                    SERIAL.printf("%c ", data[byte + 17] >> bit & 0x01 ? 65 + 8 * byte + bit : '.');
+                    SERIAL.printf("%c", data[byte + 17] >> bit & 0x01 ? 65 + 8 * byte + bit : '.');
                 } // for
             } // for
 
             // Special character '
-            SERIAL.printf("%c ", data[21] >> 6 & 0x01 ? '\'' : '.');
+            SERIAL.printf("%c", data[21] >> 6 & 0x01 ? '\'' : '.');
 
             // Available numbers are bit-coded in bytes 20...21, starting with '0' at bit 2 of byte 20, ending
             // with '9' at bit 3 of byte 21
@@ -1542,12 +1583,12 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             {
                 for (int bit = (byte == 0 ? 2 : 0); bit < (byte == 1 ? 3 : 8); bit++)
                 {
-                    SERIAL.printf("%c ", data[byte + 20] >> bit & 0x01 ? 48 + 8 * byte + bit - 2 : '.');
+                    SERIAL.printf("%c", data[byte + 20] >> bit & 0x01 ? 48 + 8 * byte + bit - 2 : '.');
                 } // for
             } // for
 
             // <Space>, printed as '_'
-            SERIAL.printf("%c ", data[22] >> 1 & 0x01 ? '_' : '.');
+            SERIAL.printf("%c", data[22] >> 1 & 0x01 ? '_' : '.');
 
             SERIAL.println();
         }
@@ -1583,14 +1624,35 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // Possible meanings of data:
 
             // data[0] & 0x07 - sequence number
-            // data[1] can be: 0x11, 0x15, 0x20, 0x21, 0x25
+            //
+            // data[1] values:
+            // - 0x11 - Stopping guidance ??
+            // - 0x15 - In guidance mode ??
+            // - 0x20 - Idle, not ready ??
+            // - 0x21 - Idle, ready ??
+            // - 0x25 - Busy calculating route ??
+            // Or bits:
             // - & 0x01 - ??
+            // - & 0x04 - ??
+            // - & 0x10 - ??
             // - & 0x20 - ??
-            // data[2] can be: 0x38, 0x39 or 0x3C
+            //
+            // data[2] values: 0x38, 0x39 or 0x3C
+            // Bits:
             // - & 0x01 - ??
             // - & 0x04 - ??
             // - & 0x08 - ??
-            // data[17] is either 0x00, 0x20, 0x21, 0x22, 0x28 or 0x30
+            //
+            // data[9] << 8 | data[10] - some kind of distance value ?? Seen 0x1F4 (500) for destination 100 km away
+            //
+            // data[17] values: 0x00, 0x20, 0x21, 0x22, 0x28, 0x2A, 0x2C, 0x2D, 0x30 or 0x38
+            // Bits:
+            // - & 0x01 - Showing terms and conditions (disclaimer) ??
+            // - & 0x02 - Audio output ??
+            // - & 0x04 - New instruction ??
+            // - & 0x08 - Reading disc ??
+            // - & 0x10 - Calculating route ??
+            // - & 0x20 - Disc present ??
 
             uint16_t status = (uint16_t)data[1] << 8 | data[2];
 
@@ -1599,7 +1661,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
             // TODO - check; total guess
             SERIAL.printf(
-                "status=%s\n",
+                "status=%s; disc_status=%s%s%s%s%s%s, distance=%u\n",
                 status == 0x2038 ? "CD_ROM_FOUND" :
                     status == 0x203C ? "INITIALIZING" :  // data[17] == 0x28
                     status == 0x213C ? "READING_CDROM" :
@@ -1609,8 +1671,15 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     status == 0x2539 ? "CALCULATING_ROUTE" :
                     status == 0x1539 ? "GUIDANCE_ACTIVE" :
                     status == 0x1139 ? "GUIDANCE_STOPPED" :
-                    status == 0x2039 ? "POWERING_OFF" :
-                    buffer
+                    status == 0x2039 ? "POWER_OFF" :
+                    buffer,
+                data[17] & 0x01 ? "SHOWING_TERMS_AND_CONDITIONS " : "",
+                data[17] & 0x02 ? "AUDIO_OUTPUT " : "",
+                data[17] & 0x04 ? "NEW_GUIDANCE_INSTRUCTION " : "",
+                data[17] & 0x08 ? "READING_DISC " : "",
+                data[17] & 0x10 ? "CALCULATING_ROUTE " : "",
+                data[17] & 0x20 ? "DISC_PRESENT" : "",
+                (uint16_t)data[9] << 8 | data[10]
             );
         }
         break;
@@ -1697,11 +1766,8 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
             uint16_t request = (uint16_t)data[0] << 8 | data[1];
 
-            char buffer[2];
-            sprintf_P(buffer, PSTR("%c"), data[3]);
-
             SERIAL.printf(
-                "request=%s (0x%04X) (%s?), command=%d, letter=%s",
+                "request=%s (0x%04X) (%s?), type=%d(%s)",
                 SatNavRequestStr(data[0]),
                 request,
                 request == 0x021D ? "ENTER_CITY" : // 4, 9 or 11 bytes
@@ -1736,25 +1802,37 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
                 // Possible meanings:
                 // * request == 0x021D:
-                //   - command = 1: request list starting at data[5] << 8 | data[6], length in data[7] << 8 | data[8]
-                //   - command = 2: choose line in data[5] << 8 | data[6]
+                //   - type = 1: request list starting at data[5] << 8 | data[6], length in data[7] << 8 | data[8]
+                //   - type = 2: choose line in data[5] << 8 | data[6]
                 // * request == 0x080D:
-                //   - command = 2: choose line in data[5] << 8 | data[6]
+                //   - type = 2: choose line in data[5] << 8 | data[6]
                 // * request == 0x08FF:
-                //   - command = 1: request list starting at data[5] << 8 | data[6], length in data[7] << 8 | data[8]
+                //   - type = 1: request list starting at data[5] << 8 | data[6], length in data[7] << 8 | data[8]
 
                 data[2],
-
-                (data[3] >= 'A' && data[3] <= 'Z') || (data[3] >= '0' && data[3] <= '9') || data[3] == '\'' ? buffer :
-                    data[3] == ' ' ? "_" : // Space
-                    data[3] == 0x01 ? "Esc" :
+                data[2] == 0x00 ? "REQ_LIST_LENGTH" :
+                    data[2] == 0x01 ? "REQ_LIST" :
+                    data[2] == 0x02 ? "CHOOSE_LINE" :
                     "??"
             );
+
+            if (data[3] != 0x00)
+            {
+                char buffer[2];
+                sprintf_P(buffer, PSTR("%c"), data[3]);
+                SERIAL.printf(
+                    ", letter=%s",
+                    (data[3] >= 'A' && data[3] <= 'Z') || (data[3] >= '0' && data[3] <= '9') || data[3] == '\'' ? buffer :
+                        data[3] == ' ' ? "_" : // Space
+                        data[3] == 0x01 ? "Esc" :
+                        "??"
+                );
+            } // if
 
             if (dataLen >= 9)
             {
                 SERIAL.printf(
-                    ", select_from_list=%u, length=%u",
+                    ", select_from=%u, select_length=%u",
                     (uint16_t)data[5] << 8 | data[6],
                     (uint16_t)data[7] << 8 | data[8]
                 );
