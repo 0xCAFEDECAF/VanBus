@@ -65,7 +65,7 @@ int RECV_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
 VanBus.Setup(RECV_PIN);
 ```
 
-Add the following line at the beginning of your main loop ```void loop()```:
+Add the following line to your main loop ```void loop()```:
 ```
 TVanPacketRxDesc pkt;
 if (VanBus.Receive(pkt)) pkt.DumpRaw(Serial);
