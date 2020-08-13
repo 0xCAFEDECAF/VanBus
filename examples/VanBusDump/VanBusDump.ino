@@ -60,6 +60,10 @@
 
 #include <VanBus.h>
 
+#if defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
+// For ESP-01 board we use GPIO 2 (internal pull-up, keep high at boot time)
+#define D2 (2)
+#endif
 int RECV_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
 
 void setup()
