@@ -121,6 +121,8 @@ For background reading:
 - https://www.amazon.com/bus-VAN-vehicle-area-network/dp/2100031600
 - http://milajda22.sweb.cz/Manual_k_ridici_jednotce.pdf#page=17
 - https://github.com/morcibacsi/VanAnalyzer/
+- [Atmel TSS463C VAN Data Link Controller with Serial Interface]
+- [Multiplexed BSI Operating Principle for the Xsara Picasso And Xsara - The VAN protocol]
 
 The following methods are available for ```TVanPacketRxDesc``` packet objects as obtained from
 ```VanBus.Receive(...)```:
@@ -242,3 +244,5 @@ Do whatever you like with it, but contributions are appreciated!
 [SN65HVD230]: https://www.ti.com/lit/ds/symlink/sn65hvd230.pdf?ts=1592992149874&ref_url=https%253A%252F%252Fwww.google.nl%252F
 [voltage divider]: https://www.quora.com/How-many-pins-on-Arduino-Uno-give-a3-3v-pin-output
 [ESP32 RMT peripheral Vehicle Area Network (VAN bus) reader]: https://github.com/morcibacsi/esp32_rmt_van_rx
+[Atmel TSS463C VAN Data Link Controller with Serial Interface]: http://ww1.microchip.com/downloads/en/DeviceDoc/doc7601.pdf
+[Multiplexed BSI Operating Principle for the Xsara Picasso And Xsara - The VAN protocol]: http://milajda22.sweb.cz/Manual_k_ridici_jednotce.pdf#page=17
