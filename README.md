@@ -195,6 +195,22 @@ Example of output:
 
     Raw: #0002 ( 2/15) 16 0E 4D4 RA0 82-0C-01-00-11-00-3F-3F-3F-3F-82-7B-A4 ACK OK 7BA4 CRC_OK
 
+Example of dumping into a char array:
+
+    const char* PacketRawToStr(TVanPacketRxDesc& pkt)
+    {
+        static char dumpBuffer[MAX_DUMP_RAW_SIZE];
+        
+        GString str(dumpBuffer);
+        PrintAdapter streamer(str);
+        pkt.DumpRaw(streamer, '\0');
+        
+        return dumpBuffer;
+    }
+
+Note: for this, you will need to install the [PrintEx](https://github.com/Chris--A/PrintEx) library. I tested with
+version 1.2.0 .
+
 ### 9. ```const TIsrDebugPacket& getIsrDebugPacket()``` <a name = "getIsrDebugPacket"></a>
 
 Retrieves a debug structure that can be used to analyse (observed) bit timings.

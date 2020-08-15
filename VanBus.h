@@ -114,7 +114,16 @@ class TVanPacketRxDesc
     bool CheckCrc() const;
     bool CheckCrcAndRepair();  // Yes, we can sometimes repair a packet by flipping a single bit
     void DumpRaw(Stream& s, char last = '\n') const;
+
+    // Example of the longest string that can be dumped (not realistic):
+    // Raw: #1234 (123/123) 33 0E ABC RA0 01-02-03-04-05-06-07-08-09-10-11-12-13-14-15-16-17-18-19-20-21-22-23-24-25-26-27-28 NO_ACK ERROR_MAX_PACKET 1234 CRC_ERROR
+    // + 1 for terminating '\0'
+    #define MAX_DUMP_RAW_SIZE (73 + MAX_DATA_BYTES * 3 + 1)
+
     const TIsrDebugPacket& getIsrDebugPacket() const { return isrDebugPacket; }
+
+    // String representation of various fields.
+    // Note: make sure to check MAX_DUMP_RAW_SIZE when making changes to any of the ...Str() methods.
     const char* FlagsStr() const
     {
         // Note: statically allocated buffer, so don't call twice within the same printf invocation

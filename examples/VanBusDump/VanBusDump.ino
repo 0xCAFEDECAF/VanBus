@@ -42,19 +42,19 @@
  *
  * Legend:
  *
- * Raw: #0002 (2/15) 16 0E 4D4 RA0 82-0C-01-00-11-00-3F-3F-3F-3F-82-7B-A4 ACK OK 7BA4 CRC_OK
- *         |     |    |  |  |   |   |                             |   |    |   |   |    |
- *         |     |    |  |  |   |   |                             |   |    |   |   |    +-- Packet CRC value is correct
- *         |     |    |  |  |   |   |                             |   |    |   |   +-- Calculated CRC value
- *         |     |    |  |  |   |   |                             |   |    |   +-- Packet read result is OK
- *         |     |    |  |  |   |   |                             |   |    +-- Packet was ACKnowledged by receiver
- *         |     |    |  |  |   |   |                             |   +--------------- CRC value in packet
- *         |     |    |  |  |   |   +<-------- Packet data ------>+
- *         |     |    |  |  |   +--- "Command" FLAGS field; "R" = Read; "A" = requesting Ack; "0" = no RTR
- *         |     |    |  |  +--- IDEN field
- *         |     |    |  +--- SOF field (always 0x0E)
- *         |     |    +--- Total number of bytes in packet
- *         |     +--- Occupied slot in circular RX queue
+ * Raw: #0002 ( 2/15) 16 0E 4D4 RA0 82-0C-01-00-11-00-3F-3F-3F-3F-82-7B-A4 ACK OK 7BA4 CRC_OK
+ *         |    |      |  |  |   |   |                             |   |    |   |   |    |
+ *         |    |      |  |  |   |   |                             |   |    |   |   |    +-- Packet CRC value is correct
+ *         |    |      |  |  |   |   |                             |   |    |   |   +-- Calculated CRC value
+ *         |    |      |  |  |   |   |                             |   |    |   +-- Packet read result is OK
+ *         |    |      |  |  |   |   |                             |   |    +-- Packet was ACKnowledged by receiver
+ *         |    |      |  |  |   |   |                             |   +--------------- CRC value in packet
+ *         |    |      |  |  |   |   +<-------- Packet data ------>+
+ *         |    |      |  |  |   +--- "Command" FLAGS field; "R" = Read; "A" = requesting Ack; "0" = no RTR
+ *         |    |      |  |  +--- IDEN field
+ *         |    |      |  +--- SOF field (always 0x0E)
+ *         |    |      +--- Total number of bytes in packet
+ *         |    +--- Occupied slot in circular RX queue
  *         +--- Packet sequence number (modulo 10000)
  */
 
@@ -83,5 +83,13 @@ void loop()
 
         // Show byte content of packet
         pkt.DumpRaw(Serial);
+    } // if
+
+    // Print some boring statistics every minute or so
+    static unsigned long lastUpdate = 0;
+    if (millis() - lastUpdate >= 60000UL) // Arithmetic has safe roll-over
+    {
+        lastUpdate = millis();
+        VanBus.DumpStats(Serial);
     } // if
 } // loop

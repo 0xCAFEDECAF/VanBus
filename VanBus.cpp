@@ -122,13 +122,13 @@ bool TVanPacketRxDesc::CheckCrcAndRepair()
     return false;
 } // TVanPacketRxDesc::CheckCrcAndRepair
 
-// Dumps the raw packet bytes to a stream.
+// Dumps the raw packet bytes to a stream (e.g. 'Serial').
 // Optionally specify the last character; default is "\n" (newline).
 void TVanPacketRxDesc::DumpRaw(Stream& s, char last) const
 {
     s.printf("Raw: #%04u (%*u/%u) %2d ",
         seqNo % 10000,
-        RX_QUEUE_SIZE > 100 ? 3 : RX_QUEUE_SIZE > 10 ? 2 : 1,  // All compile-time stuff
+        RX_QUEUE_SIZE > 100 ? 3 : RX_QUEUE_SIZE > 10 ? 2 : 1,  // This is all compile-time
         isrDebugPacket.samples[0].slot,
         RX_QUEUE_SIZE,
         size);
@@ -158,7 +158,7 @@ void TVanPacketRxQueue::Setup(uint8_t rxPin)
     timer1_attachInterrupt(WaitAckIsr);
 } // TVanPacketRxQueue::Setup
 
-// Copy a VAN packet out of the receive queue, if available. Otherwise, returns ```false```.
+// Copy a VAN packet out of the receive queue, if available. Otherwise, returns false.
 // Optionally, passes queue overrun condition into 'isQueueOverrun'.
 bool TVanPacketRxQueue::Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun)
 {

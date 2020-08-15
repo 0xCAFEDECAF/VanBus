@@ -395,9 +395,9 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // Raw: #7970 (10/15) 7 0E 8C4 WA0 52-20-A8-0E ACK OK A80E CRC_OK
 
             // Most of these packets are the same. So print only if not duplicate of previous packet.
-            static uint8_t packetData[MAX_DATA_BYTES] = "";  // Previous packet data
-            if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
-            memcpy(packetData, data, dataLen);
+            // static uint8_t packetData[MAX_DATA_BYTES] = "";  // Previous packet data
+            // if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
+            // memcpy(packetData, data, dataLen);
 
             if (dataLen < 1 || dataLen > 3)
             {
@@ -409,6 +409,9 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (data[0] == 0x8A)
             {
+                // TODO - is this really head unit reporting? Sometimes it seems the opposite: MFD reporting what it is
+                // showing on screen.
+
                 SERIAL.print("Head unit: ");
 
                 if (dataLen != 3)
@@ -431,9 +434,9 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 SERIAL.printf(
                     "%s\n",
                     data[1] == 0x20 ? "RADIO_INFO" :
-                    data[1] == 0x21 ? "RADIO_AUDIO_SETTINGS" :
+                    data[1] == 0x21 ? "RADIO_AUDIO_VOLUME_UPDATE_ANNOUNCEMENT" :
                     data[1] == 0x22 ? "BUTTON_PRESS_INFO" :
-                    data[1] == 0x24 ? "RADIO_SEARCHING" :
+                    data[1] == 0x24 ? "RADIO_TUNER_UPDATE_ANNOUNCEMENT" :
                     data[1] == 0x30 ? "CD_TRACK_FOUND" :
                     data[1] == 0x40 ? "RADIO_PRESET_INFO" :
                     data[1] == 0xC0 ? "INTERNAL_CD_OR_TAPE_INFO" :
@@ -1189,7 +1192,12 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
             SERIAL.printf(
                 "%s\n",
+
+                // hmmm... MFD can also be ON if this is reported; this happens e.g. in the "minimal VAN network" test
+                // setup with only the head unit (radio) and MFD. Maybe this is a status report: the MFD shows if it is
+                // connected to e.g. the BSI?
                 data[0] == 0x00 && data[1] == 0xFF ? "MFD_SCREEN_OFF" :
+
                     data[0] == 0x20 && data[1] == 0xFF ? "MFD_SCREEN_ON" :
                     buffer
             );
