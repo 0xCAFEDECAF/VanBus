@@ -103,7 +103,7 @@ inline uint8_t GetBcd(uint8_t bcd)
     return (bcd >> 4 & 0x0F) * 10 + (bcd & 0x0F);
 } // GetBcd
 
-const char* RadioBandStr(uint8_t data)
+const char* TunerBandStr(uint8_t data)
 {
     return
         (data & 0x07) == 0 ? "NONE" :
@@ -113,7 +113,7 @@ const char* RadioBandStr(uint8_t data)
             (data & 0x07) == 4 ? "FMAST" :
             (data & 0x07) == 5 ? "AM" :
             "??";
-} // RadioBandStr
+} // TunerBandStr
 
 const char* SatNavRequestStr(uint8_t data)
 {
@@ -394,11 +394,6 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // Raw: #7820 (10/15) 8 0E 8C4 WA0 8A-21-40-3D-54 ACK OK 3D54 CRC_OK
             // Raw: #7970 (10/15) 7 0E 8C4 WA0 52-20-A8-0E ACK OK A80E CRC_OK
 
-            // Most of these packets are the same. So print only if not duplicate of previous packet.
-            // static uint8_t packetData[MAX_DATA_BYTES] = "";  // Previous packet data
-            // if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
-            // memcpy(packetData, data, dataLen);
-
             if (dataLen < 1 || dataLen > 3)
             {
                 SERIAL.println("[unexpected packet length]");
@@ -409,8 +404,8 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (data[0] == 0x8A)
             {
-                // TODO - is this really head unit reporting? Sometimes it seems the opposite: MFD reporting what it is
-                // showing on screen.
+                // I'm sure that these messages are sent by the head unit: when no other device than the head unit is
+                // on the bus, these packets are seen (unACKed).
 
                 SERIAL.print("Head unit: ");
 
@@ -425,27 +420,45 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 // 0x02 - Button press info
                 // 0x04 - Searching (CD track or radio station)
                 // 0x08 - 
-                // 0xF0 - 0x20 = Radio
+                // 0xF0 - 0x20 = Tuner (radio)
                 //      - 0x30 = CD track found
-                //      - 0x40 = Radio preset
-                //      - 0xC0 = Internal CD or cassette tape info
+                //      - 0x40 = Tuner preset
+                //      - 0xC0 = CD or tape info
                 //      - 0xD0 = CD track info
 
-                SERIAL.printf(
-                    "%s\n",
-                    data[1] == 0x20 ? "RADIO_INFO" :
-                    data[1] == 0x21 ? "RADIO_AUDIO_VOLUME_UPDATE_ANNOUNCEMENT" :
-                    data[1] == 0x22 ? "BUTTON_PRESS_INFO" :
-                    data[1] == 0x24 ? "RADIO_TUNER_UPDATE_ANNOUNCEMENT" :
-                    data[1] == 0x30 ? "CD_TRACK_FOUND" :
-                    data[1] == 0x40 ? "RADIO_PRESET_INFO" :
-                    data[1] == 0xC0 ? "INTERNAL_CD_OR_TAPE_INFO" :
-                    data[1] == 0xC1 ? "INTERNAL_CD_OR_TAPE_AUDIO_SETTINGS" :
-                    data[1] == 0xC4 ? "INTERNAL_CD_OR_TAPE_SEARCHING" :
-                    data[1] == 0xD0 ? "CD_TRACK_INFO" :
-                    "??"
-                );
+                // SERIAL.printf(
+                    // "%s\n",
+                    // data[1] == 0x20 ? "RADIO_INFO" :
+                    // data[1] == 0x21 ? "RADIO_AUDIO_VOLUME_UPDATE_ANNOUNCEMENT" :
+                    // data[1] == 0x22 ? "BUTTON_PRESS_INFO" :
+                    // data[1] == 0x24 ? "RADIO_TUNER_UPDATE_ANNOUNCEMENT" :
+                    // data[1] == 0x30 ? "CD_TRACK_FOUND" :
+                    // data[1] == 0x40 ? "RADIO_PRESET_INFO" :
+                    // data[1] == 0xC0 ? "INTERNAL_CD_OR_TAPE_INFO" :
+                    // data[1] == 0xC1 ? "INTERNAL_CD_OR_TAPE_AUDIO_SETTINGS" :
+                    // data[1] == 0xC4 ? "INTERNAL_CD_OR_TAPE_SEARCHING" :
+                    // data[1] == 0xD0 ? "CD_TRACK_INFO" :
+                    // "??"
+                // );
 
+                SERIAL.printf(
+                    "%s - %s\n",
+                    (data[1] & 0xF0) == 0x20 ? "TUNER_OR_CD_CHANGER" :
+                        (data[1] & 0xF0) == 0x30 ? "CD_PLAYING" :
+                        (data[1] & 0xF0) == 0x40 ? "TUNER_PRESET" :
+                        (data[1] & 0xF0) == 0xC0 ? "CD_OR_TAPE" :
+                        (data[1] & 0xF0) == 0xD0 ? "CD_TRACK" :
+                        "??",
+                    (data[1] & 0x0F) == 0x00 ? "REPLY" :
+
+                        // When the following messages are ACK'ed, a report will follow, e.g.
+                        // 0x4D4 (AUDIO_SETTINGS_IDEN) or 0x554 (HEAD_UNIT_IDEN). When not ACK'ed, will retry a few
+                        // times.
+                        (data[1] & 0x0F) == 0x01 ? "AUDIO_SETTINGS_ANNOUNCE" :  // max 3 retries
+                        (data[1] & 0x0F) == 0x02 ? "BUTTON_PRESS_ANNOUNCE" :  // max 6 retries
+                        (data[1] & 0x0F) == 0x04 ? "STATUS_UPDATE_ANNOUNCE" :  // max 3 retries
+                        "??"
+                );
                 if ((data[1] & 0x0F) == 0x02)
                 {
                     char buffer[5];
@@ -465,7 +478,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                             (data[2] & 0x1F) == 0x14 ? "SEEK_FORWARD" :
                             (data[2] & 0x1F) == 0x16 ? "AUDIO" :
                             (data[2] & 0x1F) == 0x17 ? "MAN" :
-                            (data[2] & 0x1F) == 0x1B ? "RADIO" :
+                            (data[2] & 0x1F) == 0x1B ? "TUNER" :
                             (data[2] & 0x1F) == 0x1C ? "TAPE" :
                             (data[2] & 0x1F) == 0x1D ? "INTERNAL_CD" :
                             (data[2] & 0x1F) == 0x1E ? "CD_CHANGER" :
@@ -483,7 +496,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
-                SERIAL.print("CD-changer info done\n");
+                SERIAL.print("CD-changer: STATUS_UPDATE_ANNOUNCE\n");
             }
             else if (data[0] == 0x07)
             {
@@ -493,8 +506,12 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
-                // Unknown what this is. MFD reporting what it is showing??
-                // 
+                // Unknown what this is. Surely not the MFD and not the head unit. Could be:
+                // - Aircon panel
+                // - CD changer (seems unlikely)
+                // - SatNav system
+                // - Instrument panel
+
                 // data[1] seems a bit pattern. Bits seen:
                 //  & 0x01
                 //  & 0x02
@@ -522,7 +539,12 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
-                // Unknown what this is
+                // Unknown what this is. Surely not the MFD and not the head unit.
+                // Seems to be sent more often when engine is running. Could be:
+                // - Aircon panel
+                // - CD changer (seems unlikely)
+                // - SatNav system
+                // - Instrument panel
                 //
                 // data[1] is usually 0x08, sometimes 0x20
                 //  & 0x08
@@ -806,13 +828,15 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
         {
             // http://graham.auld.me.uk/projects/vanbus/packets.html#554
 
+            // These packets are sent by the head unit
+
             uint8_t seq = data[0];
             uint8_t infoType = data[1];
 
             // Head Unit info types
             enum HeatUnitInfoType_t
             {
-                INFO_TYPE_RADIO = 0xD1,
+                INFO_TYPE_TUNER = 0xD1,
                 INFO_TYPE_TAPE,
                 INFO_TYPE_PRESET,
                 INFO_TYPE_CDCHANGER = 0xD5, // TODO - Not sure
@@ -821,9 +845,9 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
             switch (infoType)
             {
-                case INFO_TYPE_RADIO:
+                case INFO_TYPE_TUNER:
                 {
-                    // Message when the HeadUnit is in "radio" (tuner) mode
+                    // Message when the HeadUnit is in "tuner" (radio) mode
 
                     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#554_1
 
@@ -837,7 +861,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
                     memcpy(packetData, data, dataLen);
 
-                    SERIAL.print("--> Radio info: ");
+                    SERIAL.print("--> Tuner info: ");
 
                     // TODO - some web pages show 22 bytes data, some 23
                     if (dataLen != 22)
@@ -848,27 +872,34 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
                     uint16_t frequency = (uint16_t)data[5] << 8 | data[4];
 
-                    // data[6] - Reception status? Like: receiving station? stereo?
+                    // data[6] - Reception status? Like: receiving station? Stereo? RDS bits like MS, TP, TA, AF?
                     // & 0xF0:
-                    //   - Usually 0x00
-                    //   - When tuning in to a station, switches to e.g. 0x20, 0x60, but (usually) ends up 0x00
-                    // & 0x0F:
-                    //   - Always 0x0F during a non-manual scan
-                    //   - Seems to be different per station (type?)
-                    //   - Signal strength? Increases with antenna plugged in and decreases with antenna plugged out.
-                    //     Updated when a station is being tuned in to, or when the MAN button is pressed.
+                    //   - Usually 0x00 when tuned in to a "normal" station.
+                    //   - One or more bits stay '1' when tuned in to a "crappy" station (e.g. pirate).
+                    //   - During the process of tuning in to another station, switches to e.g. 0x20, 0x60, but
+                    //     (usually) ends up 0x00.
+                    // & 0x10 --> Looking for RDS text?
+                    // & 0x20 --> Looking for RDS text?
+                    // & 0x40 --> Looking for PI info?
+                    // & 0x80 --> Looking for PTY info?
+                    //
+                    // & 0x0F = signal strength: increases with antenna plugged in and decreases with antenna plugged
+                    //          out. Updated when a station is being tuned in to, or when the MAN button is pressed.
                     char signalStrengthBuffer[3];
                     sprintf_P(signalStrengthBuffer, PSTR("%u"), data[6] & 0x0F);
 
-                    // data[7] - ?? Often seen values: 0x60, 0x63
+                    // data[7] - ?? Often seen values: 0x00, 0x60, 0x63
 
-                    // data[8] and data[9] contain PI code
+                    // data[8] and data[9] contain PI code.
                     // See also:
                     // - https://en.wikipedia.org/wiki/Radio_Data_System#Program_Identification_Code_(PI_Code),
                     // - https://radio-tv-nederland.nl/rds/rds.html
                     // - https://people.uta.fi/~jk54415/dx/pi-codes.html
+                    // - http://poupa.cz/rds/countrycodes.htm
+                    // - https://www.pira.cz/rds/p232man.pdf
                     uint16_t piCode = (uint16_t)data[8] << 8 | data[9];
                     uint8_t countryCode = data[8] >> 4 & 0x0F;
+                    uint8_t coverageCode = data[8] & 0x0F;
 
                     // data[10] - Always 0xA1 ?
 
@@ -879,7 +910,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     rdsTxt[8] = 0;
 
                     char piBuffer[40];
-                    sprintf_P(piBuffer, PSTR("%04X(%s)"),
+                    sprintf_P(piBuffer, PSTR("%04X(%s, %s)"),
 
                         piCode,
 
@@ -899,8 +930,13 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                             countryCode == 0x0C ? "UK" :
                             countryCode == 0x0E ? "Spain" :
                             countryCode == 0x0F ? "France" :
-                            "???"
-                        );
+                            "???",
+                        coverageCode == 0x00 ? "local" :
+                            coverageCode == 0x01 ? "international" :
+                            coverageCode == 0x02 ? "national" :
+                            coverageCode == 0x03 ? "supra-regional" :
+                            "regional"
+                    );
 
                     char ptyBuffer[40];
                     sprintf_P(ptyBuffer, PSTR("%u(%s)"),
@@ -948,7 +984,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     SERIAL.printf("position=%u, band=%s, scanning=%s%s, %smanual_scan=%s, %s %s, strength=%s, PTY=%s, PI=%s,\n"
                         "    %s, %s, %s, %s, \"%s\"%s\n",
                         data[2] >> 3 & 0x0F,
-                        RadioBandStr(data[2]),
+                        TunerBandStr(data[2]),
                         data[3] & 0x10 ? "YES" : "NO",  // scanning
 
                         // Scan mode: distant (Dx) or local (Lo)
@@ -990,7 +1026,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     SERIAL.printf("%s, %s, %s, %s\n",
                         data[2] & 0x10 ? "FAST FORWARD" : "",
                         data[2] & 0x30 ? "FAST REWIND" : "",
-                        data[2] & 0x0C == 0x0C ? "PLAYING" : data[2] & 0x0C == 0x00 ? "STOPPED"  : "??",
+                        data[2] & 0x0C == 0x0C ? "PLAY" : data[2] & 0x0C == 0x00 ? "STOP"  : "??",
                         data[2] & 0x01 ? "SIDE 1" : "SIDE 2"
                     );
                 }
@@ -1000,7 +1036,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 {
                     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#554_3
 
-                    SERIAL.print("--> Radio preset info: ");
+                    SERIAL.print("--> Tuner preset info: ");
 
                     if (dataLen != 12)
                     {
@@ -1013,7 +1049,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     rdsOrFreqTxt[8] = 0;
 
                     SERIAL.printf("band=%s, memory=%u, %s=\"%s\"\n",
-                        RadioBandStr(data[2] >> 4 & 0x07),
+                        TunerBandStr(data[2] >> 4 & 0x07),
                         data[2] & 0x0F,
                         data[2] & 0x80 ? "RDS_TEXT" : "FREQUECY",
                         rdsOrFreqTxt
@@ -1035,19 +1071,20 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
                     SERIAL.printf("%s",
                         data[3] == 0x11 ? "INSERTED" :
-                            data[3] == 0x13 ? "SEARCHING" :
-                            data[3] == 0x03 ? "PLAYING" :
+                            data[3] == 0x13 ? "PLAY-SEARCHING" :
+                            data[3] == 0x03 ? "PLAY" :
                             "??"
+                    );
+
+                    SERIAL.printf(" - %um:%us in track %u",
+                        GetBcd(data[5]),
+                        GetBcd(data[6]),
+                        GetBcd(data[7])
                     );
 
                     if (data[8] != 0xFF)
                     {
-                        SERIAL.printf(" - %um:%us in track %u/%u",
-                            GetBcd(data[5]),
-                            GetBcd(data[6]),
-                            GetBcd(data[7]),
-                            GetBcd(data[8])
-                        );
+                        SERIAL.printf("/%u", GetBcd(data[8]));
 
                         if (dataLen >= 12 && data[9] != 0xFF)
                         {
@@ -1107,6 +1144,8 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#4D4
             // https://github.com/morcibacsi/PSAVanCanBridge/blob/master/src/Van/Structs/VanRadioInfoStructs.h
 
+            // These packets are sent by the head unit
+
             // Examples:
             // 0E4D4E 800C010011003F3F3F3F80 0118
             // 0E4D4E 850D000010003F3F3F3F85 6678
@@ -1129,7 +1168,8 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
             SERIAL.printf(
                 "seq=%u, audio_menu=%s, loudness=%s, auto_volume=%s, ext_mute=%s, mute=%s, power=%s,\n"
-                "    tape=%s, cd=%s, source=%s, volume=%u%s, balance=%d%s, fader=%d%s, bass=%d%s, treble=%d%s\n",
+                "    tape=%s, cd=%s, source=%s,\n"
+                "    volume=%u%s, balance=%d%s, fader=%d%s, bass=%d%s, treble=%d%s\n",
                 data[0] & 0x07,
                 data[1] & 0x20 ? "OPEN" : "CLOSED",
                 data[1] & 0x10 ? "ON" : "OFF",
@@ -1137,10 +1177,12 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 data[1] & 0x02 ? "ON" : "OFF",
                 data[1] & 0x01 ? "ON" : "OFF",
                 data[2] & 0x01 ? "ON" : "OFF",
+                // data[4] & 0x10 ? "" : "", - TODO
                 data[4] & 0x20 ? "PRESENT" : "NOT_PRESENT",
                 data[4] & 0x40 ? "PRESENT" : "NOT_PRESENT",
 
-                (data[4] & 0x0F) == 0x01 ? "RADIO" :
+                (data[4] & 0x0F) == 0x00 ? "NONE" :
+                    (data[4] & 0x0F) == 0x01 ? "TUNER" :
                     (data[4] & 0x0F) == 0x02 ? "INTERNAL_CD_OR_TAPE" :
                     (data[4] & 0x0F) == 0x03 ? "CD_CHANGER" :
 
@@ -1190,12 +1232,16 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             char buffer[7];
             sprintf_P(buffer, PSTR("0x%04X"), mfdStatus);
 
+            // TODO - seems like data[0] & 0x20 is some kind of status bit, showing MFD connectivity status? There
+            // must also be a specific packet that triggers this bit to be set to '0', because this happens e.g. when
+            // the contact key is removed.
+
             SERIAL.printf(
                 "%s\n",
 
                 // hmmm... MFD can also be ON if this is reported; this happens e.g. in the "minimal VAN network" test
-                // setup with only the head unit (radio) and MFD. Maybe this is a status report: the MFD shows if it is
-                // connected to e.g. the BSI?
+                // setup with only the head unit (radio) and MFD. Maybe this is a status report: the MFD shows if has
+                // received any packets that show connectivity to e.g. the BSI?
                 data[0] == 0x00 && data[1] == 0xFF ? "MFD_SCREEN_OFF" :
 
                     data[0] == 0x20 && data[1] == 0xFF ? "MFD_SCREEN_ON" :
@@ -2107,15 +2153,12 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // http://graham.auld.me.uk/projects/vanbus/packets.html#8D4
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#8D4
 
-            // TODO - is this really MFD to head unit? Sometimes it seems the opposite: head unit reporting to MFD.
-            SERIAL.print("--> MFD to head unit: ");
-
             // Print only if not duplicate of previous packet
             static uint8_t packetData[MAX_DATA_BYTES] = "";  // Previous packet data
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
-            // TODO data[1] == 0x7D --> MFD is finished requesting preset stations
+            SERIAL.print("--> MFD to head unit: ");
 
             char buffer[5];
             sprintf_P(buffer, PSTR("0x%02X"), data[1]);
@@ -2130,31 +2173,50 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
                 // data[1] & 0x03 == 0x02 --> ON/OFF
                 // data[1] & 0x03 == 0x03 --> MUTE
-                SERIAL.printf("command=HEAD_UNIT_UPDATE_SETTINGS, param=%s\n",
-                    data[1] == 0x02 ? "POWER_OFF" :
-                    data[1] == 0x80 ? "0x80" : // ??
-                    data[1] == 0x82 ? "POWER_OFF" :
-                    data[1] == 0x83 ? "MUTE" :
-                    data[1] == 0xC0 ? "LOUDNESS_ON" :  // Never seen
-                    data[1] == 0xC2 ? "RADIO_ON" :
-                    data[1] == 0xC3 ? "RADIO_MUTE" :
-                    data[1] == 0xF2 ? "CD_CHANGER_ON" :
-                    data[1] == 0xF3 ? "CD_CHANGER_MUTE" :
-                    buffer
-                );
 
-                // TODO
+                // Possible bits in data[1]:
+                // 0x01 - Mute
+                // 0x02 - Auto_volume
+                // 0x10 - Loudness
+                // 0x20 - Audio menu open
+                // 0x40 - Power on
+                // 0x80 - ??
+                // 
+
+                // SERIAL.printf("command=HEAD_UNIT_UPDATE_SETTINGS, param=%s\n",
+                    // data[1] == 0x02 ? "POWER_OFF" :
+                    // data[1] == 0x80 ? "POWER_OFF" : // ??
+                    // data[1] == 0x82 ? "POWER_OFF" :
+                    // data[1] == 0x83 ? "MUTE" :
+                    // data[1] == 0xC0 ? "LOUDNESS_ON" :  // Never seen
+                    // data[1] == 0xC2 ? "RADIO_ON" :
+                    // data[1] == 0xC3 ? "RADIO_MUTE" :
+                    // data[1] == 0xD2 ? "AUDIO_SETTINGS_POPUP_CLOSED" :
+                    // data[1] == 0xE2 ? "AUDIO_SETTINGS_POPUP_OPENED" :
+                    // data[1] == 0xF2 ? "CD_CHANGER_ON" :
+                    // data[1] == 0xF3 ? "CD_CHANGER_MUTE" :
+                    // buffer
+                // );
+
+                SERIAL.printf(
+                    "command=HEAD_UNIT_UPDATE_AUDIO_BITS, mute=%s, auto_volume=%s, loudness=%s, audio_menu=%s, power=%s\n",
+                    data[1] & 0x01 ? "ON" : "OFF",
+                    data[1] & 0x02 ? "ON" : "OFF",
+                    data[1] & 0x10 ? "ON" : "OFF",
+                    data[1] & 0x20 ? "OPEN" : "CLOSED",
+                    data[1] & 0x40 ? "ON" : "OFF"
+                );
             }
             else if (data[0] == 0x12)
             {
-                if (dataLen != 2 && dataLen != 16)
+                if (dataLen != 2 && dataLen != 11)
                 {
                     SERIAL.println("[unexpected packet length]");
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
                 SERIAL.printf("command=HEAD_UNIT_SWITCH_TO, param=%s\n",
-                    data[1] == 0x01 ? "RADIO" :
+                    data[1] == 0x01 ? "TUNER" :
                     data[1] == 0x02 ? "INTERNAL_CD_OR_TAPE" :
                     data[1] == 0x03 ? "CD_CHANGER" :
 
@@ -2166,7 +2228,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     buffer
                 );
 
-                if (dataLen == 16)
+                if (dataLen == 11)
                 {
                     SERIAL.printf(
                         "    power=%s, source=%s,%s,%s,\n"
@@ -2174,7 +2236,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                         data[2] & 0x01 ? "ON" : "OFF",
                         data[4] & 0x04 ? "CD_CHANGER" : "",
                         data[4] & 0x02 ? "INTERNAL_CD_OR_TAPE" : "",
-                        data[4] & 0x01 ? "RADIO" : "",
+                        data[4] & 0x01 ? "TUNER" : "",
                         data[5] & 0x7F,
                         data[5] & 0x80 ? "<UPD>" : "",
                         (sint8_t)(0x3F) - (data[6] & 0x7F),
@@ -2207,6 +2269,31 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                         ""
                 );
             }
+            else if (data[0] == 0x14)
+            {
+                // Seen when the audio popup is on the MFD and a level is changed, and when the audio popup on
+                // the MFD disappears.
+
+                // Examples:
+                // Raw: #5848 ( 3/15) 10 0E 8D4 WA0 14-BF-3F-43-43-51-D6 ACK OK 51D6 CRC_OK
+                // Raw: #6031 (11/15) 10 0E 8D4 WA0 14-BF-3F-45-43-60-84 ACK OK 6084 CRC_OK
+                // Raw: #8926 (11/15) 10 0E 8D4 WA0 14-BF-3F-46-43-F7-B0 ACK OK F7B0 CRC_OK
+
+                if (dataLen != 5)
+                {
+                    SERIAL.println("[unexpected packet length]");
+                    return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
+                } // if
+
+                // TODO - bit 7 of data[1] is always 1 ?
+
+                SERIAL.printf("command=HEAD_UNIT_UPDATE_AUDIO_LEVELS, balance=%d, fader=%d, bass=%d, treble=%d\n",
+                    (sint8_t)(0x3F) - (data[1] & 0x7F),
+                    (sint8_t)(0x3F) - data[2],
+                    (sint8_t)data[3] - 0x3F,
+                    (sint8_t)data[4] - 0x3F
+                );
+            }
             else if (data[0] == 0x61)
             {
                 if (dataLen != 4)
@@ -2230,7 +2317,9 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
-                SERIAL.printf("command=REQUEST_RADIO_INFO\n");
+                SERIAL.printf("command=REQUEST_TUNER_INFO\n");
+
+                // data[1] seems to be always 0x7D
             }
             else if (data[0] == 0xD6)
             {
@@ -2245,7 +2334,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             else if (data[0] == 0x27)
             {
                 SERIAL.printf("preset_request band=%s, preset=%u\n",
-                    RadioBandStr(data[1] >> 4),
+                    TunerBandStr(data[1] >> 4),
                     data[1] & 0x0F
                 );
             }
