@@ -46,7 +46,7 @@
 #include <VanBus.h>
 
 #if defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
-// For ESP-01 board we use GPIO 2 (internal pull-up, keep high at boot time)
+// For ESP-01 board we use GPIO 2 (internal pull-up, keep disconnected or high at boot time)
 #define D2 (2)
 #endif
 int RECV_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
@@ -103,17 +103,71 @@ inline uint8_t GetBcd(uint8_t bcd)
     return (bcd >> 4 & 0x0F) * 10 + (bcd & 0x0F);
 } // GetBcd
 
+// Tuner band
+enum TunerBand_t
+{
+    TB_NONE = 0,
+    TB_FM1,
+    TB_FM2,
+    TB_FM3,  // Never seen, just guessing
+    TB_FMAST,
+    TB_AM
+};
+
 const char* TunerBandStr(uint8_t data)
 {
     return
-        (data & 0x07) == 0 ? "NONE" :
-            (data & 0x07) == 1 ? "FM1" :
-            (data & 0x07) == 2 ? "FM2" :
-            (data & 0x07) == 3 ? "FM3" :  // Never seen, just guessing
-            (data & 0x07) == 4 ? "FMAST" :
-            (data & 0x07) == 5 ? "AM" :
+        (data & 0x07) == TB_NONE ? "NONE" :
+            (data & 0x07) == TB_FM1 ? "FM1" :
+            (data & 0x07) == TB_FM2 ? "FM2" :
+            (data & 0x07) == TB_FM3 ? "FM3" :  // Never seen, just guessing
+            (data & 0x07) == TB_FMAST ? "FMAST" :
+            (data & 0x07) == TB_AM ? "AM" :
             "??";
+
+    // TODO - data == 0x07 when selecting PTY to scan for
+
 } // TunerBandStr
+
+const char* PtyStr(uint8_t ptyCode)
+{
+    // See also:
+    // https://www.electronics-notes.com/articles/audio-video/broadcast-audio/rds-radio-data-system-pty-codes.php
+    return
+        ptyCode == 0 ? "Not defined" :
+            ptyCode == 1 ? "News" :
+            ptyCode == 2 ? "Current affairs" :
+            ptyCode == 3 ? "Information" :
+            ptyCode == 4 ? "Sport" :
+            ptyCode == 5 ? "Education" :
+            ptyCode == 6 ? "Drama" :
+            ptyCode == 7 ? "Culture" :
+            ptyCode == 8 ? "Science" :
+            ptyCode == 9 ? "Varied" :
+            ptyCode == 10 ? "Pop Music" :
+            ptyCode == 11 ? "Rock Music" :
+            ptyCode == 12 ? "Easy Listening" :  // also: "Middle of the road music"
+            ptyCode == 13 ? "Light Classical" :
+            ptyCode == 14 ? "Serious Classical" :
+            ptyCode == 15 ? "Other Music" :
+            ptyCode == 16 ? "Weather" :
+            ptyCode == 17 ? "Finance" :
+            ptyCode == 18 ? "Children's Programmes" :
+            ptyCode == 19 ? "Social Affairs" :
+            ptyCode == 20 ? "Religion" :
+            ptyCode == 21 ? "Phone-in" :
+            ptyCode == 22 ? "Travel" :
+            ptyCode == 23 ? "Leisure" :
+            ptyCode == 24 ? "Jazz Music" :
+            ptyCode == 25 ? "Country Music" :
+            ptyCode == 26 ? "National Music" :
+            ptyCode == 27 ? "Oldies Music" :
+            ptyCode == 28 ? "Folk Music" :
+            ptyCode == 29 ? "Documentary" :
+            ptyCode == 30 ? "Alarm Test" :
+            ptyCode == 31 ? "Alarm" :
+            "??";
+} // PtyStr
 
 const char* SatNavRequestStr(uint8_t data)
 {
@@ -405,7 +459,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             if (data[0] == 0x8A)
             {
                 // I'm sure that these messages are sent by the head unit: when no other device than the head unit is
-                // on the bus, these packets are seen (unACKed).
+                // on the bus, these packets are seen (unACKed; ACKs appear when the MFD is plugged back in to the bus).
 
                 SERIAL.print("Head unit: ");
 
@@ -415,50 +469,67 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
+                // data[1] values seen:
+                // 0x20 - Tuner info - reply to 8D4 WA0 D1 (any source)
+                // 0x21 - Audio settings announcement (source = satnav, tuner or CD changer)
+                // 0x22 - Button press announcement (source = satnav, tuner or CD changer)
+                // 0x24 - Tuner info announcement (any source)
+                // 0x30 - Internal CD (or tape?) presence announcement (any source)
+                // 0x40 - Tuner presets available - reply to 8D4 WA0 27-11
+                // 0xC0 - Internal CD track data available - reply to 8D4 WA0 D6
+                // 0xC1 - Audio settings announcement (source = internal CD (or tape?))
+                // 0xC2 - Button press announcement (source = internal CD (or tape?))
+                // 0xC4 - Searching announcement (source = internal CD (or tape?))
+                // 0xD0 - Track info announcement (source = internal CD (or tape?))
+                //
+                SERIAL.printf(
+                    "%s\n",
+                    data[1] == 0x20 ? "TUNER - REPLY" :
+                    data[1] == 0x21 ? "AUDIO_SETTINGS_ANNOUNCE" :
+                    data[1] == 0x22 ? "BUTTON_PRESS_ANNOUNCE" :
+                    data[1] == 0x24 ? "TUNER_ANNOUNCEMENT" :
+                    data[1] == 0x30 ? "CD_OR_TAPE_PRESENT" :
+                    data[1] == 0x40 ? "TUNER_PRESETS - REPLY" :
+                    data[1] == 0xC0 ? "INTERNAL_CD_TRACK_INFO - REPLY" :
+                    data[1] == 0xC1 ? "INTERNAL_CD_PLAYING - AUDIO_SETTINGS_ANNOUNCE" :
+                    data[1] == 0xC2 ? "INTERNAL_CD_PLAYING - BUTTON_PRESS_ANNOUNCE" :
+                    data[1] == 0xC4 ? "INTERNAL_CD_PLAYING - SEARCHING" :
+                    data[1] == 0xD0 ? "INTERNAL_CD_PLAYING - TRACK_INFO" :
+                    "??"
+                );
+
                 // Possible bits in data[1]:
-                // 0x01 - Audio settings info
-                // 0x02 - Button press info
-                // 0x04 - Searching (CD track or radio station)
+                // 0x01 - Audio settings announcement
+                // 0x02 - Button press announcement
+                // 0x04 - Status update (CD track or tuner info)
                 // 0x08 - 
                 // 0xF0 - 0x20 = Tuner (radio)
                 //      - 0x30 = CD track found
                 //      - 0x40 = Tuner preset
-                //      - 0xC0 = CD or tape info
+                //      - 0xC0 = CD or tape playing
                 //      - 0xD0 = CD track info
-
+                //
                 // SERIAL.printf(
-                    // "%s\n",
-                    // data[1] == 0x20 ? "RADIO_INFO" :
-                    // data[1] == 0x21 ? "RADIO_AUDIO_VOLUME_UPDATE_ANNOUNCEMENT" :
-                    // data[1] == 0x22 ? "BUTTON_PRESS_INFO" :
-                    // data[1] == 0x24 ? "RADIO_TUNER_UPDATE_ANNOUNCEMENT" :
-                    // data[1] == 0x30 ? "CD_TRACK_FOUND" :
-                    // data[1] == 0x40 ? "RADIO_PRESET_INFO" :
-                    // data[1] == 0xC0 ? "INTERNAL_CD_OR_TAPE_INFO" :
-                    // data[1] == 0xC1 ? "INTERNAL_CD_OR_TAPE_AUDIO_SETTINGS" :
-                    // data[1] == 0xC4 ? "INTERNAL_CD_OR_TAPE_SEARCHING" :
-                    // data[1] == 0xD0 ? "CD_TRACK_INFO" :
-                    // "??"
+                    // "%s - %s\n",
+                    // data[1] == 0x24 ? "TUNER" : // TUNER - STATUS_UPDATE_ANNOUNCE
+                        // data[1] == 0x20 ? "TUNER" :  // TUNER - REPLY
+                        // (data[1] & 0x0F) == 0x01 ? "HEAD_UNIT" :  // HEAD_UNIT - AUDIO_SETTINGS_ANNOUNCE
+                        // (data[1] & 0x0F) == 0x02 ? "HEAD_UNIT" :  // HEAD_UNIT - BUTTON_PRESS_ANNOUNCE
+                        // (data[1] & 0xF0) == 0x30 ? "CD_PLAYING" :
+                        // (data[1] & 0xF0) == 0x40 ? "TUNER_PRESET" :
+                        // (data[1] & 0xF0) == 0xC0 ? "CD_OR_TAPE" :
+                        // (data[1] & 0xF0) == 0xD0 ? "CD_TRACK" :
+                        // "??",
+                    // data[1] & 0x0F) == 0x00 ? "REPLY" :
+
+                        // // When the following messages are ACK'ed, a report will follow, e.g.
+                        // // 0x4D4 (AUDIO_SETTINGS_IDEN) or 0x554 (HEAD_UNIT_IDEN). When not ACK'ed, will retry a few
+                        // // times.
+                        // (data[1] & 0x0F) == 0x01 ? "AUDIO_SETTINGS_ANNOUNCE" :  // max 3 retries
+                        // (data[1] & 0x0F) == 0x02 ? "BUTTON_PRESS_ANNOUNCE" :  // max 6 retries
+                        // (data[1] & 0x0F) == 0x04 ? "STATUS_UPDATE_ANNOUNCE" :  // max 3 retries
+                        // "??"
                 // );
-
-                SERIAL.printf(
-                    "%s - %s\n",
-                    (data[1] & 0xF0) == 0x20 ? "TUNER_OR_CD_CHANGER" :
-                        (data[1] & 0xF0) == 0x30 ? "CD_PLAYING" :
-                        (data[1] & 0xF0) == 0x40 ? "TUNER_PRESET" :
-                        (data[1] & 0xF0) == 0xC0 ? "CD_OR_TAPE" :
-                        (data[1] & 0xF0) == 0xD0 ? "CD_TRACK" :
-                        "??",
-                    (data[1] & 0x0F) == 0x00 ? "REPLY" :
-
-                        // When the following messages are ACK'ed, a report will follow, e.g.
-                        // 0x4D4 (AUDIO_SETTINGS_IDEN) or 0x554 (HEAD_UNIT_IDEN). When not ACK'ed, will retry a few
-                        // times.
-                        (data[1] & 0x0F) == 0x01 ? "AUDIO_SETTINGS_ANNOUNCE" :  // max 3 retries
-                        (data[1] & 0x0F) == 0x02 ? "BUTTON_PRESS_ANNOUNCE" :  // max 6 retries
-                        (data[1] & 0x0F) == 0x04 ? "STATUS_UPDATE_ANNOUNCE" :  // max 3 retries
-                        "??"
-                );
                 if ((data[1] & 0x0F) == 0x02)
                 {
                     char buffer[5];
@@ -509,16 +580,16 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 // Unknown what this is. Surely not the MFD and not the head unit. Could be:
                 // - Aircon panel
                 // - CD changer (seems unlikely)
-                // - SatNav system
+                // - SatNav system (seems likely)
                 // - Instrument panel
 
                 // data[1] seems a bit pattern. Bits seen:
-                //  & 0x01
+                //  & 0x01 - MFD shows SatNav disclaimer screen, Entering new destination in SatNav
                 //  & 0x02
                 //  & 0x04
-                //  & 0x10
-                //  & 0x20
-                //  & 0x40
+                //  & 0x10 - Entering new destination in SatNav
+                //  & 0x20 - Entering new destination in SatNav, SatNav showing direction
+                //  & 0x40 - Contact key in "ACC" position?, SatNav showing direction
                 //
                 // data[2] is usually 0x00, sometimes 0x01
 
@@ -547,7 +618,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 // - Instrument panel
                 //
                 // data[1] is usually 0x08, sometimes 0x20
-                //  & 0x08
+                //  & 0x08 - Contact key in "ON" position?
                 //  & 0x20
 
                 SERIAL.printf(
@@ -870,6 +941,19 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                         return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                     } // if
 
+                    // data[2]: memory position and band
+                    uint8_t memoryPos = data[2] >> 3 & 0x0F;
+                    uint8_t band = data[2] & 0x07;
+
+                    // data[3]: scanning bits
+                    bool scan_dx = data[3] & 0x02;  // Scan mode: distant (Dx) or local (Lo)
+                    bool pty_standby_mode = data[3] & 0x04;
+                    bool manual_scan = data[3] & 0x08;
+                    bool scanning_by_freq = data[3] & 0x10;
+                    bool fmast_search = data[3] & 0x20;  // Auto-station search (long-press Radio Band button)
+                    bool scan_direction_up = data[3] & 0x80;
+
+                    // data[4] and data[5]: frequency tuned in to
                     uint16_t frequency = (uint16_t)data[5] << 8 | data[4];
 
                     // data[6] - Reception status? Like: receiving station? Stereo? RDS bits like MS, TP, TA, AF?
@@ -880,17 +964,24 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     //     (usually) ends up 0x00.
                     // & 0x10 --> Looking for RDS text?
                     // & 0x20 --> Looking for RDS text?
-                    // & 0x40 --> Looking for PI info?
-                    // & 0x80 --> Looking for PTY info?
+                    // & 0x40 --> Looking for RDS available bit?
+                    // & 0x80 --> Looking for TA available bit?
                     //
                     // & 0x0F = signal strength: increases with antenna plugged in and decreases with antenna plugged
                     //          out. Updated when a station is being tuned in to, or when the MAN button is pressed.
+                    uint8_t signalStrength = data[6] & 0x0F;
                     char signalStrengthBuffer[3];
-                    sprintf_P(signalStrengthBuffer, PSTR("%u"), data[6] & 0x0F);
+                    sprintf_P(signalStrengthBuffer, PSTR("%u"), signalStrength);
 
-                    // data[7] - ?? Often seen values: 0x00, 0x60, 0x63
+                    // data[7]: TA, RDS and REG (regional) bits
+                    bool rds_selected = data[7] & 0x01;
+                    bool ta_selected = data[7] & 0x02;
+                    bool regional = data[7] & 0x04;  // Long-press "RDS" button
+                    bool rds_available = data[7] & 0x20;
+                    bool ta_available = data[7] & 0x40;
+                    bool ta_announce = data[7] & 0x80;
 
-                    // data[8] and data[9] contain PI code.
+                    // data[8] and data[9]: PI code
                     // See also:
                     // - https://en.wikipedia.org/wiki/Radio_Data_System#Program_Identification_Code_(PI_Code),
                     // - https://radio-tv-nederland.nl/rds/rds.html
@@ -901,10 +992,18 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     uint8_t countryCode = data[8] >> 4 & 0x0F;
                     uint8_t coverageCode = data[8] & 0x0F;
 
-                    // data[10] - Always 0xA1 ?
+                    // data[10]: for PTY-based scan mode
+                    // & 0x20: 0 = PTY of station matches selected; 1 = no match
+                    // & 0x40: 1 = "Select PTY" dialog visible (long-press "TA" button; press "<<" or ">>" to change)
+                    // & 0x1F: PTY code to scan
+                    bool pty_selection_menu = data[10] & 0x40; 
+                    bool pty_match = (data[10] & 0x20) == 0;  // PTY of station matches selected PTY
+                    uint8_t selected_pty = data[10] & 0x1F;
 
+                    // data[11]: PTY code of current station
                     uint8_t ptyCode = data[11] & 0x1F;
 
+                    // data[12]...data[20]: RDS text
                     char rdsTxt[9];
                     strncpy(rdsTxt, (const char*) data + 12, 8);
                     rdsTxt[8] = 0;
@@ -939,75 +1038,61 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     );
 
                     char ptyBuffer[40];
-                    sprintf_P(ptyBuffer, PSTR("%u(%s)"),
+                    sprintf_P(ptyBuffer, PSTR("%u(%s)"), ptyCode, PtyStr(ptyCode));
 
-                        ptyCode,
-
-                        // See also:
-                        // https://www.electronics-notes.com/articles/audio-video/broadcast-audio/rds-radio-data-system-pty-codes.php
-                        ptyCode == 0 ? "Not defined" :
-                            ptyCode == 1 ? "News" :
-                            ptyCode == 2 ? "Current affairs" :
-                            ptyCode == 3 ? "Information" :
-                            ptyCode == 4 ? "Sport" :
-                            ptyCode == 5 ? "Education" :
-                            ptyCode == 6 ? "Drama" :
-                            ptyCode == 7 ? "Culture" :
-                            ptyCode == 8 ? "Science" :
-                            ptyCode == 9 ? "Varied" :
-                            ptyCode == 10 ? "Pop" :
-                            ptyCode == 11 ? "Rock Music" :
-                            ptyCode == 12 ? "Easy Listening" :
-                            ptyCode == 13 ? "Light Classical" :
-                            ptyCode == 14 ? "Serious Classical" :
-                            ptyCode == 15 ? "Other Music" :
-                            ptyCode == 16 ? "Weather" :
-                            ptyCode == 17 ? "Finance" :
-                            ptyCode == 18 ? "Children's Programmes" :
-                            ptyCode == 19 ? "Social Affairs" :
-                            ptyCode == 20 ? "Religion" :
-                            ptyCode == 21 ? "Phone-in" :
-                            ptyCode == 22 ? "Travel" :
-                            ptyCode == 23 ? "Leisure" :
-                            ptyCode == 24 ? "Jazz Music" :
-                            ptyCode == 25 ? "Country Music" :
-                            ptyCode == 26 ? "National Music" :
-                            ptyCode == 27 ? "Oldies Music" :
-                            ptyCode == 28 ? "Folk Music" :
-                            ptyCode == 29 ? "Documentary" :
-                            ptyCode == 30 ? "Alarm Test" :
-                            ptyCode == 31 ? "Alarm" :
-                            "??"
-                    );
+                    bool search_pty = pty_standby_mode && ! manual_scan && ! pty_match;
+                    bool any_scan_busy = manual_scan || scanning_by_freq || search_pty;
 
                     char floatBuf[MAX_FLOAT_SIZE];
-                    SERIAL.printf("position=%u, band=%s, scanning=%s%s, %smanual_scan=%s, %s %s, strength=%s, PTY=%s, PI=%s,\n"
-                        "    %s, %s, %s, %s, \"%s\"%s\n",
-                        data[2] >> 3 & 0x0F,
-                        TunerBandStr(data[2]),
-                        data[3] & 0x10 ? "YES" : "NO",  // scanning
+                    SERIAL.printf("memory=%u, band=%s, %s %s, strength=%s, manual_scan=%s, fmast_search=%s, scanning_by_freq=%s%s%s,\n",
+                        memoryPos,
+                        TunerBandStr(band),
+                        frequency == 0x07FF ? "---" :
+                            band == TB_AM
+                                ? FloatToStr(floatBuf, frequency, 0)  // AM and LW bands
+                                : FloatToStr(floatBuf, frequency / 20.0 + 50.0, 2),  // FM bands
+                        band == TB_AM ? "KHz" : "MHz",
+
+                        // TODO - not sure if applicable in AM mode
+                        signalStrength == 15 && (search_pty || scanning_by_freq) ? "--" : signalStrengthBuffer,
+
+                        manual_scan ? "YES" : "NO",
+                        fmast_search ? "YES" : "NO",
+
+                        scanning_by_freq ? "YES" : "NO",
 
                         // Scan mode: distant (Dx) or local (Lo)
-                        (data[3] & 0x10) == 0 ? "" : data[3] & 0x02 ? " (Dx)" : " (Lo)",
+                        // Not sure if this bit is applicable when 'manual_scan' is true.
+                        //(data[3] & 0x10) == 0 ? "" : 
+                            scan_dx ? " (Dx)" : " (Lo)",
 
-                        (data[3] & 0x10) == 0 ? "" : data[3] & 0x80 ? "scan_direction=UP, " : "scan_direction=DOWN, ",
-                        data[3] & 0x08 ? "YES" : "NO",  // manual_scan
-                        frequency == 0x07FF ? "---" :
-                            (data[2] & 0x07) == 5
-                                ? FloatToStr(floatBuf, frequency, 0)  // AM, LW
-                                : FloatToStr(floatBuf, frequency / 20.0 + 50.0, 2),  // FM
-                        (data[2] & 0x07) == 5 ? "KHz" : "MHz",
-                        data[3] & 0x10 ? "--" : signalStrengthBuffer,
-                        ptyCode == 0x00 ? "---" : ptyBuffer,
-                        piCode == 0xFFFF ? "---" : piBuffer,
-                        (data[2] & 0x07) == 5 ? "TA N/A" : data[7] & 0x40 ? "TA avaliable" : "NO TA availabe",
-                        (data[2] & 0x07) == 5 ? "RDS N/A" : data[7] & 0x20 ? "RDS available" : "NO RDS available",
-                        (data[2] & 0x07) == 5 ? "TA N/A" : data[7] & 0x02 ? "TA ON" : "TA OFF",
-                        (data[2] & 0x07) == 5 ? "RDS N/A" : data[7] & 0x01 ? "RDS ON" : "RDS OFF",
-                        rdsTxt,
-                        data[7] & 0x80 ? "\n    --> Info Trafic!" : ""
+                        ! any_scan_busy ? "" :
+                            scan_direction_up ? ", scan_direction=UP" : ", scan_direction=DOWN"
                     );
 
+                    if (band != TB_AM)
+                    {
+                        SERIAL.printf(
+                            "    search_pty=%s, pty_selection_menu=%s, selected_pty=%s, pty_standby_mode=%s, pty_match=%s,\n"
+                            "    pty=%s, pi=%s, %s, %s, %s, %s, %s, \"%s\"%s\n",
+                            search_pty ? "YES" : "NO",
+                            pty_selection_menu ? "ON" : "OFF",
+                            PtyStr(selected_pty),
+                            pty_standby_mode ? "YES" : "NO",
+                            pty_match ? "YES" : "NO",
+
+                            ptyCode == 0x00 ? "---" : ptyBuffer,
+                            piCode == 0xFFFF ? "---" : piBuffer,
+
+                            ta_available ? "TA avaliable" : "NO TA availabe",
+                            rds_available ? "RDS available" : "NO RDS available",
+                            regional ? "REG_ON" : "REG_OFF",
+                            ta_selected ? "TA ON" : "TA OFF",
+                            rds_selected ? "RDS ON" : "RDS OFF",
+                            rdsTxt,
+                            ta_announce ? "\n    --> Info Trafic!" : ""
+                        );
+                    } // if
                 }
                 break;
                 
@@ -1023,9 +1108,10 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                         return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                     } // if
 
+                    // TODO - check
                     SERIAL.printf("%s, %s, %s, %s\n",
-                        data[2] & 0x10 ? "FAST FORWARD" : "",
-                        data[2] & 0x30 ? "FAST REWIND" : "",
+                        data[2] & 0x10 ? "FAST_FORWARD" : "",
+                        data[2] & 0x30 ? "REWIND" : "",
                         data[2] & 0x0C == 0x0C ? "PLAY" : data[2] & 0x0C == 0x00 ? "STOP"  : "??",
                         data[2] & 0x01 ? "SIDE 1" : "SIDE 2"
                     );
@@ -1071,8 +1157,12 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
                     SERIAL.printf("%s",
                         data[3] == 0x11 ? "INSERTED" :
+                            data[3] == 0x12 ? "PAUSE-SEARCHING" :
                             data[3] == 0x13 ? "PLAY-SEARCHING" :
+                            data[3] == 0x02 ? "PAUSE" :
                             data[3] == 0x03 ? "PLAY" :
+                            data[3] == 0x04 ? "FAST_FORWARD" :
+                            data[3] == 0x05 ? "REWIND" :
                             "??"
                     );
 
@@ -1171,7 +1261,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 "    tape=%s, cd=%s, source=%s,\n"
                 "    volume=%u%s, balance=%d%s, fader=%d%s, bass=%d%s, treble=%d%s\n",
                 data[0] & 0x07,
-                data[1] & 0x20 ? "OPEN" : "CLOSED",
+                data[1] & 0x20 ? "OPEN" : "CLOSED",  // Bug: if CD changer is playing, this one is always "OPEN"...
                 data[1] & 0x10 ? "ON" : "OFF",
                 data[1] & 0x04 ? "ON" : "OFF",
                 data[1] & 0x02 ? "ON" : "OFF",
@@ -1392,7 +1482,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 }
                 case 12:
                 {
-                    char floatBuf[2][MAX_FLOAT_SIZE];
+                    char floatBuf[3][MAX_FLOAT_SIZE];
 
                     SERIAL.printf(
                         "random=%s; state=%s; cartridge=%s; %sm:%ss in track %u/%u on CD %u; "
@@ -1414,7 +1504,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                         data[4] == 0xFF ? "--" : FloatToStr(floatBuf[0], GetBcd(data[4]), 0),
                         data[5] == 0xFF ? "--" : FloatToStr(floatBuf[1], GetBcd(data[5]), 0),
                         GetBcd(data[6]),
-                        GetBcd(data[8]),
+                        data[8] == 0xFF ? "--" : FloatToStr(floatBuf[2], GetBcd(data[8]), 0),
                         GetBcd(data[7]),
 
                         data[10] & 0x01 ? "1" : " ",
@@ -2135,6 +2225,8 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 cdcCommand == 0x2101 ? "POWER_OFF" :
                 cdcCommand == 0x1181 ? "PAUSE" :
                 cdcCommand == 0x1183 ? "PLAY" :
+                cdcCommand == 0x31FE ? "PREVIOUS_TRACK" :
+                cdcCommand == 0x31FF ? "NEXT_TRACK" :
                 cdcCommand == 0x4101 ? "CD 1" :
                 cdcCommand == 0x4102 ? "CD 2" :
                 cdcCommand == 0x4103 ? "CD 3" :
@@ -2171,40 +2263,15 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
-                // data[1] & 0x03 == 0x02 --> ON/OFF
-                // data[1] & 0x03 == 0x03 --> MUTE
-
-                // Possible bits in data[1]:
-                // 0x01 - Mute
-                // 0x02 - Auto_volume
-                // 0x10 - Loudness
-                // 0x20 - Audio menu open
-                // 0x40 - Power on
-                // 0x80 - ??
-                // 
-
-                // SERIAL.printf("command=HEAD_UNIT_UPDATE_SETTINGS, param=%s\n",
-                    // data[1] == 0x02 ? "POWER_OFF" :
-                    // data[1] == 0x80 ? "POWER_OFF" : // ??
-                    // data[1] == 0x82 ? "POWER_OFF" :
-                    // data[1] == 0x83 ? "MUTE" :
-                    // data[1] == 0xC0 ? "LOUDNESS_ON" :  // Never seen
-                    // data[1] == 0xC2 ? "RADIO_ON" :
-                    // data[1] == 0xC3 ? "RADIO_MUTE" :
-                    // data[1] == 0xD2 ? "AUDIO_SETTINGS_POPUP_CLOSED" :
-                    // data[1] == 0xE2 ? "AUDIO_SETTINGS_POPUP_OPENED" :
-                    // data[1] == 0xF2 ? "CD_CHANGER_ON" :
-                    // data[1] == 0xF3 ? "CD_CHANGER_MUTE" :
-                    // buffer
-                // );
-
                 SERIAL.printf(
-                    "command=HEAD_UNIT_UPDATE_AUDIO_BITS, mute=%s, auto_volume=%s, loudness=%s, audio_menu=%s, power=%s\n",
+                    "command=HEAD_UNIT_UPDATE_AUDIO_BITS, mute=%s, auto_volume=%s, loudness=%s, audio_menu=%s,\n"
+                    "    power=%s, contact_key=%s\n",
                     data[1] & 0x01 ? "ON" : "OFF",
                     data[1] & 0x02 ? "ON" : "OFF",
                     data[1] & 0x10 ? "ON" : "OFF",
-                    data[1] & 0x20 ? "OPEN" : "CLOSED",
-                    data[1] & 0x40 ? "ON" : "OFF"
+                    data[1] & 0x20 ? "OPEN" : "CLOSED",  // Bug: if CD changer is playing, this one is always "OPEN"...
+                    data[1] & 0x40 ? "ON" : "OFF",
+                    data[1] & 0x80 ? "ON" : "OFF"
                 );
             }
             else if (data[0] == 0x12)
@@ -2303,7 +2370,8 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 } // if
 
                 SERIAL.printf("command=REQUEST_CD, param=%s\n",
-                    data[1] == 0x03 ? "PLAY" :
+                    data[1] == 0x02 ? "PAUSE" :
+                        data[1] == 0x03 ? "PLAY" :
                         data[3] == 0xFF ? "NEXT" :
                         data[3] == 0xFE ? "PREV" :
                         "??"

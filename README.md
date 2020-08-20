@@ -257,7 +257,7 @@ Do whatever you like with it, but contributions are appreciated!
 
 [MCP2551]: http://ww1.microchip.com/downloads/en/devicedoc/21667d.pdf
 [level converter]: https://www.tinytronics.nl/shop/en/dc-dc-converters/level-converters/i2c-uart-bi-directional-logic-level-converter-5v-3.3v-2-channel-with-supply
-[SN65HVD230]: https://www.ti.com/lit/ds/symlink/sn65hvd230.pdf?ts=1592992149874&ref_url=https%253A%252F%252Fwww.google.nl%252F
+[SN65HVD230]: https://www.ti.com/lit/ds/symlink/sn65hvd230.pdf?ts=1592992149874
 [voltage divider]: https://www.quora.com/How-many-pins-on-Arduino-Uno-give-a3-3v-pin-output
 [ESP32 RMT peripheral Vehicle Area Network (VAN bus) reader]: https://github.com/morcibacsi/esp32_rmt_van_rx
 [Atmel TSS463C VAN Data Link Controller with Serial Interface]: http://ww1.microchip.com/downloads/en/DeviceDoc/doc7601.pdf
