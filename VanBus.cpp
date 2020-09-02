@@ -10,6 +10,126 @@
 
 #include "VanBus.h"
 
+static const uint16_t CRC_POLYNOM = 0x0F9D;
+
+uint16_t _crc(const uint8_t bytes[], int size)
+{
+    uint16_t crc16 = 0x7FFF;
+
+    for (int i = 1; i < size - 2; i++)  // Skip first byte (SOF, 0x0E) and last 2 (CRC)
+    {
+        uint8_t byte = bytes[i];
+
+        for (int j = 0; j < 8; j++)
+        {
+            uint16_t bit = crc16 & 0x4000;
+            if (byte & 0x80) bit ^= 0x4000;
+            byte <<= 1;
+            crc16 <<= 1;
+            if (bit) crc16 ^= CRC_POLYNOM;
+        } // for
+    } // if
+
+    crc16 ^= 0x7FFF;
+    crc16 <<= 1;  // Shift left 1 bit to turn 15 bit result into 16 bit representation
+
+    return crc16;
+} // _crc
+
+uint16_t txPacket[MAX_PACKET_SIZE];
+unsigned int atByte = 0;
+unsigned int atBit = 0;
+unsigned int txPacketSize = 0;
+
+// TODO - find a suitable output pin, set pin mode: pinMode(txPin, OUTPUT);
+//
+#if defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
+// For ESP-01 board we use GPIO 0
+#define D3 (0)
+#endif
+uint8_t vanBusTxPin = D3;
+
+// Send one bit on the VAN bus
+void ICACHE_RAM_ATTR SendBitIsr()
+{
+    uint8_t byte = txPacket[atByte];
+    uint8_t bit = byte & (1 << atBit);
+
+    // Write to GPIO pin
+    if (bit) GPOS = (1 << vanBusTxPin); else GPOC = (1 << vanBusTxPin);
+
+    // Advance to next bit
+    if (++atBit == 10)  // Enhanced Manchester encoding: 10 bits per byte 
+    {
+        atBit = 0;
+        if (++atByte == txPacketSize)
+        {
+            // Finished sending packet
+            GPOS = (1 << vanBusTxPin);  // Set pin to '1'
+            timer1_disable();
+
+            // TODO - make sure that the next packet is sent only after EOF (5 time slots) from now. I think in
+            // practice there are always at least 13 time slots between subsequent packets.
+        } // if
+    } // if
+} // SendBitIsr
+
+// Send data as a packet on the VAN bus
+void SendPacket(uint16_t iden, uint8_t flags, const char* data, size_t len)
+{
+    // Send at most MAX_DATA_BYTES data
+    if (len > MAX_DATA_BYTES) len = MAX_DATA_BYTES;
+
+    // Prepare full packet data
+    uint8_t bytes[MAX_PACKET_SIZE];
+    bytes[0] = 0x0E;  // SOF
+    bytes[1] = iden >> 4 & 0xFF;  // IDEN (MSB 8 bits)
+    bytes[2] = iden << 4 | 0x08 | flags & 0x07;  // IDEN (LSB 4 bits), always-1, COM (3 bits)
+    memcpy(bytes + 3, data, len);
+    uint16_t crc = _crc(bytes, len + 5);
+    bytes[len + 3] = crc >> 8;
+    bytes[len + 4] = crc & 0xFF;
+
+    // Stuff with Manchester bits
+    for (int i = 0; i < len + 5; i++)
+    {
+        uint8_t byte = bytes[i];
+        txPacket[i] = (byte & 0xF0) << 2 | (~ byte & 0x10) << 1 | (byte & 0x0F) << 1 | ~ byte & 0x01;
+    } // for
+
+    // The last bit is always 0 (CRC has been shifted left 1 bit), and the last Manchester bit is also always 0,
+    // to indicate EOD
+    txPacket[len + 4] &= 0xFFFC;
+
+    atByte = 0;
+    atBit = 0;
+    txPacketSize = len + 5;
+
+    // For now, simply dump all the bits to Serial
+    // TODO - remove
+    Serial.print(F("SendPacket: "));
+    for (int i = 0; i < len + 5; i++)
+    {
+        uint16_t byte = txPacket[i];
+        for (int bit = 9; bit >= 0; bit--)
+        {
+            Serial.print(byte & (1 << bit) ? '1' : '0');
+            if (bit == 6 || bit == 5 || bit == 1) Serial.print('-');
+        } // for
+        Serial.print(' ');
+    } // for
+    Serial.println();
+    return;
+
+    // Sending a packet is done completely by interrupt-servicing
+    timer1_disable();
+    timer1_attachInterrupt(SendBitIsr);
+
+    // Set a repetitive timer
+    timer1_enable(TIM_DIV16, TIM_EDGE, TIM_LOOP);
+    timer1_write(8 * 5); // 1 time slot = 8 us
+} // SendPacket
+
 // Returns the IDEN field of a VAN packet
 uint16_t TVanPacketRxDesc::Iden() const
 {
@@ -17,7 +137,7 @@ uint16_t TVanPacketRxDesc::Iden() const
 } // TVanPacketRxDesc::Iden
 
 // Returns the Flags field of a VAN packet
-uint16_t TVanPacketRxDesc::Flags() const
+uint8_t TVanPacketRxDesc::Flags() const
 {
     // Bits:
     // 3 : always 1
@@ -40,34 +160,10 @@ int TVanPacketRxDesc::DataLen() const
     return size - 5;
 } // TVanPacketRxDesc::DataLen
 
-static const uint16_t CRC_POLYNOM = 0x0F9D;
-
 // Calculates the CRC of a VAN packet
 uint16_t TVanPacketRxDesc::Crc() const
 {
-    uint16_t crc16 = 0x7FFF;
-
-    for (int i = 1; i < size - 2; i++) // Skip first byte (SOF, 0x0E) and last 2 (CRC)
-    {
-        // Update CRC
-        uint8_t byte = bytes[i];
-
-        for (int j = 0; j < 8; j++)
-        {
-            uint16_t bit = crc16 & 0x4000;
-            if (byte & 0x80) bit ^= 0x4000;
-            byte <<= 1;
-            crc16 <<= 1;
-            if (bit) crc16 ^= CRC_POLYNOM;
-        } // for
-    } // if
-
-    crc16 ^= 0x7FFF;
-
-    // Shift left 1 bit to turn 15 bit result into 16 bit representation
-    crc16 <<= 1;
-
-    return crc16;
+    return _crc(bytes, size);
 } // TVanPacketRxDesc::Crc
 
 // Checks the CRC value of a VAN packet
@@ -75,9 +171,8 @@ bool TVanPacketRxDesc::CheckCrc() const
 {
     uint16_t crc16 = 0x7FFF;
 
-    for (int i = 1; i < size; i++) // Skip first byte (SOF, 0x0E)
+    for (int i = 1; i < size; i++)  // Skip first byte (SOF, 0x0E)
     {
-        // Update CRC
         unsigned char byte = bytes[i];
 
         for (int j = 0; j < 8; j++)
@@ -129,7 +224,7 @@ void TVanPacketRxDesc::DumpRaw(Stream& s, char last) const
     s.printf("Raw: #%04u (%*u/%u) %2d ",
         seqNo % 10000,
         RX_QUEUE_SIZE > 100 ? 3 : RX_QUEUE_SIZE > 10 ? 2 : 1,  // This is all compile-time
-        isrDebugPacket.samples[0].slot,
+        isrDebugPacket.samples[0].slot + 1,
         RX_QUEUE_SIZE,
         size);
 

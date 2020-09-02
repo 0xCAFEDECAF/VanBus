@@ -107,7 +107,7 @@ class TVanPacketRxDesc
 
     TVanPacketRxDesc() { Init(); }
     uint16_t Iden() const;
-    uint16_t Flags() const;
+    uint8_t Flags() const;
     const uint8_t* Data() const;
     int DataLen() const;
     uint16_t Crc() const;
@@ -176,6 +176,8 @@ class TVanPacketRxDesc
     interrupts(); \
     return result; \
 }
+
+void SendPacket(uint16_t iden, uint8_t flags, const char* data, size_t len);
 
 //  Circular buffer of VAN packet Rx descriptors
 class TVanPacketRxQueue
