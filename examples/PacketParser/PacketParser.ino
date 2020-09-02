@@ -73,12 +73,12 @@ int RECV_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
 #define TIME_IDEN 0x984
 #define AUDIO_SETTINGS_IDEN 0x4D4
 #define MFD_STATUS_IDEN 0x5E4
-#define SATNAV_GUIDANCE_IDEN 0x9CE
+#define SATNAV_GUIDANCE_DATA_IDEN 0x9CE
 #define AIRCON_IDEN 0x464
 #define AIRCON2_IDEN 0x4DC
 #define CDCHANGER_IDEN 0x4EC
 #define SATNAV1_IDEN 0x54E
-#define SATNAV2_IDEN 0x64E
+#define SATNAV_GUIDANCE_IDEN 0x64E
 #define SATNAV3_IDEN 0x6CE
 #define SATNAV4_IDEN 0x74E
 #define SATNAV5_IDEN 0x7CE
@@ -261,18 +261,23 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
-            // TODO - Always "CLOSE", even if open. Actual status of LED on instrument cluster is in packet with
-            // IDEN 0x4FC (LIGHTS_STATUS_IDEN)
+            // TODO - Always "CLOSE", even if open. Actual status of "door open" icon on instrument cluster is found in
+            // packet with IDEN 0x4FC (LIGHTS_STATUS_IDEN)
             //data[1] & 0x08 ? "door=OPEN" : "door=CLOSE",
 
             char floatBuf[3][MAX_FLOAT_SIZE];
             SERIAL.printf(
-                "dashboard_light=%s, dashboard_actual_brightness=%u; contact=%s; ignition=%s; engine=%s;\n"
-                "    economy_mode=%s; in_reverse=%s; trailer=%s; water_temp=%s; odometer=%s; ext_temp=%s\n",
+                "dash_light=%s, dash_actual_brightness=%u; contact_key_position=%s; engine=%s;\n"
+                "    economy_mode=%s; in_reverse=%s; trailer=%s; water_temp=%s; odometer=%s; exterior_temperature=%s\n",
                 data[0] & 0x80 ? "FULL" : "DIMMED (LIGHTS ON)",
                 data[0] & 0x0F,
-                data[1] & 0x01 ? "ACC" : "OFF",
-                data[1] & 0x02 ? "ON" : "OFF",
+
+                (data[1] & 0x03) == 0x00 ? "OFF" :
+                    (data[1] & 0x03) == 0x01 ? "ACC" :
+                    (data[1] & 0x03) == 0x03 ? "ON" :
+                    (data[1] & 0x03) == 0x02 ? "START_ENGINE" :
+                    "??",
+
                 data[1] & 0x04 ? "RUNNING" : "OFF",
                 data[1] & 0x10 ? "ON" : "OFF",
                 data[1] & 0x20 ? "YES" : "NO",
@@ -577,11 +582,26 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
-                // Unknown what this is. Surely not the MFD and not the head unit. Could be:
+                // Unknown what this is. Surely not the head unit. Could be:
+                // - MFD unit - this type of packet is showing often when the MFD is changing to another screen
                 // - Aircon panel
                 // - CD changer (seems unlikely)
-                // - SatNav system (seems likely)
+                // - SatNav system - this type of packet is showing often when using the SatNav
                 // - Instrument panel
+
+                // Examples:
+                // Raw: #0408 ( 3/15)  8 0E 8C4 WA0 07-40-00-E6-2C ACK OK E62C CRC_OK
+                // Raw: #1857 (12/15)  8 0E 8C4 WA0 07-41-00-94-C0 ACK OK 94C0 CRC_OK
+                // Raw: #2152 ( 7/15)  8 0E 8C4 WA0 07-10-00-47-E8 ACK OK 47E8 CRC_OK
+                // Raw: #2155 (10/15)  8 0E 8C4 WA0 07-01-00-46-62 ACK OK 4662 CRC_OK
+                // Raw: #3026 (11/15)  8 0E 8C4 WA0 07-20-00-D2-42 ACK OK D242 CRC_OK
+                // Raw: #4199 (14/15)  8 0E 8C4 WA0 07-21-01-BF-94 ACK OK BF94 CRC_OK
+                // Raw: #5039 (14/15)  8 0E 8C4 WA0 07-01-01-59-58 ACK OK 5958 CRC_OK
+                // Raw: #5919 ( 9/15)  8 0E 8C4 WA0 07-00-01-2B-B4 ACK OK 2BB4 CRC_OK
+                // Raw: #7644 ( 9/15)  8 0E 8C4 WA0 07-47-00-A5-92 ACK OK A592 CRC_OK
+                // Raw: #7677 (12/15)  8 0E 8C4 WA0 07-60-00-00-E0 ACK OK 00E0 CRC_OK
+                // Raw: #9471 ( 6/15)  8 0E 8C4 WA0 07-00-02-0A-FA ACK OK 0AFA CRC_OK
+                // Raw: #7386 ( 1/15)  8 0E 8C4 WA0 07-40-02-D8-58 ACK OK D858 CRC_OK
 
                 // data[1] seems a bit pattern. Bits seen:
                 //  & 0x01 - MFD shows SatNav disclaimer screen, Entering new destination in SatNav
@@ -591,7 +611,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 //  & 0x20 - Entering new destination in SatNav, SatNav showing direction
                 //  & 0x40 - Contact key in "ACC" position?, SatNav showing direction
                 //
-                // data[2] is usually 0x00, sometimes 0x01
+                // data[2] is usually 0x00, sometimes 0x01 or 0x02
 
                 SERIAL.printf(
                     "0x%02X 0x%02X 0x%02X [to be decoded]\n",
@@ -616,10 +636,14 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 // - CD changer (seems unlikely)
                 // - SatNav system
                 // - Instrument panel
-                //
+
+                // Examples (the only two I had):
+                // Raw: #2641 ( 1/15)  7 0E 8C4 WA0 52-08-97-D0 ACK OK 97D0 CRC_OK
+                // Raw: #0000 ( 0/15)  7 0E 8C4 WA0 52-20-A8-0E NO_ACK OK A80E CRC_OK
+
                 // data[1] is usually 0x08, sometimes 0x20
                 //  & 0x08 - Contact key in "ON" position?
-                //  & 0x20
+                //  & 0x20 - Economy mode ON?
 
                 SERIAL.printf(
                     "0x%02X 0x%02X [to be decoded]\n",
@@ -661,7 +685,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             char floatBuf[3][MAX_FLOAT_SIZE];
             SERIAL.printf(
                 "seq=%u; doors=%s%s%s%s%s; right_stalk_button=%s; avg_speed_1=%u; avg_speed_2=%u; "
-                "fuel_level=%u litre;\n"
+                "exp_moving_avg_speed=%u;\n"
                 "    range_1=%u; avg_consumption_1=%s; range_2=%u; avg_consumption_2=%s; inst_consumption=%s; "
                 "mileage=%u\n",
                 data[0] & 0x07,
@@ -673,7 +697,21 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 data[10] & 0x01 ? "PRESSED" : "RELEASED",
                 data[11],
                 data[12],
-                data[13], // Fuel level in litres? TODO - total guess
+
+                // When engine running but stopped (actual vehicle speed is 0), this value counts down by 1 every
+                // 10 - 20 seconds or so. When driving, this goes up and down slowly toward the current speed.
+                // Looking at the time stamps when this value changes, it looks like this is an exponential moving
+                // average (EMA) of the recent vehicle speed. When the actual speed is 0, the value is seen to decrease
+                // about 12% per minute. If the actual vehicle speed is sampled every second, then, in the
+                // following formula, K would be around 12% / 60 = 0.2% = 0.002 :
+                //
+                //   exp_moving_avg_speed := exp_moving_avg_speed * (1 − K) + actual_vehicle_speed * K
+                //
+                // Often used in EMA is the constant N, where K = 2 / (N + 1). That means N would be around 1000 (given
+                // a sampling time of 1 second).
+                //
+                data[13],
+
                 (uint16_t)data[14] << 8 | data[15],
                 FloatToStr(floatBuf[0], ((uint16_t)data[16] << 8 | data[17]) / 10.0, 1),
                 (uint16_t)data[18] << 8 | data[19],
@@ -881,14 +919,18 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
+            // data[6..10] - always 00-FF-00-FF-00
+
             char floatBuf[2][MAX_FLOAT_SIZE];
             SERIAL.printf(
                 "hazard_lights=%s; door=%s; dashboard_programmed_brightness=%u, esp=%s,\n"
-                "    fuel_level_filtered=%s litre, fuel_level_raw=%s litre\n", // TODO - I think fuel level here is in % ?
+                "    fuel_level_filtered=%s litre, fuel_level_raw=%s litre\n",
                 data[0] & 0x02 ? "ON" : "OFF",
                 data[2] & 0x40 ? "LOCKED" : "UNLOCKED",
                 data[2] & 0x0F,
-                data[3] & 0x02 ? "OFF" : "ON",
+                data[3] & 0x02 ? "ON" : "OFF",
+
+                // Surely fuel level. Test with tank full shows definitely level is in litres.
                 FloatToStr(floatBuf[0], data[4] / 2.0, 1),
                 FloatToStr(floatBuf[1], data[5] / 2.0, 1)
             );
@@ -1074,7 +1116,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     {
                         SERIAL.printf(
                             "    search_pty=%s, pty_selection_menu=%s, selected_pty=%s, pty_standby_mode=%s, pty_match=%s,\n"
-                            "    pty=%s, pi=%s, %s, %s, %s, %s, %s, \"%s\"%s\n",
+                            "    pty=%s, pi=%s, %s, %s, %s, %s, %s, rds_text=\"%s\"%s\n",
                             search_pty ? "YES" : "NO",
                             pty_selection_menu ? "ON" : "OFF",
                             PtyStr(selected_pty),
@@ -1340,12 +1382,12 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
         }
         break;
 
-        case SATNAV_GUIDANCE_IDEN:
+        case SATNAV_GUIDANCE_DATA_IDEN:
         {
             // http://graham.auld.me.uk/projects/vanbus/packets.html#9CE
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#9CE
 
-            SERIAL.print("--> SatNav guidance instruction: ");
+            SERIAL.print("--> SatNav guidance data: ");
 
             if (dataLen != 16)
             {
@@ -1353,18 +1395,60 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
-            // This packet precedes a packet with IDEN value 0x64E (SATNAV2_IDEN).
-            // I think this packet contains direction instructions during guidance.
+            // This packet precedes a packet with IDEN value 0x64E (SATNAV_GUIDANCE_IDEN).
+            // This packet contains direction data during guidance.
             //
-            // Possible meanings of data:
+            // Meanings of data:
+            //
             // - data[0] & 0x0F , data[15] & 0x0F = sequence number
-            // - data[2] = number of icon to be shown on MFD ??
-            //   - data[2] == 0x81, or (data[2] & 0x7F) == 0x01: turn right ?
-            // - data[9] << 8 | data[10] = number of meters before next instruction
+            //
+            // - data[1], [2] = current heading in degrees
+            //
+            // - data[3], [4] = heading to destination in degrees
+            //
+            // - (data[5] & 0x7F) << 8 | data[6] = remaining distance to destination
+            //   Unit (kilometers or meters) is encoded in most significant bit:
+            //   & 0x80: 1 = in kilometers (>= 10 km), 0 = in meters (< 10 km)
+            //
+            // - (data[7] & 0x7F) << 8 | data[8] = distance to destination in straight line
+            //   Unit (kilometers or meters) is encoded in most significant bit:
+            //   & 0x80: 1 = in kilometers (>= 10 km), 0 = in meters (< 10 km)
+            //
+            // - (data[9] & 0x7F) << 8 | data[10] = distance to next guidance instruction
+            //   Unit (kilometers or meters) is encoded in most significant bit:
+            //   & 0x80: 1 = in kilometers (>= 10 km), 0 = in meters (< 10 km)
+            //
+            // - data [11] << 8 & data[12] = Usually 0x7FFF. If not, low values (maximum value seen is 0x0167). Some
+            //   kind of heading indication? Seen only when driving on a roundabout. For indicating when to take the
+            //   exit of a roundabout?
+            //
+            // - data [13] << 8 & data[14] = Some distance value. Always in km. Decreases steadily while driving,
+            //   but can jump up after a route has been recalculated. When decreasing, sometimes just skips a value.
+            //
+            uint16_t currHeading = (uint16_t)data[1] << 8 | data[2];
+            uint16_t headingToDestination = (uint16_t)data[3] << 8 | data[4];
+            uint16_t distanceToDestination = (uint16_t)(data[5] & 0x7F) << 8 | data[6];
+            uint16_t gpsDistanceToDestination = (uint16_t)(data[7] & 0x7F) << 8 | data[8];
+            uint16_t distanceToNextTurn = (uint16_t)(data[9] & 0x7F) << 8 | data[10];
+            uint16_t headingOnRoundabout = (uint16_t)data[11] << 8 | data[12];
+            uint16_t gpsDistanceToDestination2 = (uint16_t)data[13] << 8 | data[14];
 
-            uint16_t metersToNextInstr = (uint16_t)data[9] << 8 | data[10];
-
-            SERIAL.printf("meters=%u\n", metersToNextInstr);
+            char floatBuf[MAX_FLOAT_SIZE];
+            SERIAL.printf(
+                "curr_heading=%u deg, heading_to_dest=%u deg, distance_to_dest=%u %s,"
+                " distance_to_dest_straight_line=%u %s, turn_at=%u %s,\n"
+                " heading_on_roundabout=%s deg, distance_to_dest_straight_line_2=%u\n",
+                currHeading,
+                headingToDestination,
+                distanceToDestination,
+                data[5] & 0x80 ? "Km" : "m" ,
+                gpsDistanceToDestination,
+                data[7] & 0x80 ? "Km" : "m" ,
+                distanceToNextTurn,
+                data[9] & 0x80 ? "Km" : "m",
+                headingOnRoundabout == 0x7FFF ? "---" : FloatToStr(floatBuf, headingOnRoundabout, 0),
+                gpsDistanceToDestination2
+            );
         }
         break;
 
@@ -1397,20 +1481,95 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
-            SERIAL.printf(
-                "auto=%s; enabled=%s; on_if_necessary=%s; recirc=%s; demist=%s, rear_heat=%s, fanSpeed=%u\n",
-                data[0] & 0x40 ? "AUTO" : "MANUAL",
-                data[0] & 0x20 ? "YES" : "NO",
-                data[0] & 0x10 ? "YES" : "NO",
-                data[0] & 0x0A ? "ON" : "OFF",
-                data[0] & 0x04 ? "ON" : "OFF",
-                data[0] & 0x01 ? "YES" : "NO",
+            // data[0] - bits:
+            // - & 0x01: Rear window heater ON
+            // - & 0x04: Air recirculation ON
+            // - & 0x10: A/C icon?
+            // - & 0x20: A/C icon? "YES" : "NO",  // TODO - what is this? This bit is always 0
+            // - & 0x40: mode ? "AUTO" : "MANUAL",  // TODO - what is this? This bit is always 0
+            // - & 0x0A: demist ? "ON" : "OFF",  // TODO - what is this? These bits are always 0
 
-                // TODO - unravel byte value. Maybe this is effective (not the set) fan speed.
-                // There is an offset that depends on various conditions, e.g. airco or recirc. I seem to notice fan
-                // speed in fact goes up when recirc is on. Note: aircon on usually triggers recirc when interior
-                // temperature is high (to speed up cooling).
-                data[4]
+            // data[4] - reported fan speed
+            //
+            // Real-world tests: reported fan_speed values with various settings of the fan speed icon (NO icon
+            // visible ... all blades full, 0...7), under varying conditions:
+            //
+            // 1.) Recirculation = OFF, rear window heater = OFF, A/C = OFF:
+            //     Fan icon not visible at all = 0
+            //     Fan icon with all empty blades = 4 
+            //     One blade visible = 4 (same as previous!)
+            //     Two blades - low = 6
+            //     Two blades - high = 7
+            //     Three blades - low = 9
+            //     Three blades - high = 10
+            //     Four blades = 19
+            //     
+            // 2.) Recirculation = ON, rear window heater = OFF, A/C = OFF:
+            //     Fan icon not visible at all = 0
+            //     Fan icon with all empty blades = 4
+            //     One blade visible = 4 (same as previous!)
+            //     Two blades - low = 6
+            //     Two blades - high = 7
+            //     Three blades - low = 9
+            //     Three blades - high = 10
+            //     Four blades = 19
+            //
+            // 3.) Recirculation = OFF, rear window heater = OFF, A/C = ON (compressor running):
+            //     Fan icon not visible at all = 0 (A/C icon will turn off)
+            //     Fan icon with all empty blades = 4
+            //     One blade visible = 4 (same as previous!)
+            //     Two blades - low = 8
+            //     Two blades - high = 9
+            //     Three blades - low = 11
+            //     Three blades - high = 12
+            //     Four blades = 21
+            //
+            // 4.) Recirculation = OFF, rear window heater = ON, A/C = OFF:
+            //     Fan icon not visible at all = 12
+            //     Fan icon with all empty blades = 15
+            //     One blade visible = 16
+            //     Two blades - low = 17
+            //     Two blades - high = 19
+            //     Three blades - low = 20
+            //     Three blades - high = 22
+            //     Four blades = 30
+            //
+            // 5.) Recirculation = OFF, rear window heater = ON, = A/C ON:
+            //     Fan icon not visible at all = 12 (A/C icon will turn off)
+            //     Fan icon with all empty blades = 17
+            //     One blade visible = 18
+            //     Two blades - low = 19
+            //     Two blades - high = 21
+            //     Three blades - low = 22
+            //     Three blades - high = 24
+            //     Four blades = 32
+            //
+            // All above with demist ON --> makes no difference
+            //
+            // In "AUTO" mode, the fan speed varies gradually over time in increments or decrements of 1.
+
+            bool rear_heat = data[0] & 0x01;
+            bool ac_icon = data[0] & 0x10;
+            uint8_t setFanSpeed = data[4];
+            if (rear_heat) setFanSpeed -= 12;
+            if (ac_icon) setFanSpeed -= 2;
+            setFanSpeed =
+                setFanSpeed >= 18 ? 7 : // Four blades
+                setFanSpeed >= 10 ? 6 : // Three blades - high
+                setFanSpeed >= 8 ? 5 : // Three blades - low
+                setFanSpeed == 7 ? 4 : // Two blades - high
+                setFanSpeed >= 5 ? 3 : // Two blades - low
+                setFanSpeed == 4 ? 2 : // One blade (2) or all empty blades (1)
+                setFanSpeed == 3 ? 1 : // All empty blades (1)
+                0; // Fan icon not visible at all
+
+            SERIAL.printf(
+                "ac_icon=%s; recirc=%s, rear_heat=%s, reported_fan_speed=%u, set_fan_speed=%u\n",
+                ac_icon ? "ON" : "OFF",
+                data[0] & 0x04 ? "ON" : "OFF",
+                rear_heat ? "YES" : "NO",
+                data[4],
+                setFanSpeed
             );
         }
         break;
@@ -1421,7 +1580,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#4DC
             // https://github.com/morcibacsi/PSAVanCanBridge/blob/master/src/Van/Structs/VanAirConditioner2Structs.h
 
-            // Evaporator temperature is contantly toggling between 2 values, while the rest of the data is the same.
+            // Evaporator temperature is constantly toggling between 2 values, while the rest of the data is the same.
             // So print only if not duplicate of previous 2 packets.
             static uint8_t packetData[2][MAX_DATA_BYTES];  // Previous packet data
 
@@ -1441,17 +1600,23 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
             char floatBuf[2][MAX_FLOAT_SIZE];
             SERIAL.printf(
-                "auto=%s; enabled=%s; rear_window=%s; aircon_compressor=%s; air_con_key=%s;\n"
-                "    interiorTemperature=%s, evaporatorTemperature=%s\n",
-                data[0] & 0x80 ? "AUTO" : "MANUAL",
+                "contact_key_on=%s; enabled=%s; rear_window=%s; aircon_compressor=%s; contact_key_position=%s;\n"
+                "    condenserTemperature=%s, evaporatorTemperature=%s\n",
+                data[0] & 0x80 ? "YES" : "NO",
                 data[0] & 0x40 ? "YES" : "NO",
                 data[0] & 0x20 ? "ON" : "OFF",
                 data[0] & 0x01 ? "ON" : "OFF",
-                data[1] == 0x1C ? "OFF" :
-                    data[1] == 0x04 ? "ACC" :
+                data[1] == 0x1C ? "ACC_OR_OFF" :
+                    data[1] == 0x18 ? "ACC-->OFF" :
+                    data[1] == 0x04 ? "ON-->ACC" :
                     data[1] == 0x00 ? "ON" :
-                    "INVALID",
+                    "??",
+
+                // This is not interior temperature. This rises quite rapidly if the aircon compressor is
+                // running, and drops again when the aircon compressor is off. So I think this is the condenser
+                // temperature.
                 data[2] == 0xFF ? "--" : FloatToStr(floatBuf[0], data[2], 0),
+
                 FloatToStr(floatBuf[1], ((uint16_t)data[3] << 8 | data[4]) / 10.0 - 40.0, 1)
             );
         }
@@ -1556,10 +1721,13 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 "status=%s%s\n",
                 status == 0x0000 ? "NOT_OPERATING" :
                     status == 0x0080 ? "READY" :
-                    status == 0x0200 ? "INITIALISING" :
+                    status == 0x0200 ? "INITIALISING" : // No, definitely not this
+                    status == 0x0300 ? "0x0300" :
                     status == 0x0301 ? "GUIDANCE_STARTED" :
                     status == 0x4000 ? "GUIDANCE_STOPPED" :
-                    status == 0x0400 ? "TERMS_AND_CONDITIONS_ACCEPTED" :
+                    status == 0x0400 ? "TERMS_AND_CONDITIONS_ACCEPTED" : // No, definitely not this
+                    status == 0x0700 ? "0x0700" :
+                    status == 0x0701 ? "0x0701" : // 
                     status == 0x0800 ? "PLAYING_AUDIO_MESSAGE" :
                     status == 0x9000 ? "READING_DISC" :
                     buffer,
@@ -1572,35 +1740,192 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
         }
         break;
 
-        case SATNAV2_IDEN:
+        case SATNAV_GUIDANCE_IDEN:
         {
             // http://graham.auld.me.uk/projects/vanbus/packets.html#64E
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#64E
 
-            SERIAL.print("--> SatNav 2: ");
+            SERIAL.print("--> SatNav guidance: ");
 
-            if (dataLen != 4)
+            if (dataLen != 4 && dataLen != 6 && dataLen != 13 && dataLen != 23)
             {
                 SERIAL.println("[unexpected packet length]");
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
             // Packet appears as soon as the first guidance instruction is given.
-            // Just before this packet there is always a packet with IDEN value 0x9CE (SATNAV_GUIDANCE_IDEN).
+            // Just before this packet there is always a packet with IDEN value 0x9CE (SATNAV_GUIDANCE_DATA_IDEN).
             //
             // Possible meanings of data:
-            // - data[0] & 0x0F , data[3] & 0x0F = sequence number
-            // - data[1] = always 0x05
-            // - data[2] = 0x01 or 0x02 - I think this is the direction icon to be shown in the MFD
-            //   Possible meanings:
+            //
+            // - data[0] & 0x0F , data[dataLen - 1] & 0x0F = sequence number
+            //
+            // - data[1]: large icon (left in MFD, indicating current instruction)
+            //   0x01 = Single turn instruction ("Turn left"). dataLen = 6 or 13
+            //   0x03 = Double turn instruction ("Turn left, then turn right"). dataLen = 23
+            //   0x05 = Go straight. dataLen = 4. No further information about this icon
+            //
+            // - data[2]: small icon (between current street and next street, indicating next instruction)
+            //   0x00 = No icon
             //   0x01 = turn right
+            //   0x02 = Turn left
+            //   0x04 = Roundabout
+            //   0x08 = Go straight
+            //   0x10 = Retrieving next instruction
+            //
+            // - data[3] ... [12] or [22]: describe the shape of the large navigation icon as shown in the left of
+            //   the MFD
+            //
+            //   Depending on the value of data[1] and data[2], there can 1 or 2 "instructions" encoded. An
+            //   "instruction" consists of 8 bytes:
+            //   * 0   : turn angle in increments of 22.5 degrees, measured clockwise, starting with 0 at 6 o-clock.
+            //           E.g.: 0x4 == 90 deg left, 0x8 = 180 deg = straight ahead, 0xC = 270 deg = 90 deg right.
+            //   * 1   : always 0x00 ??
+            //   * 2, 3: bit pattern indicating which legs are present in the junction. Each bit set is for one leg.
+            //           Lowest bit of byte 3 corresponds to the leg of 0 degrees (straight down, which is
+            //           always there, because that is where we are currently driving), running clockwise up to the
+            //           highest bit of byte 2, which corresponds to a leg of 337.5 degrees (very sharp right).
+            //   * 4, 5: bit pattern indicating which legs in the junction are "no entry". Bitcoding is the same as
+            //           for bytes 2 and 3.
+            //   * 6   : always 0x00 ??
+            //   * 7   : always 0x00 ??
+            //
+            //   * data[3]: ?? Seen values: 0x00, 0x01, 0x42, 0x53
+            //
+            //   when data[1] == 0x01 && data[2] == 0x02:
+            //   * data[4]:
+            //     0x41: keep left on fork
+            //     0x14: keep right on fork
+            //     0x12: take right exit
+            //
+            //   when data[1] == 0x01 && data[2] == 0x00:
+            //   * data[4...11]: current instruction ("turn left")
+            //
+            //   when data[1] == 0x03:
+            //   * data[6...13]: current instruction ("turn left ...")
+            //   * data[14...21]: next instruction ("... then turn right")
+            //
+            //   Just some examples:
+            //
+            //     01-02-53-41 is shown as:
+            //           ^  |
+            //           || |
+            //           \\ /
+            //            ++
+            //            ||
+            //            ||
+            //       (keep left on fork)
+            //
+            //     01-02-53-14 is shown as:
+            //           |  ^
+            //           | ||
+            //           \ //
+            //            ++
+            //            ||
+            //            ||
+            //       (keep right on fork)
+            //
+            //     01-02-53-12 is shown as:
+            //            |  ^
+            //            | ||
+            //            |//
+            //            ++
+            //            ||
+            //            ||
+            //       (take right exit)
+            //
+            //     01-00-53-04-00-12-11-00-00-00-00 is shown as:
+            //               /
+            //              /
+            //         <===+---
+            //            ||
+            //            ||
+            //       (turn left 90 deg; ahead = +202.5 deg; right = 270 deg)
+            //
+            //     01-00-53-04-00-01-11-00-00-00-00 is shown as:
+            //             |
+            //             |
+            //         <===+
+            //            ||
+            //            ||
+            //       (turn left 90 deg; ahead = 180 deg; no right)
+            //
+            //     01-00-53-03-00-11-09-10-00-00-00 is:
+            //              |
+            //              |
+            //            /=+--- (-)
+            //         <-/ ||
+            //             ||
+            //       (turn left -67.5 deg; ahead = 180 deg; right = 270 deg: no entry)
+            //
+            //     01-00-53-05-00-02-21-00-00-00-00 is:
+            //                /
+            //         <-\   /
+            //            \=+
+            //             ||
+            //             ||
+            //       (turn left 112.5 deg; ahead = +202.5 deg; no right)
+            //
+            //     01-00-53-0C-00-10-21-00-00-00-00
+            //
+            //         -\
+            //           \-+===>
+            //            ||
+            //            ||
+            //       (turn right 270 deg; no ahead; left = 112.5 deg)
+            //
+            //     01-00-01-0C-00-11-11-00-10-00-00 is:
+            //             |
+            //             |
+            //      (-) ---+===>
+            //            ||
+            //            ||
+            //       (turn right 270 deg; ahead = 180 deg; left = 90: no entry)
+            //
+            //     01-00-01-04-00-10-13-00-03-00-00 is:
+            //
+            //         <===+---
+            //            /||
+            //           / ||
+            //          (-)
+            //       (turn left 90 deg; no ahead; right = 270 deg, sharp left = 22.5 deg: no entry)
+            //
+            //     03-00-53-00-41-0C-00-11-01-00-00-00-00-0B-00-08-11-00-00-00-00 is:
+            //             |
+            //             |
+            //             +===>
+            //            ||
+            //            ||
+            //       (turn right 270 deg; ahead = 180 deg; no left)
+            //
+            //     03-00-53-00-41-0C-00-10-11-00-10-00-00-04-00-12-11-00-00-00-00 is:
+            //
+            //      (-) ---+===>
+            //            ||
+            //            ||
+            //       (turn right 270 deg; no ahead; left = 90 deg: no entry)
+            //
+            //     03-00-53-00-63-04-00-01-11-00-00-00-00-03-00-08-09-00-00-00-00 and
+            //     03-00-53-00-32-04-00-01-11-00-00-00-00-05-00-02-21-00-00-00-00 is:
+            //             |
+            //             |
+            //         <===+
+            //            ||
+            //            ||
+            //       (turn left 90 deg; ahead = 180 deg; no right)
+            //
+            //     03-00-53-00-3A-0B-00-08-11-00-00-00-00-04-00-10-11-00-00-00-00 is:
 
             char buffer[10];
             sprintf_P(buffer, PSTR("0x%02X-0x%02X"), data[1], data[2]);
 
-            SERIAL.printf("%s\n", buffer);
-
-            return VAN_PACKET_PARSE_TO_BE_DECODED_IDEN;
+            SERIAL.printf("%s - %s\n",
+                buffer,
+                data[1] == 0x01 ? "TURN" :
+                    data[1] == 0x03 ? "TURN_THEN_TURN" :
+                    data[1] == 0x05 ? "GO_STRAIGHT_AHEAD" :
+                    "??"
+            );
         }
         break;
 
@@ -1792,13 +2117,13 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // data[0] & 0x07 - sequence number
             //
             // data[1] values:
-            // - 0x11 - Stopping guidance ??
-            // - 0x15 - In guidance mode ??
-            // - 0x20 - Idle, not ready ??
-            // - 0x21 - Idle, ready ??
-            // - 0x25 - Busy calculating route ??
-            // - 0x41 - Finished downloading ??
-            // - 0xC1 - Finished downloading ??
+            // - 0x11 - Stopping guidance??
+            // - 0x15 - In guidance mode??
+            // - 0x20 - Idle, not ready??
+            // - 0x21 - Idle, ready??
+            // - 0x25 - Busy calculating route??
+            // - 0x41 - Finished downloading?? Audio volume dialog??
+            // - 0xC1 - Finished downloading??
             // Or bits:
             // - & 0x01 - ??
             // - & 0x04 - ??
@@ -1811,47 +2136,88 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // Bits:
             // - & 0x01 - ??
             // - & 0x02 - ??
-            // - & 0x04 - ??
+            // - & 0x04 - Reading disc ??
             // - & 0x08 - Always 1
             // - & 0x10 - Disc recognized / valid??
             // - & 0x20 - Disc present??
             // - & 0x40 - No Disc present??
             //
-            // data[9] << 8 | data[10] - some kind of distance value ?? Seen 0x1F4 (500) for destination 100 km away
+            // data[3] - either 0x00 or 0x02
+            // 
+            // data[4] - always 0x07
             //
-            // data[17] values: 0x00, 0x20, 0x21, 0x22, 0x28, 0x2A, 0x2C, 0x2D, 0x30 or 0x38
+            // data[5] - either 0x01 or 0x06
+            //
+            // data[6] - either 0x01, 0x02, or 0x04
+            //
+            // data[7...8] - always 0x00
+            //
+            // data[9] << 8 | data[10] - always either 0x0000 or 0x01F4 (500)
+            //
+            // data[11...15] - always 0x00
+            //
+            // data[16] - vehicle speed (measured by GPS?) in km/h. Can be negative (e.g. 0xFC) when reversing.
+            //
+            // data[17] values: 0x00, 0x20, 0x21, 0x22, 0x28, 0x29, 0x2A, 0x2C, 0x2D, 0x30, 0x38, 0xA1
             // Bits:
-            // - & 0x01 - Showing terms and conditions (disclaimer) ??
-            // - & 0x02 - Audio output ??
-            // - & 0x04 - New instruction ??
-            // - & 0x08 - Reading disc ??
-            // - & 0x10 - Calculating route ??
-            // - & 0x20 - Disc present ??
+            // - & 0x01 - Loading audio fragment
+            // - & 0x02 - Audio output
+            // - & 0x04 - New instruction??
+            // - & 0x08 - Reading disc??
+            // - & 0x10 - Calculating route??
+            // - & 0x20 - Disc present??
+            // - & 0x80 - Reached destination (sure!)
+            //
+            // data[18] - always 0x00
+            //
+            // data[19] - same as data[0]: sequence number
 
             uint16_t status = (uint16_t)data[1] << 8 | data[2];
 
             char buffer[12];
             sprintf_P(buffer, PSTR("0x%04X-0x%02X"), status, data[17]);
 
-            // TODO - check; total guess
-            SERIAL.printf(
-                "status=%s",
-                status == 0x2038 ? "CD_ROM_FOUND" :
-                    status == 0x203C ? "INITIALIZING" :  // data[17] == 0x28
-                    status == 0x213C ? "READING_CDROM" :
-                    status == 0x2139 && data[17] == 0x28 ? "DISC_IDENTIFIED" :
-                    status == 0x2139 && data[17] == 0x29 ? "SHOWING_TERMS_AND_CONDITIONS" : 
-                    status == 0x2139 && data[17] == 0x2A ? "READ_WELCOME_MESSAGE" : 
-                    status == 0x2539 ? "CALCULATING_ROUTE" :
-                    status == 0x1539 ? "GUIDANCE_ACTIVE" :
-                    status == 0x1139 ? "GUIDANCE_STOPPED" :
-                    status == 0x2039 ? "POWER_OFF" :
-                    buffer
+            // SERIAL.printf(
+                // "status=%s",
+                // status == 0x2038 ? "CD_ROM_FOUND" :
+                    // status == 0x203C ? "INITIALIZING" :  // data[17] == 0x28
+                    // status == 0x213C ? "READING_CDROM" :
+                    // status == 0x2139 && data[17] == 0x20 ? "DISC_PRESENT" :
+                    // status == 0x2139 && data[17] == 0x28 ? "DISC_IDENTIFIED" :
+                    // status == 0x2139 && data[17] == 0x29 ? "SHOWING_TERMS_AND_CONDITIONS" : 
+                    // status == 0x2139 && data[17] == 0x2A ? "READ_WELCOME_MESSAGE" : 
+                    // status == 0x2539 ? "CALCULATING_ROUTE" :
+                    // status == 0x1539 ? "GUIDANCE_ACTIVE" :
+                    // status == 0x1139 ? "GUIDANCE_STOPPED" :
+                    // status == 0x2039 ? "POWER_OFF" :
+                    // buffer
+            // );
+
+            SERIAL.printf("status=%s",
+                data[1] == 0x11 ? "STOPPING_GUIDANCE" :
+                    data[1] == 0x15 ? "IN_GUIDANCE_MODE" :
+                    data[1] == 0x20 ? "IDLE_NOT_READY" :
+                    data[1] == 0x21 ? "IDLE_READY" :
+                    data[1] == 0x25 ? "CALCULATING_ROUTE" :
+                    data[1] == 0x41 ? "???" :
+                    data[1] == 0xC1 ? "FINISHED_DOWNLOADING" :
+                    "??"
             );
+
+            SERIAL.printf(", disc=%s, reading_disc=%s, xxx=%s, yyy=%s",
+                (data[2] & 0x70) == 0x70 ? "NONE_PRESENT" :
+                    (data[2] & 0x70) == 0x30 ? "RECOGNIZED" :
+                    (data[2] & 0x70) == 0x10 ? "PRESENT_NOT_RECOGNIZED" :
+                    "??",
+                data[2] & 0x04 ? "YES" : "NO",
+                data[2] & 0x01 ? "ON" : "OFF",
+                data[2] & 0x02 ? "ON" : "OFF"
+            );
+
             if (data[17] != 0x00)
             {
-                SERIAL.printf("; disc_status=%s%s%s%s%s%s",
-                    data[17] & 0x01 ? "SHOWING_TERMS_AND_CONDITIONS " : "",
+                SERIAL.printf(", disc_status=%s%s%s%s%s%s",
+                    data[17] & 0x01 ? "LOADING_AUDIO_FRAGMENT " : "",
                     data[17] & 0x02 ? "AUDIO_OUTPUT " : "",
                     data[17] & 0x04 ? "NEW_GUIDANCE_INSTRUCTION " : "",
                     data[17] & 0x08 ? "READING_DISC " : "",
@@ -1860,14 +2226,13 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 );
             } // if
 
-            uint16_t distance = (uint16_t)data[9] << 8 | data[10];
-            if (distance != 0x00)
-            {
-                SERIAL.printf(
-                    "; distance=%u\n",
-                    distance
-                );
-            } // if
+            uint16_t zzz = (uint16_t)data[9] << 8 | data[10];
+            if (zzz != 0x00) SERIAL.printf(", zzz=%u", zzz);
+
+            SERIAL.printf(", gps_speed=%u km/h%s",
+                data[16] < 0xE0 ? data[16] : 0xFF - data[16] + 1,  // 0xE0: just guessing
+                data[16] >= 0xE0 ? " (reverse)" : ""
+            );
 
             SERIAL.println();
         }
@@ -1879,18 +2244,20 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#8CE
 
             // Examples:
-            // Raw: #2733 ( 8/15) 7 0E 8CE WA0 00-00-62-98 ACK OK 6298 CRC_OK
-            // Raw: #2820 ( 5/15) 7 0E 8CE WA0 00-01-7D-A2 ACK OK 7DA2 CRC_OK
-            // Raw: #5252 ( 2/15) 7 0E 8CE WA0 0C-02-3E-48 ACK OK 3E48 CRC_OK
-            // Raw: #2041 (11/15) 7 0E 8CE WA0 0C-01-1F-06 ACK OK 1F06 CRC_OK
+            // Raw: #2733 ( 8/15)  7 0E 8CE WA0 00-00-62-98 ACK OK 6298 CRC_OK
+            // Raw: #2820 ( 5/15)  7 0E 8CE WA0 00-01-7D-A2 ACK OK 7DA2 CRC_OK
+            // Raw: #5252 ( 2/15)  7 0E 8CE WA0 0C-02-3E-48 ACK OK 3E48 CRC_OK
+            // Raw: #2041 (11/15)  7 0E 8CE WA0 0C-01-1F-06 ACK OK 1F06 CRC_OK
             // Raw: #2103 (13/15) 22 0E 8CE WA0 20-50-41-34-42-32-35-30-30-53-42-20-00-30-30-31-41-14-E6 ACK OK 14E6 CRC_OK
-            // Raw: #2108 ( 3/15) 7 0E 8CE WA0 01-40-83-52 ACK OK 8352 CRC_OK
+            // Raw: #2108 ( 3/15)  7 0E 8CE WA0 01-40-83-52 ACK OK 8352 CRC_OK
+            // Raw: #5129 ( 9/15)  8 0E 8CE WA0 04-04-00-B2-B8 ACK OK B2B8 CRC_OK
+            // Raw: #1803 ( 8/15)  8 0E 8CE WA0 04-02-00-83-EA ACK OK 83EA CRC_OK
 
             // Possible meanings of data:
 
             SERIAL.print("--> SatNav 6 - SatNav status: ");
 
-            if (dataLen != 2 && dataLen != 17)
+            if (dataLen != 2 && dataLen != 3 && dataLen != 17)
             {
                 SERIAL.println("[unexpected packet length]");
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
@@ -2361,6 +2728,13 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     (sint8_t)data[4] - 0x3F
                 );
             }
+            else if (data[0] == 0x27)
+            {
+                SERIAL.printf("preset_request band=%s, preset=%u\n",
+                    TunerBandStr(data[1] >> 4),
+                    data[1] & 0x0F
+                );
+            }
             else if (data[0] == 0x61)
             {
                 if (dataLen != 4)
@@ -2373,7 +2747,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     data[1] == 0x02 ? "PAUSE" :
                         data[1] == 0x03 ? "PLAY" :
                         data[3] == 0xFF ? "NEXT" :
-                        data[3] == 0xFE ? "PREV" :
+                        data[3] == 0xFE ? "PREVIOUS" :
                         "??"
                 );
             }
@@ -2398,13 +2772,6 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 } // if
 
                 SERIAL.printf("command=REQUEST_CD_TRACK_INFO\n");
-            }
-            else if (data[0] == 0x27)
-            {
-                SERIAL.printf("preset_request band=%s, preset=%u\n",
-                    TunerBandStr(data[1] >> 4),
-                    data[1] & 0x0F
-                );
             }
             else
             {
@@ -2431,6 +2798,52 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
         }
         break;
 
+        case ECU_IDEN:
+        {
+            SERIAL.print("--> ECU status(?): ");
+
+            if (dataLen != 15)
+            {
+                SERIAL.println("[unexpected packet length]");
+                return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
+            } // if
+
+            // No idea who is sending this packet (engine ECU?) and what this packet means.
+
+            // Examples:
+            //
+            // Raw: #3857 (12/15) 20 0E B0E W-0 01-1D-6E-B0-0B-35-5A-3C-79-E3-1D-F7-00-00-00-F6-BE NO_ACK OK F6BE CRC_OK
+            // Raw: #3918 (13/15) 20 0E B0E W-0 01-1D-6E-B0-0B-35-5A-3C-79-E3-1D-FA-00-00-02-D1-5A NO_ACK OK D15A CRC_OK
+            // Raw: #3977 (12/15) 20 0E B0E W-0 01-1D-6E-B0-0B-35-5A-3C-79-E3-1D-FA-00-00-00-EF-2E NO_ACK OK EF2E CRC_OK
+            // Raw: #4038 (13/15) 20 0E B0E W-0 01-1D-6E-B0-0B-35-5A-3C-79-E3-1D-FB-00-00-02-9A-EC NO_ACK OK 9AEC CRC_OK
+            // Raw: #4099 (14/15) 20 0E B0E W-0 01-1D-6E-B0-0B-35-5A-3C-79-E3-1E-01-00-00-01-40-E8 NO_ACK OK 40E8 CRC_OK
+            // Raw: #4160 ( 0/15) 20 0E B0E W-0 01-1D-6E-B0-0B-35-5A-3C-79-E3-1E-02-00-00-01-9C-32 NO_ACK OK 9C32 CRC_OK
+            // Raw: #4221 ( 1/15) 20 0E B0E W-0 01-1D-6E-B0-0B-35-5A-3C-79-E3-1E-02-00-00-00-83-08 NO_ACK OK 8308 CRC_OK
+            //
+            // Raw: #8351 ( 1/15) 20 0E B0E W-0 01-1D-6E-C2-0B-35-5A-3C-79-E3-1E-FA-00-00-01-28-DE NO_ACK OK 28DE CRC_OK
+            // Raw: #8470 ( 0/15) 20 0E B0E W-0 01-1D-6E-C2-0B-35-5A-3C-79-E3-1E-FB-00-00-01-63-68 NO_ACK OK 6368 CRC_OK
+            // Raw: #8527 (12/15) 20 0E B0E W-0 01-1D-6E-C2-0B-35-5A-3C-79-E3-20-01-00-00-01-82-48 NO_ACK OK 8248 CRC_OK --> Skipping 1F ??
+            // Raw: #8586 (11/15) 20 0E B0E W-0 01-1D-6E-C2-0B-35-5A-3C-79-E3-20-02-00-00-01-5E-92 NO_ACK OK 5E92 CRC_OK
+            // Raw: #8645 (10/15) 20 0E B0E W-0 01-1D-6E-C2-0B-35-5A-3C-79-E3-20-03-00-00-01-15-24 NO_ACK OK 1524 CRC_OK
+            // Raw: #8763 ( 8/15) 20 0E B0E W-0 01-1D-6E-C2-0B-35-5A-3C-79-E3-20-05-00-00-01-B3-AA NO_ACK OK B3AA CRC_OK
+            //
+            // Raw: #1741 (11/15) 20 0E B0E W-0 01-48-E5-02-0A-B3-E3-3B-79-FD-35-F7-00-00-01-5A-1C NO_ACK OK 5A1C CRC_OK
+            // Raw: #1876 (11/15) 20 0E B0E W-0 01-48-E5-02-0A-B3-E3-3B-79-FD-35-F9-00-00-01-9F-56 NO_ACK OK 9F56 CRC_OK
+            // Raw: #2010 (10/15) 20 0E B0E W-0 01-48-E5-02-0A-B3-E3-3B-79-FD-35-FA-00-00-01-43-8C NO_ACK OK 438C CRC_OK
+            // Raw: #2079 ( 4/15) 20 0E B0E W-0 01-48-E5-02-0A-B3-E3-3B-79-FD-36-00-00-00-02-99-88 NO_ACK OK 9988 CRC_OK
+            // Raw: #2150 ( 0/15) 20 0E B0E W-0 01-48-E5-02-0A-B3-E3-3B-79-FD-36-02-00-00-01-2F-AA NO_ACK OK 2FAA CRC_OK
+
+            // data[9] << 16 | data[10] << 8 | data[11]: Counter incrementing by 1 per second?
+            //     Counting is regardless of engine running or not.
+
+            SERIAL.printf("counter=%lu\n",
+                (uint32_t)data[9] << 16 | (uint32_t)data[10] << 8 | data[11]
+            );
+
+            return VAN_PACKET_PARSE_TO_BE_DECODED_IDEN;
+        }
+        break;
+
         default:
         {
             return VAN_PACKET_PARSE_UNRECOGNIZED_IDEN;
@@ -2444,7 +2857,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 void setup()
 {
     SERIAL.begin(115200);
-    Serial.println("Starting VAN bus packet parser");
+    SERIAL.println("Starting VAN bus packet parser");
     VanBus.Setup(RECV_PIN);
 } // setup
 
@@ -2457,7 +2870,7 @@ void loop()
         bool isQueueOverrun;
         VanBus.Receive(pkt, &isQueueOverrun);
 
-        if (isQueueOverrun) Serial.print("QUEUE OVERRUN!\n");
+        if (isQueueOverrun) SERIAL.print("QUEUE OVERRUN!\n");
 
         pkt.CheckCrcAndRepair();
 
@@ -2562,6 +2975,14 @@ void loop()
         // Process at most 30 packets at a time
         if (++n >= 30) break;
     } // while
+
+    // Print statistics every 5 seconds
+    static unsigned long lastUpdate = 0;
+    if (millis() - lastUpdate >= 5000UL) // Arithmetic has safe roll-over
+    {
+        lastUpdate = millis();
+        VanBus.DumpStats(SERIAL);
+    } // if
 
     delay(1); // Give some time to system to process other things?
 } // loop
