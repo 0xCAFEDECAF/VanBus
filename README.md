@@ -119,7 +119,6 @@ For background reading:
 - http://ebajic.free.fr/Ecole%20Printemps%20Reseau%20Mars%202006/Supports/J%20MERCKLE%20CANopen.pdf
 - http://igm.univ-mlv.fr/~duris/NTREZO/20042005/Guerrin-Guers-Guinchard-VAN-CAN-rapport.pdf
 - https://www.amazon.com/bus-VAN-vehicle-area-network/dp/2100031600
-- http://milajda22.sweb.cz/Manual_k_ridici_jednotce.pdf#page=17
 - https://github.com/morcibacsi/VanAnalyzer/
 - [Atmel TSS463C VAN Data Link Controller with Serial Interface]
 - [Multiplexed BSI Operating Principle for the Xsara Picasso And Xsara - The VAN protocol]
