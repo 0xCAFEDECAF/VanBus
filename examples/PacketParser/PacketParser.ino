@@ -73,20 +73,20 @@ int RECV_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
 #define TIME_IDEN 0x984
 #define AUDIO_SETTINGS_IDEN 0x4D4
 #define MFD_STATUS_IDEN 0x5E4
-#define SATNAV_GUIDANCE_DATA_IDEN 0x9CE
 #define AIRCON_IDEN 0x464
 #define AIRCON2_IDEN 0x4DC
 #define CDCHANGER_IDEN 0x4EC
-#define SATNAV1_IDEN 0x54E
+#define SATNAV_STATUS_1_IDEN 0x54E
+#define SATNAV_STATUS_2_IDEN 0x7CE
+#define SATNAV_STATUS_3_IDEN 0x8CE
+#define SATNAV_GUIDANCE_DATA_IDEN 0x9CE
 #define SATNAV_GUIDANCE_IDEN 0x64E
-#define SATNAV3_IDEN 0x6CE
-#define SATNAV4_IDEN 0x74E
-#define SATNAV5_IDEN 0x7CE
-#define SATNAV6_IDEN 0x8CE
-#define SATNAV7_IDEN 0x94E
-#define SATNAV8_IDEN 0x6F4
-#define SATNAV9_IDEN 0xA44
-#define SATNAV10_IDEN 0xAC4
+#define SATNAV_REPORT_IDEN 0x6CE
+#define MFD_TO_SATNAV_IDEN 0x94E
+#define SATNAV_TO_MFD_IDEN 0x74E
+#define SATNAV_DOWNLOADING_IDEN 0x6F4
+#define SATNAV_DOWNLOADED1_IDEN 0xA44
+#define SATNAV_DOWNLOADED2_IDEN 0xAC4
 #define WHEEL_SPEED_IDEN 0x744
 #define ODOMETER_IDEN 0x8FC
 #define COM2000_IDEN 0x450
@@ -110,24 +110,55 @@ enum TunerBand_t
     TB_FM1,
     TB_FM2,
     TB_FM3,  // Never seen, just guessing
-    TB_FMAST,
-    TB_AM
+    TB_FMAST,  // Auto-station
+    TB_AM,
+    TB_PTY_SELECT = 7
 };
 
 const char* TunerBandStr(uint8_t data)
 {
     return
-        (data & 0x07) == TB_NONE ? "NONE" :
-            (data & 0x07) == TB_FM1 ? "FM1" :
-            (data & 0x07) == TB_FM2 ? "FM2" :
-            (data & 0x07) == TB_FM3 ? "FM3" :  // Never seen, just guessing
-            (data & 0x07) == TB_FMAST ? "FMAST" :
-            (data & 0x07) == TB_AM ? "AM" :
-            "??";
-
-    // TODO - data == 0x07 when selecting PTY to scan for
-
+        data == TB_NONE ? "NONE" :
+        data == TB_FM1 ? "FM1" :
+        data == TB_FM2 ? "FM2" :
+        data == TB_FM3 ? "FM3" :  // Never seen, just guessing
+        data == TB_FMAST ? "FMAST" :
+        data == TB_AM ? "AM" :
+        data == TB_PTY_SELECT ? "PTY_SELECT" :  // When selecting PTY to scan for
+        "??";
 } // TunerBandStr
+
+// Tuner scan mode
+// Bits:
+//  2  1  0
+// ---+--+---
+//  0  0  0 : Not searching
+//  0  0  1 : Manual tuning
+//  0  1  0 : Scanning by frequency
+//  0  1  1 : 
+//  1  0  0 : Scanning for station with matching PTY
+//  1  0  1 : 
+//  1  1  0 : 
+//  1  1  1 : Auto-station search in the FMAST band (long-press "Radio Band" button)
+enum TunerScanMode_t
+{
+    TS_NOT_SEARCHING = 0,
+    TS_MANUAL = 1,
+    TS_BY_FREQUENCY = 2,
+    TS_BY_MATCHING_PTY = 4,
+    TS_FM_AST = 7
+};
+
+const char* TunerScanModeStr(uint8_t data)
+{
+    return
+        data == TS_NOT_SEARCHING ? "NOT_SEARCHING" :
+        data == TS_MANUAL ? "MANUAL_TUNING" :
+        data == TS_BY_FREQUENCY ? "SCANNING_BY_FREQUENCY" :
+        data == TS_BY_MATCHING_PTY ? "SCANNING_MATCHING_PTY" : // Scanning for station with matching PTY
+        data == TS_FM_AST ? "FM_AST_SEARCH" : // Auto-station search in the FMAST band (long-press Radio Band button)
+        "??";
+} // TunerScanModeStr
 
 const char* PtyStr(uint8_t ptyCode)
 {
@@ -169,6 +200,15 @@ const char* PtyStr(uint8_t ptyCode)
             "??";
 } // PtyStr
 
+// Seems to be used in bus packets with IDEN:
+//
+// - SATNAV_REPORT_IDEN (0x6CE): data[1]. Following values of data[1] seen:
+//   0x02, 0x05, 0x08, 0x09, 0x0E, 0x0F, 0x10, 0x11, 0x13, 0x1B, 0x1D,
+// - SATNAV_TO_MFD_IDEN (0x74E): data[1]. Following values of data[1] seen:
+//   0x02, 0x05, 0x08, 0x09, 0x1B, 0x1C
+// - MFD_TO_SATNAV_IDEN (0x94E): data[0]. Following values of data[1] seen:
+//   0x02, 0x05, 0x06, 0x08, 0x09, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x1B, 0x1C, 0x1D
+//
 const char* SatNavRequestStr(uint8_t data)
 {
     char buffer[5];
@@ -186,8 +226,8 @@ const char* SatNavRequestStr(uint8_t data)
             data == 0x08 ? "PLACE_OF_INTEREST_CATEGORY_LIST" :
             data == 0x09 ? "PLACE_OF_INTEREST_CATEGORY" :
             data == 0x0E ? "GPS_FOR_PLACE_OF_INTEREST" :
-            data == 0x0F ? "CURRENT_DESTINATION" :
-            data == 0x10 ? "CURRENT_ADDRESS" :
+            data == 0x0F ? "NEXT_STREET" : // Shown during navigation in the (solid line) top box
+            data == 0x10 ? "CURRENT_STREET" : // Shown during navigation in the (dashed line) bottom box
             data == 0x11 ? "PRIVATE_ADDRESS" :
             data == 0x12 ? "BUSINESS_ADDRESS" :
             data == 0x13 ? "SOFTWARE_MODULE_VERSIONS" :
@@ -196,6 +236,73 @@ const char* SatNavRequestStr(uint8_t data)
             data == 0x1D ? "GPS_CHOOSE_DESTINATION" :
             buffer;
 } // SatNavRequestStr
+
+// Attempt to show a detailed SatNnav guidance instruction in "Ascii art"
+//
+// A detailed SatNnav guidance instruction consists of 8 bytes:
+// * 0   : turn angle in increments of 22.5 degrees, measured clockwise, starting with 0 at 6 o-clock.
+//         E.g.: 0x4 == 90 deg left, 0x8 = 180 deg = straight ahead, 0xC = 270 deg = 90 deg right. Turn angle is
+//         shown as (vertical) (d|sl)ash ('\', '|', '/', or '-').
+// * 1   : always 0x00 ??
+// * 2, 3: bit pattern indicating which legs are present in the junction or roundabout. Each bit set is for one leg.
+//         Lowest bit of byte 3 corresponds to the leg of 0 degrees (straight down, which is
+//         always there, because that is where we are currently driving), running clockwise up to the
+//         highest bit of byte 2, which corresponds to a leg of 337.5 degrees (very sharp right).
+//         A leg is shown as a '.'.
+// * 4, 5: bit pattern indicating which legs in the junction are "no entry". The coding of the bits is the same
+//         as for bytes 2 and 3.
+//         A "no-entry" is shown as "(-)".
+// * 6   : always 0x00 ??
+// * 7   : always 0x00 ??
+//
+void PrintGuidanceInstruction(const uint8_t data[8])
+{
+    SERIAL.printf("      %s%s%s%s%s\n",
+        data[5] & 0x40 ? "(-)" : "   ",
+        data[5] & 0x80 ? "(-)" : "   ",
+        data[4] & 0x01 ? "(-)" : "   ",
+        data[4] & 0x02 ? "(-)" : "   ",
+        data[4] & 0x04 ? "(-)" : "   "
+    );
+    SERIAL.printf("       %s  %s  %s  %s  %s\n",
+        data[0] == 6 ? "\\" : data[3] & 0x40 ? "." : " ",
+        data[0] == 7 ? "\\" : data[3] & 0x80 ? "." : " ",
+        data[0] == 8 ? "|" : data[2] & 0x01 ? "." : " ",
+        data[0] == 9 ? "/" : data[2] & 0x02 ? "." : " ",
+        data[0] == 10 ? "/" : data[2] & 0x04 ? "." : " "
+    );
+    SERIAL.printf("    %s%s           %s%s\n",
+        data[5] & 0x20 ? "(-)" : "   ",
+        data[0] == 5 ? "-" : data[3] & 0x20 ? "." : " ",
+        data[0] == 11 ? "-" : data[2] & 0x08 ? "." : " ",
+        data[4] & 0x08 ? "(-)" : "   "
+    );
+    SERIAL.printf("    %s%s     +     %s%s\n",
+        data[5] & 0x10 ? "(-)" : "   ",
+        data[0] == 4 ? "-" : data[3] & 0x10 ? "." : " ",
+        data[0] == 12 ? "-" : data[2] & 0x10 ? "." : " ",
+        data[4] & 0x10 ? "(-)" : "   "
+    );
+    SERIAL.printf("    %s%s     |     %s%s\n",
+        data[5] & 0x08 ? "(-)" : "   ",
+        data[0] == 3 ? "-" : data[3] & 0x08 ? "." : " ",
+        data[0] == 13 ? "-" : data[2] & 0x20 ? "." : " ",
+        data[4] & 0x20 ? "(-)" : "   "
+    );
+    SERIAL.printf("       %s  %s  |  %s  %s\n",
+        data[0] == 2 ? "/" : data[3] & 0x04 ? "." : " ",
+        data[0] == 1 ? "/" : data[3] & 0x02 ? "." : " ",
+        data[0] == 14 ? "\\" : data[3] & 0x40 ? "." : " ",
+        data[0] == 15 ? "\\" : data[3] & 0x80 ? "." : " "
+    );
+    SERIAL.printf("      %s%s%s%s%s\n",
+        data[5] & 0x04 ? "(-)" : "   ",
+        data[5] & 0x02 ? "(-)" : "   ",
+        data[5] & 0x01 ? "(-)" : "   ",
+        data[4] & 0x40 ? "(-)" : "   ",
+        data[4] & 0x80 ? "(-)" : "   "
+    );
+} // PrintGuidanceInstruction
 
 // Parse a VAN packet
 // Result:
@@ -983,17 +1090,21 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                         return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                     } // if
 
-                    // data[2]: memory position and band
-                    uint8_t memoryPos = data[2] >> 3 & 0x0F;
+                    // data[2]: radio band and preset position
                     uint8_t band = data[2] & 0x07;
+                    uint8_t presetPos = data[2] >> 3 & 0x0F;
 
                     // data[3]: scanning bits
-                    bool scan_dx = data[3] & 0x02;  // Scan mode: distant (Dx) or local (Lo)
-                    bool pty_standby_mode = data[3] & 0x04;
-                    bool manual_scan = data[3] & 0x08;
-                    bool scanning_by_freq = data[3] & 0x10;
-                    bool fmast_search = data[3] & 0x20;  // Auto-station search (long-press Radio Band button)
-                    bool scan_direction_up = data[3] & 0x80;
+                    bool scanDx = data[3] & 0x02;  // Scan mode: distant (Dx) or local (Lo)
+                    bool ptyStandbyMode = data[3] & 0x04;
+
+                    uint8_t scanMode = data[3] >> 3 & 0x07;
+
+                    bool manualScan = data[3] & 0x08;
+                    bool scanningByFreq = data[3] & 0x10;
+                    bool fmastSearch = data[3] & 0x20;  // Auto-station search (long-press "Radio Band" button)
+
+                    bool scanDirectionUp = data[3] & 0x80;
 
                     // data[4] and data[5]: frequency tuned in to
                     uint16_t frequency = (uint16_t)data[5] << 8 | data[4];
@@ -1004,10 +1115,10 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     //   - One or more bits stay '1' when tuned in to a "crappy" station (e.g. pirate).
                     //   - During the process of tuning in to another station, switches to e.g. 0x20, 0x60, but
                     //     (usually) ends up 0x00.
-                    // & 0x10 --> Looking for RDS text?
-                    // & 0x20 --> Looking for RDS text?
-                    // & 0x40 --> Looking for RDS available bit?
-                    // & 0x80 --> Looking for TA available bit?
+                    //   & 0x10 --> Looking for RDS text?
+                    //   & 0x20 --> Looking for RDS text?
+                    //   & 0x40 --> Looking for RDS available bit?
+                    //   & 0x80 --> Looking for TA available bit?
                     //
                     // & 0x0F = signal strength: increases with antenna plugged in and decreases with antenna plugged
                     //          out. Updated when a station is being tuned in to, or when the MAN button is pressed.
@@ -1016,12 +1127,12 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     sprintf_P(signalStrengthBuffer, PSTR("%u"), signalStrength);
 
                     // data[7]: TA, RDS and REG (regional) bits
-                    bool rds_selected = data[7] & 0x01;
-                    bool ta_selected = data[7] & 0x02;
+                    bool rdsSelected = data[7] & 0x01;
+                    bool taSelected = data[7] & 0x02;
                     bool regional = data[7] & 0x04;  // Long-press "RDS" button
-                    bool rds_available = data[7] & 0x20;
-                    bool ta_available = data[7] & 0x40;
-                    bool ta_announce = data[7] & 0x80;
+                    bool rdsAvailable = data[7] & 0x20;
+                    bool taAvailable = data[7] & 0x40;
+                    bool taAnnounce = data[7] & 0x80;
 
                     // data[8] and data[9]: PI code
                     // See also:
@@ -1035,15 +1146,15 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     uint8_t coverageCode = data[8] & 0x0F;
 
                     // data[10]: for PTY-based scan mode
+                    // & 0x1F: PTY code to scan
                     // & 0x20: 0 = PTY of station matches selected; 1 = no match
                     // & 0x40: 1 = "Select PTY" dialog visible (long-press "TA" button; press "<<" or ">>" to change)
-                    // & 0x1F: PTY code to scan
-                    bool pty_selection_menu = data[10] & 0x40; 
-                    bool pty_match = (data[10] & 0x20) == 0;  // PTY of station matches selected PTY
-                    uint8_t selected_pty = data[10] & 0x1F;
+                    uint8_t selectedPty = data[10] & 0x1F;
+                    bool ptyMatch = (data[10] & 0x20) == 0;  // PTY of station matches selected PTY
+                    bool ptySelectionMenu = data[10] & 0x40; 
 
                     // data[11]: PTY code of current station
-                    uint8_t ptyCode = data[11] & 0x1F;
+                    uint8_t currPty = data[11] & 0x1F;
 
                     // data[12]...data[20]: RDS text
                     char rdsTxt[9];
@@ -1079,60 +1190,70 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                             "regional"
                     );
 
-                    char ptyBuffer[40];
-                    sprintf_P(ptyBuffer, PSTR("%u(%s)"), ptyCode, PtyStr(ptyCode));
+                    char currPtyBuffer[40];
+                    sprintf_P(currPtyBuffer, PSTR("%s(%u)"), PtyStr(currPty), currPty);
 
-                    bool search_pty = pty_standby_mode && ! manual_scan && ! pty_match;
-                    bool any_scan_busy = manual_scan || scanning_by_freq || search_pty;
+                    char selectedPtyBuffer[40];
+                    sprintf_P(selectedPtyBuffer, PSTR("%s(%u)"), PtyStr(selectedPty), selectedPty);
+
+                    char presetPosBuffer[20];
+                    sprintf_P(presetPosBuffer, PSTR(", memory=%u"), presetPos);
+
+                    bool anyScanBusy = (scanMode != TS_NOT_SEARCHING);
 
                     char floatBuf[MAX_FLOAT_SIZE];
-                    SERIAL.printf("memory=%u, band=%s, %s %s, strength=%s, manual_scan=%s, fmast_search=%s, scanning_by_freq=%s%s%s,\n",
-                        memoryPos,
+                    SERIAL.printf(
+                        "band=%s%s, %s %s, strength=%s,\n"
+                        "    scan_mode=%s%s%s,\n",
                         TunerBandStr(band),
+                        presetPos == 0 ? "" : presetPosBuffer,
                         frequency == 0x07FF ? "---" :
                             band == TB_AM
                                 ? FloatToStr(floatBuf, frequency, 0)  // AM and LW bands
                                 : FloatToStr(floatBuf, frequency / 20.0 + 50.0, 2),  // FM bands
                         band == TB_AM ? "KHz" : "MHz",
 
-                        // TODO - not sure if applicable in AM mode
-                        signalStrength == 15 && (search_pty || scanning_by_freq) ? "--" : signalStrengthBuffer,
+                        // TODO - check:
+                        // - not sure if applicable in AM mode
+                        // - signalStrength == 15 always means "not applicable" or "no signal"? Not just while scanning?
+                        //   In other words: maybe 14 is the highest possible signal strength, and 15 just means: no
+                        //   signal.
+                        signalStrength == 15 && (scanMode == TS_BY_FREQUENCY || scanMode == TS_BY_MATCHING_PTY)
+                            ? "--"
+                            : signalStrengthBuffer,
 
-                        manual_scan ? "YES" : "NO",
-                        fmast_search ? "YES" : "NO",
+                        TunerScanModeStr(scanMode),
 
-                        scanning_by_freq ? "YES" : "NO",
+                        // Scan sensitivity: distant (Dx) or local (Lo)
+                        // TODO - not sure if this bit is applicable for the various values of 'scanMode'
+                        ! anyScanBusy ? "" :
+                            scanDx ? ", sensitivity=Dx" : ", sensitivity=Lo",
 
-                        // Scan mode: distant (Dx) or local (Lo)
-                        // Not sure if this bit is applicable when 'manual_scan' is true.
-                        //(data[3] & 0x10) == 0 ? "" : 
-                            scan_dx ? " (Dx)" : " (Lo)",
-
-                        ! any_scan_busy ? "" :
-                            scan_direction_up ? ", scan_direction=UP" : ", scan_direction=DOWN"
+                        ! anyScanBusy ? "" :
+                            scanDirectionUp ? ", scan_direction=UP" : ", scan_direction=DOWN"
                     );
 
                     if (band != TB_AM)
                     {
                         SERIAL.printf(
-                            "    search_pty=%s, pty_selection_menu=%s, selected_pty=%s, pty_standby_mode=%s, pty_match=%s,\n"
-                            "    pty=%s, pi=%s, %s, %s, %s, %s, %s, rds_text=\"%s\"%s\n",
-                            search_pty ? "YES" : "NO",
-                            pty_selection_menu ? "ON" : "OFF",
-                            PtyStr(selected_pty),
-                            pty_standby_mode ? "YES" : "NO",
-                            pty_match ? "YES" : "NO",
+                            "    pty_selection_menu=%s, selected_pty=%s, pty_standby_mode=%s, pty_match=%s, pty=%s,\n"
+                            "    pi=%s, regional=%s, ta=%s %s, rds=%s %s, rds_text=\"%s\"%s\n",
 
-                            ptyCode == 0x00 ? "---" : ptyBuffer,
+                            ptySelectionMenu ? "ON" : "OFF",
+                            selectedPtyBuffer,
+                            ptyStandbyMode ? "YES" : "NO",
+                            ptyMatch ? "YES" : "NO",
+                            currPty == 0x00 ? "---" : currPtyBuffer,
+
                             piCode == 0xFFFF ? "---" : piBuffer,
-
-                            ta_available ? "TA avaliable" : "NO TA availabe",
-                            rds_available ? "RDS available" : "NO RDS available",
-                            regional ? "REG_ON" : "REG_OFF",
-                            ta_selected ? "TA ON" : "TA OFF",
-                            rds_selected ? "RDS ON" : "RDS OFF",
+                            regional ? "ON" : "OFF",
+                            taSelected ? "ON" : "OFF",
+                            taAvailable ? "(AVAILABLE)" : "(NOT_AVAILABLE)",
+                            rdsSelected ? "ON" : "OFF",
+                            rdsAvailable ? "(AVAILABLE)" : "(NOT_AVAILABLE)",
                             rdsTxt,
-                            ta_announce ? "\n    --> Info Trafic!" : ""
+
+                            taAnnounce ? "\n    --> Info Trafic!" : ""
                         );
                     } // if
                 }
@@ -1298,22 +1419,18 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
-            SERIAL.printf(
-                "seq=%u, audio_menu=%s, loudness=%s, auto_volume=%s, ext_mute=%s, mute=%s, power=%s,\n"
-                "    tape=%s, cd=%s, source=%s,\n"
-                "    volume=%u%s, balance=%d%s, fader=%d%s, bass=%d%s, treble=%d%s\n",
-                data[0] & 0x07,
-                data[1] & 0x20 ? "OPEN" : "CLOSED",  // Bug: if CD changer is playing, this one is always "OPEN"...
-                data[1] & 0x10 ? "ON" : "OFF",
-                data[1] & 0x04 ? "ON" : "OFF",
-                data[1] & 0x02 ? "ON" : "OFF",
-                data[1] & 0x01 ? "ON" : "OFF",
-                data[2] & 0x01 ? "ON" : "OFF",
-                // data[4] & 0x10 ? "" : "", - TODO
-                data[4] & 0x20 ? "PRESENT" : "NOT_PRESENT",
-                data[4] & 0x40 ? "PRESENT" : "NOT_PRESENT",
+            // data[0] & 0x07: sequence number
+            // data[4] & 0x10: TODO
 
-                (data[4] & 0x0F) == 0x00 ? "NONE" :
+            SERIAL.printf(
+                "power=%s, tape=%s, cd=%s, source=%s, ext_mute=%s, mute=%s,\n"
+                "    volume=%u%s, audio_menu=%s, bass=%d%s, treble=%d%s, loudness=%s, fader=%d%s, balance=%d%s, "
+                "auto_volume=%s\n",
+                data[2] & 0x01 ? "ON" : "OFF",  // power
+                data[4] & 0x20 ? "PRESENT" : "NOT_PRESENT",  // tape
+                data[4] & 0x40 ? "PRESENT" : "NOT_PRESENT",  // cd
+
+                (data[4] & 0x0F) == 0x00 ? "NONE" :  // source
                     (data[4] & 0x0F) == 0x01 ? "TUNER" :
                     (data[4] & 0x0F) == 0x02 ? "INTERNAL_CD_OR_TAPE" :
                     (data[4] & 0x0F) == 0x03 ? "CD_CHANGER" :
@@ -1325,16 +1442,25 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
                     "???",
 
-                data[5] & 0x7F,
+                data[1] & 0x02 ? "ON" : "OFF",  // ext_mute
+                data[1] & 0x01 ? "ON" : "OFF",  // mute
+
+                data[5] & 0x7F,  // volume
                 data[5] & 0x80 ? "<UPD>" : "",
-                (sint8_t)(0x3F) - (data[6] & 0x7F),
-                data[6] & 0x80 ? "<UPD>" : "",
-                (sint8_t)(0x3F) - (data[7] & 0x7F),
-                data[7] & 0x80 ? "<UPD>" : "",
-                (sint8_t)(data[8] & 0x7F) - 0x3F,
+
+                // audio_menu. Bug: if CD changer is playing, this one is always "OPEN"...
+                data[1] & 0x20 ? "OPEN" : "CLOSED",
+
+                (sint8_t)(data[8] & 0x7F) - 0x3F,  // bass
                 data[8] & 0x80 ? "<UPD>" : "",
-                (sint8_t)(data[9] & 0x7F) - 0x3F,
-                data[9] & 0x80 ? "<UPD>" : ""
+                (sint8_t)(data[9] & 0x7F) - 0x3F,  // treble
+                data[9] & 0x80 ? "<UPD>" : "",
+                data[1] & 0x10 ? "ON" : "OFF",  // loudness
+                (sint8_t)(0x3F) - (data[7] & 0x7F),  // fader
+                data[7] & 0x80 ? "<UPD>" : "",
+                (sint8_t)(0x3F) - (data[6] & 0x7F),  // balance
+                data[6] & 0x80 ? "<UPD>" : "",
+                data[1] & 0x04 ? "ON" : "OFF"  // auto_volume
             );
         }
         break;
@@ -1378,76 +1504,6 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
                     data[0] == 0x20 && data[1] == 0xFF ? "MFD_SCREEN_ON" :
                     buffer
-            );
-        }
-        break;
-
-        case SATNAV_GUIDANCE_DATA_IDEN:
-        {
-            // http://graham.auld.me.uk/projects/vanbus/packets.html#9CE
-            // http://pinterpeti.hu/psavanbus/PSA-VAN.html#9CE
-
-            SERIAL.print("--> SatNav guidance data: ");
-
-            if (dataLen != 16)
-            {
-                SERIAL.println("[unexpected packet length]");
-                return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
-            } // if
-
-            // This packet precedes a packet with IDEN value 0x64E (SATNAV_GUIDANCE_IDEN).
-            // This packet contains direction data during guidance.
-            //
-            // Meanings of data:
-            //
-            // - data[0] & 0x0F , data[15] & 0x0F = sequence number
-            //
-            // - data[1], [2] = current heading in degrees
-            //
-            // - data[3], [4] = heading to destination in degrees
-            //
-            // - (data[5] & 0x7F) << 8 | data[6] = remaining distance to destination
-            //   Unit (kilometers or meters) is encoded in most significant bit:
-            //   & 0x80: 1 = in kilometers (>= 10 km), 0 = in meters (< 10 km)
-            //
-            // - (data[7] & 0x7F) << 8 | data[8] = distance to destination in straight line
-            //   Unit (kilometers or meters) is encoded in most significant bit:
-            //   & 0x80: 1 = in kilometers (>= 10 km), 0 = in meters (< 10 km)
-            //
-            // - (data[9] & 0x7F) << 8 | data[10] = distance to next guidance instruction
-            //   Unit (kilometers or meters) is encoded in most significant bit:
-            //   & 0x80: 1 = in kilometers (>= 10 km), 0 = in meters (< 10 km)
-            //
-            // - data [11] << 8 & data[12] = Usually 0x7FFF. If not, low values (maximum value seen is 0x0167). Some
-            //   kind of heading indication? Seen only when driving on a roundabout. For indicating when to take the
-            //   exit of a roundabout?
-            //
-            // - data [13] << 8 & data[14] = Some distance value. Always in km. Decreases steadily while driving,
-            //   but can jump up after a route has been recalculated. When decreasing, sometimes just skips a value.
-            //
-            uint16_t currHeading = (uint16_t)data[1] << 8 | data[2];
-            uint16_t headingToDestination = (uint16_t)data[3] << 8 | data[4];
-            uint16_t distanceToDestination = (uint16_t)(data[5] & 0x7F) << 8 | data[6];
-            uint16_t gpsDistanceToDestination = (uint16_t)(data[7] & 0x7F) << 8 | data[8];
-            uint16_t distanceToNextTurn = (uint16_t)(data[9] & 0x7F) << 8 | data[10];
-            uint16_t headingOnRoundabout = (uint16_t)data[11] << 8 | data[12];
-            uint16_t gpsDistanceToDestination2 = (uint16_t)data[13] << 8 | data[14];
-
-            char floatBuf[MAX_FLOAT_SIZE];
-            SERIAL.printf(
-                "curr_heading=%u deg, heading_to_dest=%u deg, distance_to_dest=%u %s,"
-                " distance_to_dest_straight_line=%u %s, turn_at=%u %s,\n"
-                " heading_on_roundabout=%s deg, distance_to_dest_straight_line_2=%u\n",
-                currHeading,
-                headingToDestination,
-                distanceToDestination,
-                data[5] & 0x80 ? "Km" : "m" ,
-                gpsDistanceToDestination,
-                data[7] & 0x80 ? "Km" : "m" ,
-                distanceToNextTurn,
-                data[9] & 0x80 ? "Km" : "m",
-                headingOnRoundabout == 0x7FFF ? "---" : FloatToStr(floatBuf, headingOnRoundabout, 0),
-                gpsDistanceToDestination2
             );
         }
         break;
@@ -1690,7 +1746,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
         }
         break;
 
-        case SATNAV1_IDEN:
+        case SATNAV_STATUS_1_IDEN:
         {
             // http://graham.auld.me.uk/projects/vanbus/packets.html#54E
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#54E
@@ -1700,7 +1756,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // Raw: #0974 (14/15) 11 0E 54E RA0 80-00-80-00-00-80-95-06 ACK OK 9506 CRC_OK
             // Raw: #1058 ( 8/15) 11 0E 54E RA0 81-02-00-00-00-81-B2-6C ACK OK B26C CRC_OK
 
-            SERIAL.print("--> SatNav 1 - SatNav status: ");
+            SERIAL.print("--> SatNav status 1: ");
 
             if (dataLen != 6)
             {
@@ -1709,8 +1765,18 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             } // if
 
             // Possible meanings of data
-            // data[0] & 0x07 - sequence number
-
+            //
+            // data[0] & 0xF0, data[dataLen - 1] & 0xF0: always 0x80
+            // data[0] & 0x07, data[dataLen - 1] & 0x07: sequence number
+            //
+            // data[1]: status ??
+            //
+            // data[2]: status ??
+            //
+            // data[3]: usually 0x00, sometimes 0x02
+            //
+            // data[4]: usually 0x00, sometimes 0x0B, 0x0C, 0x0E, 0x7A
+            //
             uint16_t status = (uint16_t)data[1] << 8 | data[2];
 
             char buffer[10];
@@ -1720,18 +1786,24 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             SERIAL.printf(
                 "status=%s%s\n",
                 status == 0x0000 ? "NOT_OPERATING" :
+                    status == 0x0020 ? "0x0020" : // Nearly at destination ??
                     status == 0x0080 ? "READY" :
                     status == 0x0200 ? "INITIALISING" : // No, definitely not this
                     status == 0x0300 ? "0x0300" :
                     status == 0x0301 ? "GUIDANCE_STARTED" :
-                    status == 0x4000 ? "GUIDANCE_STOPPED" :
+                    status == 0x0320 ? "0x0320" :
                     status == 0x0400 ? "TERMS_AND_CONDITIONS_ACCEPTED" : // No, definitely not this
+                    status == 0x0410 ? "0x0410" :  // Arrived at destination ??
                     status == 0x0700 ? "0x0700" :
                     status == 0x0701 ? "0x0701" : // 
                     status == 0x0800 ? "PLAYING_AUDIO_MESSAGE" :
+                    status == 0x4001 ? "0x4001" :
+                    status == 0x4000 ? "GUIDANCE_STOPPED" :
+                    status == 0x4200 ? "0x4200" :  // Arrived at destination ??
                     status == 0x9000 ? "READING_DISC" :
                     buffer,
-                data[4] == 0x0C ? " reason=NO_DISC" :
+                data[4] == 0x0B ? " reason=0x0B" :  // Seen with status == 0x4001
+                    data[4] == 0x0C ? " reason=NO_DISC" :
                     data[4] == 0x0E ? " reason=NO_DISC" :
                     ""
             );
@@ -1740,352 +1812,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
         }
         break;
 
-        case SATNAV_GUIDANCE_IDEN:
-        {
-            // http://graham.auld.me.uk/projects/vanbus/packets.html#64E
-            // http://pinterpeti.hu/psavanbus/PSA-VAN.html#64E
-
-            SERIAL.print("--> SatNav guidance: ");
-
-            if (dataLen != 4 && dataLen != 6 && dataLen != 13 && dataLen != 23)
-            {
-                SERIAL.println("[unexpected packet length]");
-                return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
-            } // if
-
-            // Packet appears as soon as the first guidance instruction is given.
-            // Just before this packet there is always a packet with IDEN value 0x9CE (SATNAV_GUIDANCE_DATA_IDEN).
-            //
-            // Possible meanings of data:
-            //
-            // - data[0] & 0x0F , data[dataLen - 1] & 0x0F = sequence number
-            //
-            // - data[1]: large icon (left in MFD, indicating current instruction)
-            //   0x01 = Single turn instruction ("Turn left"). dataLen = 6 or 13
-            //   0x03 = Double turn instruction ("Turn left, then turn right"). dataLen = 23
-            //   0x05 = Go straight. dataLen = 4. No further information about this icon
-            //
-            // - data[2]: small icon (between current street and next street, indicating next instruction)
-            //   0x00 = No icon
-            //   0x01 = turn right
-            //   0x02 = Turn left
-            //   0x04 = Roundabout
-            //   0x08 = Go straight
-            //   0x10 = Retrieving next instruction
-            //
-            // - data[3] ... [12] or [22]: describe the shape of the large navigation icon as shown in the left of
-            //   the MFD
-            //
-            //   Depending on the value of data[1] and data[2], there can 1 or 2 "instructions" encoded. An
-            //   "instruction" consists of 8 bytes:
-            //   * 0   : turn angle in increments of 22.5 degrees, measured clockwise, starting with 0 at 6 o-clock.
-            //           E.g.: 0x4 == 90 deg left, 0x8 = 180 deg = straight ahead, 0xC = 270 deg = 90 deg right.
-            //   * 1   : always 0x00 ??
-            //   * 2, 3: bit pattern indicating which legs are present in the junction. Each bit set is for one leg.
-            //           Lowest bit of byte 3 corresponds to the leg of 0 degrees (straight down, which is
-            //           always there, because that is where we are currently driving), running clockwise up to the
-            //           highest bit of byte 2, which corresponds to a leg of 337.5 degrees (very sharp right).
-            //   * 4, 5: bit pattern indicating which legs in the junction are "no entry". Bitcoding is the same as
-            //           for bytes 2 and 3.
-            //   * 6   : always 0x00 ??
-            //   * 7   : always 0x00 ??
-            //
-            //   * data[3]: ?? Seen values: 0x00, 0x01, 0x42, 0x53
-            //
-            //   when data[1] == 0x01 && data[2] == 0x02:
-            //   * data[4]:
-            //     0x41: keep left on fork
-            //     0x14: keep right on fork
-            //     0x12: take right exit
-            //
-            //   when data[1] == 0x01 && data[2] == 0x00:
-            //   * data[4...11]: current instruction ("turn left")
-            //
-            //   when data[1] == 0x03:
-            //   * data[6...13]: current instruction ("turn left ...")
-            //   * data[14...21]: next instruction ("... then turn right")
-            //
-            //   Just some examples:
-            //
-            //     01-02-53-41 is shown as:
-            //           ^  |
-            //           || |
-            //           \\ /
-            //            ++
-            //            ||
-            //            ||
-            //       (keep left on fork)
-            //
-            //     01-02-53-14 is shown as:
-            //           |  ^
-            //           | ||
-            //           \ //
-            //            ++
-            //            ||
-            //            ||
-            //       (keep right on fork)
-            //
-            //     01-02-53-12 is shown as:
-            //            |  ^
-            //            | ||
-            //            |//
-            //            ++
-            //            ||
-            //            ||
-            //       (take right exit)
-            //
-            //     01-00-53-04-00-12-11-00-00-00-00 is shown as:
-            //               /
-            //              /
-            //         <===+---
-            //            ||
-            //            ||
-            //       (turn left 90 deg; ahead = +202.5 deg; right = 270 deg)
-            //
-            //     01-00-53-04-00-01-11-00-00-00-00 is shown as:
-            //             |
-            //             |
-            //         <===+
-            //            ||
-            //            ||
-            //       (turn left 90 deg; ahead = 180 deg; no right)
-            //
-            //     01-00-53-03-00-11-09-10-00-00-00 is:
-            //              |
-            //              |
-            //            /=+--- (-)
-            //         <-/ ||
-            //             ||
-            //       (turn left -67.5 deg; ahead = 180 deg; right = 270 deg: no entry)
-            //
-            //     01-00-53-05-00-02-21-00-00-00-00 is:
-            //                /
-            //         <-\   /
-            //            \=+
-            //             ||
-            //             ||
-            //       (turn left 112.5 deg; ahead = +202.5 deg; no right)
-            //
-            //     01-00-53-0C-00-10-21-00-00-00-00
-            //
-            //         -\
-            //           \-+===>
-            //            ||
-            //            ||
-            //       (turn right 270 deg; no ahead; left = 112.5 deg)
-            //
-            //     01-00-01-0C-00-11-11-00-10-00-00 is:
-            //             |
-            //             |
-            //      (-) ---+===>
-            //            ||
-            //            ||
-            //       (turn right 270 deg; ahead = 180 deg; left = 90: no entry)
-            //
-            //     01-00-01-04-00-10-13-00-03-00-00 is:
-            //
-            //         <===+---
-            //            /||
-            //           / ||
-            //          (-)
-            //       (turn left 90 deg; no ahead; right = 270 deg, sharp left = 22.5 deg: no entry)
-            //
-            //     03-00-53-00-41-0C-00-11-01-00-00-00-00-0B-00-08-11-00-00-00-00 is:
-            //             |
-            //             |
-            //             +===>
-            //            ||
-            //            ||
-            //       (turn right 270 deg; ahead = 180 deg; no left)
-            //
-            //     03-00-53-00-41-0C-00-10-11-00-10-00-00-04-00-12-11-00-00-00-00 is:
-            //
-            //      (-) ---+===>
-            //            ||
-            //            ||
-            //       (turn right 270 deg; no ahead; left = 90 deg: no entry)
-            //
-            //     03-00-53-00-63-04-00-01-11-00-00-00-00-03-00-08-09-00-00-00-00 and
-            //     03-00-53-00-32-04-00-01-11-00-00-00-00-05-00-02-21-00-00-00-00 is:
-            //             |
-            //             |
-            //         <===+
-            //            ||
-            //            ||
-            //       (turn left 90 deg; ahead = 180 deg; no right)
-            //
-            //     03-00-53-00-3A-0B-00-08-11-00-00-00-00-04-00-10-11-00-00-00-00 is:
-
-            char buffer[10];
-            sprintf_P(buffer, PSTR("0x%02X-0x%02X"), data[1], data[2]);
-
-            SERIAL.printf("%s - %s\n",
-                buffer,
-                data[1] == 0x01 ? "TURN" :
-                    data[1] == 0x03 ? "TURN_THEN_TURN" :
-                    data[1] == 0x05 ? "GO_STRAIGHT_AHEAD" :
-                    "??"
-            );
-        }
-        break;
-
-        case SATNAV3_IDEN:
-        {
-            // http://graham.auld.me.uk/projects/vanbus/packets.html#6CE
-            // http://pinterpeti.hu/psavanbus/PSA-VAN.html#6CE
-
-            SERIAL.print("--> SatNav 3: ");
-
-            if (dataLen < 3)
-            {
-                SERIAL.println("[unexpected packet length]");
-                return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
-            } // if
-
-            // Possible meanings of data:
-            //
-            // data[0] - starts low (0x02, 0x05), then increments every time with either 9 or 1.
-            //   & 0x80 = last packet in sequence
-            //   --> Last data byte (data[dataLen - 1]) is always the same as the first (data[0]).
-            //
-            // data[1] - Code of report; see below
-            //
-            // Lists are formatted as follows:
-            // - Record: terminated with '\1', containing a set of:
-            //   - Strings: terminated with '\0'
-            //     - Special characters:
-            //       * 0x81 = '+' in solid circle, means: this destination cannot be selected with the current
-            //         navigation disc. Something from UTF-8? See also U+2A01 (UTF-8 0xe2 0xa8 0x81) at:
-            //         https://www.utf8-chartable.de/unicode-utf8-table.pl?start=10752&number=1024&utf8=0x&htmlent=1
-            //
-            // Character set is "Extended ASCII/Windows-1252"; e.g. ë is 0xEB.
-            // See also: https://bytetool.web.app/en/ascii/
-            //
-            // Address format:
-            // - Starts with "V" (Ville? Vers?) or "C" (Country? Courant?)
-            // - Country
-            // - Province
-            // - City
-            // - District (or empty)
-            // - String "G" which can be followed by text that is not important for searching on, e.g. "GRue de"
-            // - Street name
-            // - Either:
-            //   - House number (or "0" if unknown), or
-            //   - GPS coordinates (e.g. "+495456", "+060405"). Note that these coordinates are in degrees, NOT in
-            //     decimal notation. So the just given example would translate to: 49°54'56"N 6°04'05"E. There
-            //     seems to be however some offset, because the shown GPS coordinates do not exactly match the
-            //     destination.
-
-            #define MAX_SATNAV_STRING_SIZE 128
-            static char buffer[128];
-            static int offsetInBuffer = 0;
-
-            int offsetInPacket = 1;
-
-            if ((data[0] & 0x7F) <= 7)
-            {
-                // Start of report sequence
-                offsetInPacket = 2;
-                offsetInBuffer = 0;
-
-                SERIAL.printf("report=%s:\n    ", SatNavRequestStr(data[1]));
-            }
-            else
-            {
-                SERIAL.print("\n    ");
-            } // if
-
-            while (offsetInPacket < dataLen - 1)
-            {
-                // New record?
-                if (data[offsetInPacket] == 0x01)
-                {
-                    offsetInPacket++;
-                    offsetInBuffer = 0;
-                    SERIAL.print("\n    ");
-                } // if
-
-                int maxLen = dataLen - 1 - offsetInPacket;
-                if (offsetInBuffer + maxLen >= MAX_SATNAV_STRING_SIZE)
-                {
-                    maxLen = MAX_SATNAV_STRING_SIZE - offsetInBuffer - 1;
-                } // if
-
-                strncpy(buffer + offsetInBuffer, (const char*) data + offsetInPacket, maxLen);
-                buffer[offsetInBuffer + maxLen] = 0;
-
-                offsetInPacket += strlen(buffer) + 1 - offsetInBuffer;
-                if (offsetInPacket <= dataLen - 1)
-                {
-                    SERIAL.printf("'%s' - ", buffer);
-                    offsetInBuffer = 0;
-                }
-                else
-                {
-                    offsetInBuffer = strlen(buffer);
-                } // if
-            } // while
-
-            // Last packet in report sequence?
-            if (data[0] & 0x80) SERIAL.print("--LAST--");
-            SERIAL.println();
-        }
-        break;
-
-        case SATNAV4_IDEN:
-        {
-            // http://graham.auld.me.uk/projects/vanbus/packets.html#74E
-            // http://pinterpeti.hu/psavanbus/PSA-VAN.html#74E
-
-            SERIAL.print("--> SatNav 4 - SatNav to MFD: ");
-
-            if (dataLen != 27)
-            {
-                SERIAL.println("[unexpected packet length]");
-                return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
-            } // if
-
-            // Possible meanings of data:
-
-            // data[0] & 0x07 - sequence number
-            // data[1] - Request code
-
-            SERIAL.printf(
-                "response=%s; list_size=%u, ",
-                SatNavRequestStr(data[1]),
-                (uint16_t)data[4] << 8 | data[5]
-            );
-
-            // Available letters are bit-coded in bytes 17...20
-            for (int byte = 0; byte <= 3; byte++)
-            {
-                for (int bit = 0; bit < (byte == 3 ? 2 : 8); bit++)
-                {
-                    SERIAL.printf("%c", data[byte + 17] >> bit & 0x01 ? 65 + 8 * byte + bit : '.');
-                } // for
-            } // for
-
-            // Special character '
-            SERIAL.printf("%c", data[21] >> 6 & 0x01 ? '\'' : '.');
-
-            // Available numbers are bit-coded in bytes 20...21, starting with '0' at bit 2 of byte 20, ending
-            // with '9' at bit 3 of byte 21
-            for (int byte = 0; byte <= 1; byte++)
-            {
-                for (int bit = (byte == 0 ? 2 : 0); bit < (byte == 1 ? 3 : 8); bit++)
-                {
-                    SERIAL.printf("%c", data[byte + 20] >> bit & 0x01 ? 48 + 8 * byte + bit - 2 : '.');
-                } // for
-            } // for
-
-            // <Space>, printed as '_'
-            SERIAL.printf("%c", data[22] >> 1 & 0x01 ? '_' : '.');
-
-            SERIAL.println();
-        }
-        break;
-
-        case SATNAV5_IDEN:
+        case SATNAV_STATUS_2_IDEN:
         {
             // http://graham.auld.me.uk/projects/vanbus/packets.html#7CE
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#7CE
@@ -2104,7 +1831,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
-            SERIAL.print("--> SatNav 5 - SatNav status: ");
+            SERIAL.print("--> SatNav status 2: ");
 
             if (dataLen != 20)
             {
@@ -2117,30 +1844,30 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // data[0] & 0x07 - sequence number
             //
             // data[1] values:
-            // - 0x11 - Stopping guidance??
-            // - 0x15 - In guidance mode??
-            // - 0x20 - Idle, not ready??
-            // - 0x21 - Idle, ready??
-            // - 0x25 - Busy calculating route??
-            // - 0x41 - Finished downloading?? Audio volume dialog??
-            // - 0xC1 - Finished downloading??
+            // - 0x11: Stopping guidance??
+            // - 0x15: In guidance mode
+            // - 0x20: Idle, not ready??
+            // - 0x21: Idle, ready??
+            // - 0x25: Busy calculating route??
+            // - 0x41: Finished downloading?? Audio volume dialog??
+            // - 0xC1: Finished downloading??
             // Or bits:
-            // - & 0x01 - ??
-            // - & 0x04 - ??
-            // - & 0x10 - ??
-            // - & 0x20 - ??
-            // - & 0x40 - ??
-            // - & 0x80 - ??
+            // - & 0x01: ??
+            // - & 0x04: ??
+            // - & 0x10: ??
+            // - & 0x20: ??
+            // - & 0x40: ??
+            // - & 0x80: ??
             //
             // data[2] values: 0x38, 0x39, 0x3A, 0x3C, 0x78, 0x79, 0x7C
             // Bits:
-            // - & 0x01 - ??
-            // - & 0x02 - ??
-            // - & 0x04 - Reading disc ??
-            // - & 0x08 - Always 1
-            // - & 0x10 - Disc recognized / valid??
-            // - & 0x20 - Disc present??
-            // - & 0x40 - No Disc present??
+            // - & 0x01: GPS fix
+            // - & 0x02: GPS signal lost
+            // - & 0x04: Scanning for GPS signal (at startup, or when driving under bridge on in tunnel)
+            // - & 0x08: Always 1
+            // - & 0x70:
+            //   0x30 = Disc recognized / valid
+            //   0x70 = No Disc present
             //
             // data[3] - either 0x00 or 0x02
             // 
@@ -2156,13 +1883,13 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             //
             // data[11...15] - always 0x00
             //
-            // data[16] - vehicle speed (measured by GPS?) in km/h. Can be negative (e.g. 0xFC) when reversing.
+            // data[16] - vehicle speed (as measured by GPS?) in km/h. Can be negative (e.g. 0xFC) when reversing.
             //
             // data[17] values: 0x00, 0x20, 0x21, 0x22, 0x28, 0x29, 0x2A, 0x2C, 0x2D, 0x30, 0x38, 0xA1
             // Bits:
             // - & 0x01 - Loading audio fragment
             // - & 0x02 - Audio output
-            // - & 0x04 - New instruction??
+            // - & 0x04 - New guidance instruction??
             // - & 0x08 - Reading disc??
             // - & 0x10 - Calculating route??
             // - & 0x20 - Disc present??
@@ -2172,10 +1899,10 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             //
             // data[19] - same as data[0]: sequence number
 
-            uint16_t status = (uint16_t)data[1] << 8 | data[2];
+            // uint16_t status = (uint16_t)data[1] << 8 | data[2];
 
-            char buffer[12];
-            sprintf_P(buffer, PSTR("0x%04X-0x%02X"), status, data[17]);
+            // char buffer[12];
+            // sprintf_P(buffer, PSTR("0x%04X-0x%02X"), status, data[17]);
 
             // SERIAL.printf(
                 // "status=%s",
@@ -2204,25 +1931,25 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     "??"
             );
 
-            SERIAL.printf(", disc=%s, reading_disc=%s, xxx=%s, yyy=%s",
+            SERIAL.printf(", disc=%s, gps_fix=%s, gps_fix_lost=%s, gps_scanning=%s",
                 (data[2] & 0x70) == 0x70 ? "NONE_PRESENT" :
                     (data[2] & 0x70) == 0x30 ? "RECOGNIZED" :
-                    (data[2] & 0x70) == 0x10 ? "PRESENT_NOT_RECOGNIZED" :
                     "??",
-                data[2] & 0x04 ? "YES" : "NO",
-                data[2] & 0x01 ? "ON" : "OFF",
-                data[2] & 0x02 ? "ON" : "OFF"
+                data[2] & 0x01 ? "YES" : "NO",
+                data[2] & 0x02 ? "YES" : "NO",
+                data[2] & 0x04 ? "YES" : "NO"
             );
 
             if (data[17] != 0x00)
             {
-                SERIAL.printf(", disc_status=%s%s%s%s%s%s",
+                SERIAL.printf(", disc_status=%s%s%s%s%s%s%s",
                     data[17] & 0x01 ? "LOADING_AUDIO_FRAGMENT " : "",
                     data[17] & 0x02 ? "AUDIO_OUTPUT " : "",
                     data[17] & 0x04 ? "NEW_GUIDANCE_INSTRUCTION " : "",
                     data[17] & 0x08 ? "READING_DISC " : "",
                     data[17] & 0x10 ? "CALCULATING_ROUTE " : "",
-                    data[17] & 0x20 ? "DISC_PRESENT" : ""
+                    data[17] & 0x20 ? "DISC_PRESENT" : "",
+                    data[17] & 0x80 ? "REACHED_DESTINATION" : ""
                 );
             } // if
 
@@ -2230,7 +1957,10 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             if (zzz != 0x00) SERIAL.printf(", zzz=%u", zzz);
 
             SERIAL.printf(", gps_speed=%u km/h%s",
-                data[16] < 0xE0 ? data[16] : 0xFF - data[16] + 1,  // 0xE0: just guessing
+
+                // 0xE0 as boundary for "reverse": just guessing. Do we ever drive faster than 224 km/h?
+                data[16] < 0xE0 ? data[16] : 0xFF - data[16] + 1,
+
                 data[16] >= 0xE0 ? " (reverse)" : ""
             );
 
@@ -2238,7 +1968,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
         }
         break;
 
-        case SATNAV6_IDEN:
+        case SATNAV_STATUS_3_IDEN:
         {
             // http://graham.auld.me.uk/projects/vanbus/packets.html#8CE
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#8CE
@@ -2255,7 +1985,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
             // Possible meanings of data:
 
-            SERIAL.print("--> SatNav 6 - SatNav status: ");
+            SERIAL.print("--> SatNav status 3: ");
 
             if (dataLen != 2 && dataLen != 3 && dataLen != 17)
             {
@@ -2306,12 +2036,505 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
         }
         break;
 
-        case SATNAV7_IDEN:
+        case SATNAV_GUIDANCE_DATA_IDEN:
+        {
+            // http://graham.auld.me.uk/projects/vanbus/packets.html#9CE
+            // http://pinterpeti.hu/psavanbus/PSA-VAN.html#9CE
+
+            SERIAL.print("--> SatNav guidance data: ");
+
+            if (dataLen != 16)
+            {
+                SERIAL.println("[unexpected packet length]");
+                return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
+            } // if
+
+            // This packet precedes a packet with IDEN value 0x64E (SATNAV_GUIDANCE_IDEN).
+            // This packet contains direction data during guidance.
+            //
+            // Meanings of data:
+            //
+            // - data[0] & 0x0F , data[15] & 0x0F = sequence number
+            //
+            // - data[1], [2] = current heading in degrees
+            //
+            // - data[3], [4] = heading to destination in degrees
+            //
+            // - (data[5] & 0x7F) << 8 | data[6] = remaining distance to destination
+            //   Unit (kilometers or meters) is encoded in most significant bit:
+            //   & 0x80: 1 = in kilometers (>= 10 km), 0 = in meters (< 10 km)
+            //
+            // - (data[7] & 0x7F) << 8 | data[8] = distance to destination in straight line
+            //   Unit (kilometers or meters) is encoded in most significant bit:
+            //   & 0x80: 1 = in kilometers (>= 10 km), 0 = in meters (< 10 km)
+            //
+            // - (data[9] & 0x7F) << 8 | data[10] = distance to next guidance instruction
+            //   Unit (kilometers or meters) is encoded in most significant bit:
+            //   & 0x80: 1 = in kilometers (>= 10 km), 0 = in meters (< 10 km)
+            //
+            // - data [11] << 8 & data[12] = Usually 0x7FFF. If not, low values (maximum value seen is 0x0167). Some
+            //   kind of heading indication? Seen only when driving on a roundabout. For indicating when to take the
+            //   exit of a roundabout?
+            //
+            // - data [13] << 8 & data[14] = Some distance value?? If so, always in km. Or: remaining time in minutes
+            //   (TTG)? Or: the number of remaining guidance instructions until destination?
+            //   Decreases steadily while driving, but can jump up after a route has been recalculated. When
+            //   decreasing, sometimes just skips a value.
+            //
+            uint16_t currHeading = (uint16_t)data[1] << 8 | data[2];
+            uint16_t headingToDestination = (uint16_t)data[3] << 8 | data[4];
+            uint16_t distanceToDestination = (uint16_t)(data[5] & 0x7F) << 8 | data[6];
+            uint16_t gpsDistanceToDestination = (uint16_t)(data[7] & 0x7F) << 8 | data[8];
+            uint16_t distanceToNextTurn = (uint16_t)(data[9] & 0x7F) << 8 | data[10];
+            uint16_t headingOnRoundabout = (uint16_t)data[11] << 8 | data[12];
+            uint16_t xxxDistanceToDestination = (uint16_t)data[13] << 8 | data[14];
+
+            char floatBuf[MAX_FLOAT_SIZE];
+            SERIAL.printf(
+                "curr_heading=%u deg, heading_to_dest=%u deg, distance_to_dest=%u %s,"
+                " distance_to_dest_straight_line=%u %s, turn_at=%u %s,\n"
+                " heading_on_roundabout=%s deg, distance_to_dest_xxx=%u\n",
+                currHeading,
+                headingToDestination,
+                distanceToDestination,
+                data[5] & 0x80 ? "Km" : "m" ,
+                gpsDistanceToDestination,
+                data[7] & 0x80 ? "Km" : "m" ,
+                distanceToNextTurn,
+                data[9] & 0x80 ? "Km" : "m",
+                headingOnRoundabout == 0x7FFF ? "---" : FloatToStr(floatBuf, headingOnRoundabout, 0),
+                xxxDistanceToDestination
+            );
+        }
+        break;
+
+        case SATNAV_GUIDANCE_IDEN:
+        {
+            // http://graham.auld.me.uk/projects/vanbus/packets.html#64E
+            // http://pinterpeti.hu/psavanbus/PSA-VAN.html#64E
+
+            SERIAL.print("--> SatNav guidance: ");
+
+            if (dataLen != 3 && dataLen != 4 && dataLen != 6 && dataLen != 13 && dataLen != 23)
+            {
+                SERIAL.println("[unexpected packet length]");
+                return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
+            } // if
+
+            // Packet appears as soon as the first guidance instruction is given.
+            // Just before this packet there is always a packet with IDEN value 0x9CE (SATNAV_GUIDANCE_DATA_IDEN).
+            //
+            // Meanings of data:
+            //
+            // - data[0] & 0x0F , data[dataLen - 1] & 0x0F = sequence number
+            //
+            // - data[1]: current instruction (large icon in left of MFD)
+            //   0x01: Single turn instruction ("Turn left",  dataLen = 6 or 13)
+            //   0x03: Double turn instruction ("Turn left, then turn right", dataLen = 23)
+            //   0x04: Turn around if possible (dataLen = 3)
+            //   0x05: Follow current road until next instruction (dataLen = 4)
+            //   0x06: Not on map; follow heading (dataLen = 4)
+            //
+            // If data[1] == 0x01 or data[1] == 0x03, then the remaining bytes (data[4], data[4...11] or
+            // data[6...21]) describe the detailed shape of the large navigation icon as shown in the left of the MFD.
+            // Note: the basic shape (junction or roundabout) is determined by the data[2] value as found in the
+            // last received packet with data[1] == 0x05 ("wait for next instruction").
+            //
+            // - If data[1] == 0x01 and data[2] == 0x02: fork or exit instruction; dataLen = 6
+            //   * data[4]:
+            //     0x41: keep left on fork
+            //     0x14: keep right on fork
+            //     0x12: take right exit
+            //
+            // - If data[1] == 0x01 and (data[2] == 0x00 || data[2] == 0x01): one "detailed instruction"; dataLen = 13
+            //   * data[4...11]: current instruction ("turn left")
+            //
+            // - If data[1] == 0x03: two "detailed instructions"; dataLen = 23
+            //   * data[6...13]: current instruction ("turn left ...")
+            //   * data[14...21]: next instruction ("... then turn right")
+            //
+            //   A "detailed instruction" consists of 8 bytes:
+            //   * 0   : turn angle in increments of 22.5 degrees, measured clockwise, starting with 0 at 6 o-clock.
+            //           E.g.: 0x4 == 90 deg left, 0x8 = 180 deg = straight ahead, 0xC = 270 deg = 90 deg right.
+            //   * 1   : always 0x00 ??
+            //   * 2, 3: bit pattern indicating which legs are present in the junction or roundabout. Each bit set is
+            //           for one leg.
+            //           Lowest bit of byte 3 corresponds to the leg of 0 degrees (straight down, which is
+            //           always there, because that is where we are currently driving), running clockwise up to the
+            //           highest bit of byte 2, which corresponds to a leg of 337.5 degrees (very sharp right).
+            //   * 4, 5: bit pattern indicating which legs in the junction are "no entry". The coding of the bits is
+            //           the same as for bytes 2 and 3.
+            //   * 6   : always 0x00 ??
+            //   * 7   : always 0x00 ??
+            //
+            // - If data[1] == 0x05: wait for next instruction; follow current road (dataLen = 4)
+            //   data[2]: small icon (between current street and next street, indicating next instruction)
+            //     Note: the icon indicated here is shown in the large icon as soon as the "detailed instruction"
+            //       (see above) is received.
+            //     0x00 = No icon
+            //     0x01 = Junction: turn right
+            //     0x02 = Junction: turn left
+            //     0x04 = Roundabout
+            //     0x08 = Go straight
+            //     0x10 = Retrieving next instruction
+            //
+            // - If data[1] == 0x06: not on map; follow heading (dataLen = 4)
+            //   data[2]: angle of heading to maintain, in increments of 22.5 degrees, measured clockwise, starting
+            //      with 0 at 6 o-clock.
+            //      E.g.: 0x4 == 90 deg left, 0x8 = 180 deg = straight ahead, 0xC = 270 deg = 90 deg right.
+            //
+            // - data[3]: ?? Seen values: 0x00, 0x01, 0x20, 0x42, 0x53
+            //
+            // =====
+            // Just some examples:
+            //
+            //     01-02-53-41 is shown as:
+            //           ^  |
+            //           || |
+            //           \\ /
+            //            ++
+            //            ||
+            //            ||
+            //       (keep left on fork)
+            //
+            //     01-02-53-14 is shown as:
+            //           |  ^
+            //           | ||
+            //           \ //
+            //            ++
+            //            ||
+            //            ||
+            //       (keep right on fork)
+            //
+            //     01-02-53-12 is shown as:
+            //            |  ^
+            //            | ||
+            //            |//
+            //            ++
+            //            ||
+            //            ||
+            //       (take right exit)
+            //
+            //     01-00-53-04-00-12-11-00-00-00-00 is shown as:
+            //               /
+            //              /
+            //         <===+---
+            //            ||
+            //            ||
+            //       (turn left 90 deg; ahead = +202.5 deg; right = 270 deg)
+            //
+            //     01-00-53-04-00-01-11-00-00-00-00 is shown as:
+            //             |
+            //             |
+            //         <===+
+            //            ||
+            //            ||
+            //       (turn left 90 deg; ahead = 180 deg; no right)
+            //
+            //     01-00-53-03-00-11-09-10-00-00-00 is:
+            //                |
+            //                |
+            //             /==+--- (-)
+            //         <==/  ||
+            //               ||
+            //       (turn left -67.5 deg; ahead = 180 deg; right = 270 deg: no entry)
+            //
+            //     01-00-53-05-00-02-21-00-00-00-00 is:
+            //                  /
+            //         <==\    /
+            //             \==+
+            //               ||
+            //               ||
+            //       (turn left 112.5 deg; ahead = +202.5 deg; no right)
+            //
+            //     01-00-53-0C-00-10-21-00-00-00-00
+            //
+            //         --\
+            //            \--+===>
+            //              ||
+            //              ||
+            //       (turn right 270 deg; no ahead; left = 112.5 deg)
+            //
+            //     01-01-53-09-00-22-21-00-00-00-00 is:
+            //
+            //                /
+            //               /
+            //             --+
+            //            /   \\
+            //     --\   /     \\
+            //        \--+     ++--\
+            //           \    //    \--
+            //            \++//
+            //             ||
+            //             ||
+            //
+            //       (take second exit on roundabout @ 202.5 degrees, exits on 112.5, 202.5 and 290.5 degrees)
+            //
+            //     01-00-01-0C-00-11-11-00-10-00-00 is:
+            //             |
+            //             |
+            //      (-) ---+===>
+            //            ||
+            //            ||
+            //       (turn right 270 deg; ahead = 180 deg; left = 90: no entry)
+            //
+            //     01-00-01-04-00-10-13-00-03-00-00 is:
+            //
+            //         <===+---
+            //            /||
+            //           / ||
+            //          (-)
+            //       (turn left 90 deg; no ahead; right = 270 deg, sharp left = 22.5 deg: no entry)
+            //
+            //     03-00-53-00-41-0C-00-11-01-00-00-00-00-0B-00-08-11-00-00-00-00 is:
+            //             |
+            //             |
+            //             +===>
+            //            ||
+            //            ||
+            //       (current instruction: turn right 270 deg; ahead = 180 deg; no left)
+            //
+            //     03-00-53-00-41-0C-00-10-11-00-10-00-00-04-00-12-11-00-00-00-00 is:
+            //
+            //      (-) ---+===>
+            //            ||
+            //            ||
+            //       (current instruction: turn right 270 deg; no ahead; left = 90 deg: no entry)
+            //
+            //     03-00-53-00-63-04-00-01-11-00-00-00-00-03-00-08-09-00-00-00-00 and
+            //     03-00-53-00-32-04-00-01-11-00-00-00-00-05-00-02-21-00-00-00-00 is:
+            //             |
+            //             |
+            //         <===+
+            //            ||
+            //            ||
+            //       (current instruction: turn left 90 deg; ahead = 180 deg; no right)
+            //
+            //     03-00-53-00-3A-0B-00-08-11-00-00-00-00-04-00-10-11-00-00-00-00 is:
+            //
+            //                 /==>
+            //      (-) ---+==/
+            //            ||
+            //            ||
+            //       (current instruction: turn right 247.2 deg; no ahead; left = 90 deg)
+            //       (next instruction: turn left 90 deg; no ahead; right = 270 deg)
+            //
+
+            char buffer[20];
+            sprintf_P(buffer, PSTR("unknown(0x%02X-0x%02X)"), data[1], data[2]);
+
+            SERIAL.printf("guidance_instruction=%s\n",
+                data[1] == 0x01 ? "SINGLE_TURN" :
+                    data[1] == 0x03 ? "DOUBLE_TURN" :
+                    data[1] == 0x04 ? "TURN_AROUND_IF_POSSIBLE" :
+                    data[1] == 0x05 ? "FOLLOW_ROAD" :
+                    data[1] == 0x06 ? "NOT_ON_MAP" :
+                    buffer
+            );
+
+            if (data[1] == 0x01)
+            {
+                if (data[2] == 0x00 || data[2] == 0x01)
+                {
+                    if (dataLen != 13)
+                    {
+                        SERIAL.println("    [unexpected packet length]");
+                        return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
+                    } // if
+
+                    // One "detailed instruction" in data[4...11]
+                    SERIAL.print("    current_instruction=\n");
+                    PrintGuidanceInstruction(data + 4);
+                }
+                else if (data[2] == 0x02)
+                {
+                    if (dataLen != 6)
+                    {
+                        SERIAL.println("    [unexpected packet length]");
+                        return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
+                    } // if
+
+                    // Fork or exit instruction
+                    SERIAL.printf("    current_instruction=%s\n",
+                        data[4] == 0x41 ? "KEEP_LEFT_ON_FORK" :
+                            data[4] == 0x14 ? "KEEP_RIGHT_ON_FORK" :
+                            data[4] == 0x12 ? "TAKE_RIGHT_EXIT" :
+                            "??"
+                    );
+                }
+                else
+                {
+                    SERIAL.printf("%s\n", buffer);
+                } // if
+            }
+            else if (data[1] == 0x03)
+            {
+                if (dataLen != 23)
+                {
+                    SERIAL.println("    [unexpected packet length]");
+                    return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
+                } // if
+
+                // Two "detailed instructions": current in data[6...13], next in data[14...21]
+                SERIAL.print("    current_instruction=\n");
+                PrintGuidanceInstruction(data + 6);
+                SERIAL.print("    next_instruction=\n");
+                PrintGuidanceInstruction(data + 14);
+            }
+            else if (data[1] == 0x04)
+            {
+                if (dataLen != 3)
+                {
+                    SERIAL.println("    [unexpected packet length]");
+                    return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
+                } // if
+
+            } // if
+            else if (data[1] == 0x05)
+            {
+                if (dataLen != 4)
+                {
+                    SERIAL.println("    [unexpected packet length]");
+                    return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
+                } // if
+
+                SERIAL.printf("    follow_road_next_instruction=%s\n",
+                    data[2] == 0x00 ? "NONE" :
+                        data[2] == 0x01 ? "TURN_RIGHT" :
+                        data[2] == 0x02 ? "TURN_LEFT" :
+                        data[2] == 0x04 ? "ROUNDABOUT" :
+                        data[2] == 0x08 ? "GO_STRAIGHT_AHEAD" :
+                        data[2] == 0x10 ? "RETRIEVING_NEXT_INSTRUCTION" :
+                        "??"
+                );
+            }
+            else if (data[1] == 0x06)
+            {
+                if (dataLen != 4)
+                {
+                    SERIAL.println("    [unexpected packet length]");
+                    return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
+                } // if
+
+                SERIAL.printf("    not_on_map_follow_heading=%u\n", data[2]);
+            } // if
+        }
+        break;
+
+        case SATNAV_REPORT_IDEN:
+        {
+            // http://graham.auld.me.uk/projects/vanbus/packets.html#6CE
+            // http://pinterpeti.hu/psavanbus/PSA-VAN.html#6CE
+
+            SERIAL.print("--> SatNav report: ");
+
+            if (dataLen < 3)
+            {
+                SERIAL.println("[unexpected packet length]");
+                return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
+            } // if
+
+            // Possible meanings of data:
+            //
+            // data[0]: starts low (0x02, 0x05), then increments every time with either 9 or 1.
+            //   & 0x80: last packet in sequence
+            //   --> Last data byte (data[dataLen - 1]) is always the same as the first (data[0]).
+            //
+            // data[1]: Code of report; see below
+            //
+            // Lists are formatted as follows:
+            // - Record: terminated with '\1', containing a set of:
+            //   - Strings: terminated with '\0'
+            //     - Special characters:
+            //       * 0x81 = '+' in solid circle, means: this destination cannot be selected with the current
+            //         navigation disc. Something from UTF-8? See also U+2A01 (UTF-8 0xe2 0xa8 0x81) at:
+            //         https://www.utf8-chartable.de/unicode-utf8-table.pl?start=10752&number=1024&utf8=0x&htmlent=1
+            //
+            // Character set is "Extended ASCII/Windows-1252"; e.g. ë is 0xEB.
+            // See also: https://bytetool.web.app/en/ascii/
+            //
+            // Address format:
+            // - Starts with "V" (Ville? Vers?) or "C" (Country? Courant? Chosen?)
+            // - Country
+            // - Province
+            // - City
+            // - District (or empty)
+            // - String "G" (iGnore?) which can be followed by text that is not important for searching on, e.g.
+            //   "GRue de"
+            // - Street name
+            // - Either:
+            //   - House number (or "0" if unknown or not applicable), or
+            //   - GPS coordinates (e.g. "+495456", "+060405"). Note that these coordinates are in degrees, NOT in
+            //     decimal notation. So the just given example would translate to: 49°54'56"N 6°04'05"E. There
+            //     seems to be however some offset, because the shown GPS coordinates do not exactly match the
+            //     destination.
+
+            #define MAX_SATNAV_STRING_SIZE 128
+            static char buffer[128];
+            static int offsetInBuffer = 0;
+
+            int offsetInPacket = 1;
+
+            if ((data[0] & 0x7F) <= 7)
+            {
+                // First packet of report sequence
+                offsetInPacket = 2;
+                offsetInBuffer = 0;
+
+                SERIAL.printf("report=%s:\n    ", SatNavRequestStr(data[1]));
+            }
+            else
+            {
+                // TODO - check if data[0] & 0x7F has incremented by either 1 or 9 w.r.t. the last received packet.
+                // If it has incremented by e.g. 10 (9+1) or 18 (9+9), then we have obviously missed a packet, so
+                // appending the text of the current packet to that of the previous packet would be incorrect.
+
+                SERIAL.print("\n    ");
+            } // if
+
+            while (offsetInPacket < dataLen - 1)
+            {
+                // New record?
+                if (data[offsetInPacket] == 0x01)
+                {
+                    offsetInPacket++;
+                    offsetInBuffer = 0;
+                    SERIAL.print("\n    ");
+                } // if
+
+                int maxLen = dataLen - 1 - offsetInPacket;
+                if (offsetInBuffer + maxLen >= MAX_SATNAV_STRING_SIZE)
+                {
+                    maxLen = MAX_SATNAV_STRING_SIZE - offsetInBuffer - 1;
+                } // if
+
+                strncpy(buffer + offsetInBuffer, (const char*) data + offsetInPacket, maxLen);
+                buffer[offsetInBuffer + maxLen] = 0;
+
+                offsetInPacket += strlen(buffer) + 1 - offsetInBuffer;
+                if (offsetInPacket <= dataLen - 1)
+                {
+                    SERIAL.printf("'%s' - ", buffer);
+                    offsetInBuffer = 0;
+                }
+                else
+                {
+                    offsetInBuffer = strlen(buffer);
+                } // if
+            } // while
+
+            // Last packet in report sequence?
+            if (data[0] & 0x80) SERIAL.print("--LAST--");
+            SERIAL.println();
+        }
+        break;
+
+        case MFD_TO_SATNAV_IDEN:
         {
             // http://graham.auld.me.uk/projects/vanbus/packets.html#94E
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#94E
 
-            SERIAL.print("--> SatNav 7 - MFD to SatNav: ");
+            SERIAL.print("--> MFD to SatNav: ");
 
             if (dataLen != 4 && dataLen != 9 && dataLen != 11)
             {
@@ -2319,19 +2542,44 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
+            // Possible meanings of data:
+            //
+            // data[0]: request code
+            //
+            // data[1]:
+            // - 0x0D: user is selecting an option
+            // - 0x0E: user is selecting an option
+            // - 0x1D: user is entering data (city, street, house number, ...)
+            // - 0xFF: user or MFD is requesting a list or data item
+            //
+            // data[2]: Type
+            // - 0x00: request length of list
+            // - 0x01: request list, starting at data[5] << 8 | data[6], length in data[7] << 8 | data[8]
+            // - 0x02: select item as indicated in data[5] << 8 | data[6]
+            //
+            // data[3]: Selected letter, digit or character (A..Z, 0..9, '). 0 if not applicable.
+            //
+            // data[4]:
+            //
+            // data[5] << 8 | data[6]: selected item or offset, or 0 if not applicable.
+            //
+            // data[7] << 8 | data[8]: number of items or length, or 0 if not applicable.
+            //
             uint16_t request = (uint16_t)data[0] << 8 | data[1];
 
+            char buffer[7];
+            sprintf_P(buffer, PSTR("0x%04X"), request);
+
             SERIAL.printf(
-                "request=%s (0x%04X) (%s?), type=%d(%s)",
+                "request=%s (%s), type=%d(%s)",
                 SatNavRequestStr(data[0]),
-                request,
                 request == 0x021D ? "ENTER_CITY" : // 4, 9 or 11 bytes
                     request == 0x051D ? "ENTER_STREET" : // 4, 9 or 11 bytes
                     request == 0x061D ? "ENTER_HOUSE_NUMBER" : // 9 or 11 bytes
                     request == 0x080D && dataLen == 4 ? "REQUEST_LIST_SIZE_OF_CATEGORIES" :
                     request == 0x080D && dataLen == 9 ? "CHOOSE_CATEGORY" :
 
-                    // Strange: when starting a SatNav session, the MFD seems to always start by asking the number of
+                    // Strange: when starting a SatNav session, the MFD always starts off by asking the number of
                     // items in the list of categories. It gets the correct answer (38) but just ignores that.
                     request == 0x08FF && dataLen == 4 ? "START_SATNAV" :
 
@@ -2339,9 +2587,9 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     request == 0x090D ? "CHOOSE_CATEGORY":
                     request == 0x0E0D ? "CHOOSE_ADDRESS_FOR_PLACES_OF_INTEREST" :
                     request == 0x0EFF ? "REQUEST_ADDRESS_FOR_PLACES_OF_INTEREST" :
-                    request == 0x0FFF ? "SHOW_CURRENT_DESTINATION" :
+                    request == 0x0FFF ? "REQUEST_NEXT_STREET" :
                     request == 0x100D ? "CHOOSE_CURRENT_ADDRESS" :
-                    request == 0x10FF ? "REQUEST_CURRENT_ADDRESS" :
+                    request == 0x10FF ? "REQUEST_CURRENT_STREET" :
                     request == 0x110E ? "CHOOSE_PRIVATE_ADDRESS" :
                     request == 0x11FF ? "REQUEST_PRIVATE_ADDRESS" :
                     request == 0x120E ? "CHOOSE_BUSINESS_ADDRESS" :
@@ -2353,7 +2601,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     request == 0x1CFF && dataLen == 9 ? "REQUEST_BUSINESS_ADDRESSES" :
                     request == 0x1D0E ? "SELECT_FASTEST_ROUTE?" :
                     request == 0x1DFF ? "CHOOSE_DESTINATION_SHOW_CURRENT_ADDRESS" :
-                    "??",
+                    buffer,
 
                 // Possible meanings:
                 // * request == 0x021D:
@@ -2367,7 +2615,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 data[2],
                 data[2] == 0x00 ? "REQ_LIST_LENGTH" :
                     data[2] == 0x01 ? "REQ_LIST" :
-                    data[2] == 0x02 ? "CHOOSE_LINE" :
+                    data[2] == 0x02 ? "CHOOSE" :
                     "??"
             );
 
@@ -2386,18 +2634,73 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen >= 9)
             {
-                SERIAL.printf(
-                    ", select_from=%u, select_length=%u",
-                    (uint16_t)data[5] << 8 | data[6],
-                    (uint16_t)data[7] << 8 | data[8]
-                );
+                uint16_t selectionOrOffset = (uint16_t)data[5] << 8 | data[6];
+                uint16_t length = (uint16_t)data[7] << 8 | data[8];
+
+                if (selectionOrOffset > 0 && length > 0) SERIAL.printf(", offset=%u, length=%u", selectionOrOffset, length);
+                else if (selectionOrOffset > 0) SERIAL.printf(", selection=%u", selectionOrOffset);
             } // if
 
             SERIAL.println();
         }
         break;
 
-        case SATNAV8_IDEN:
+        case SATNAV_TO_MFD_IDEN:
+        {
+            // http://graham.auld.me.uk/projects/vanbus/packets.html#74E
+            // http://pinterpeti.hu/psavanbus/PSA-VAN.html#74E
+
+            SERIAL.print("--> SatNav to MFD: ");
+
+            if (dataLen != 27)
+            {
+                SERIAL.println("[unexpected packet length]");
+                return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
+            } // if
+
+            // Possible meanings of data:
+
+            // data[0] & 0x07: sequence number
+            // data[1]: request code
+            // data[4] << 8 | data[5]: number of items
+            // data[17...22]: bits indicating available letters, numbers, single quote (') or space
+
+            SERIAL.printf(
+                "response=%s; list_size=%u, ",
+                SatNavRequestStr(data[1]),
+                (uint16_t)data[4] << 8 | data[5]
+            );
+
+            // Available letters are bit-coded in bytes 17...20
+            for (int byte = 0; byte <= 3; byte++)
+            {
+                for (int bit = 0; bit < (byte == 3 ? 2 : 8); bit++)
+                {
+                    SERIAL.printf("%c", data[byte + 17] >> bit & 0x01 ? 65 + 8 * byte + bit : '.');
+                } // for
+            } // for
+
+            // Special character '
+            SERIAL.printf("%c", data[21] >> 6 & 0x01 ? '\'' : '.');
+
+            // Available numbers are bit-coded in bytes 20...21, starting with '0' at bit 2 of byte 20, ending
+            // with '9' at bit 3 of byte 21
+            for (int byte = 0; byte <= 1; byte++)
+            {
+                for (int bit = (byte == 0 ? 2 : 0); bit < (byte == 1 ? 3 : 8); bit++)
+                {
+                    SERIAL.printf("%c", data[byte + 20] >> bit & 0x01 ? 48 + 8 * byte + bit - 2 : '.');
+                } // for
+            } // for
+
+            // <Space>, printed here as '_'
+            SERIAL.printf("%c", data[22] >> 1 & 0x01 ? '_' : '.');
+
+            SERIAL.println();
+        }
+        break;
+
+        case SATNAV_DOWNLOADING_IDEN:
         {
             // I think this is just a message from the SatNav system that it is processing a new navigation disc.
             // MFD shows "DOWNLOADING".
@@ -2405,7 +2708,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // Examples:
             // Raw: #1593 ( 3/15)  5 0E 6F4 RA1 3A-3E NO_ACK OK 3A3E CRC_OK
 
-            SERIAL.print("--> SatNav 8 - SatNav is DOWNLOADING: ");
+            SERIAL.print("--> SatNav is DOWNLOADING: ");
 
             if (dataLen != 0)
             {
@@ -2417,7 +2720,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
         }
         break;
 
-        case SATNAV9_IDEN:
+        case SATNAV_DOWNLOADED1_IDEN:
         {
             // SatNav system somehow indicating that it is finished "DOWNLOADING".
             // Sequence of messages is the same for different discs.
@@ -2426,7 +2729,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // Raw: #2894 (14/15)  7 0E A44 WA0 21-80-74-A4 ACK OK 74A4 CRC_OK
             // Raw: #2932 ( 7/15)  6 0E A44 WA0 82-D5-86 ACK OK D586 CRC_OK
 
-            SERIAL.print("--> SatNav 9 - SatNav DOWNLOADING finished: ");
+            SERIAL.print("--> SatNav DOWNLOADING finished 1: ");
 
             if (dataLen != 1 && dataLen != 2)
             {
@@ -2438,7 +2741,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
         }
         break;
 
-        case SATNAV10_IDEN:
+        case SATNAV_DOWNLOADED2_IDEN:
         {
             // SatNav system somehow indicating that it is finished "DOWNLOADING".
             // Sequence of messages is the same for different discs.
@@ -2449,7 +2752,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // Raw: #2898 ( 3/15) 31 0E AC4 RA0 89-61-80-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-89-ED-C0 ACK OK EDC0 CRC_OK
             // Raw: #2933 ( 8/15)  8 0E AC4 RA0 8A-C2-8A-21-04 ACK OK 2104 CRC_OK
 
-            SERIAL.print("--> SatNav 10 - SatNav DOWNLOADING finished: ");
+            SERIAL.print("--> SatNav DOWNLOADING finished 2: ");
 
             if (dataLen != 0 && dataLen != 3 && dataLen != 26)
             {
@@ -2731,7 +3034,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             else if (data[0] == 0x27)
             {
                 SERIAL.printf("preset_request band=%s, preset=%u\n",
-                    TunerBandStr(data[1] >> 4),
+                    TunerBandStr(data[1] >> 4 & 0x07),
                     data[1] & 0x0F
                 );
             }
@@ -2896,20 +3199,20 @@ void loop()
             // || iden == TIME_IDEN
             // || iden == AUDIO_SETTINGS_IDEN
             // || iden == MFD_STATUS_IDEN
-            // || iden == SATNAV_GUIDANCE_IDEN
             // || iden == AIRCON_IDEN
             // || iden == AIRCON2_IDEN
             // || iden == CDCHANGER_IDEN
-            // || iden == SATNAV1_IDEN
-            // || iden == SATNAV2_IDEN
-            // || iden == SATNAV3_IDEN
-            // || iden == SATNAV4_IDEN
-            // || iden == SATNAV5_IDEN
-            // || iden == SATNAV6_IDEN
-            // || iden == SATNAV7_IDEN
-            // || iden == SATNAV8_IDEN
-            // || iden == SATNAV9_IDEN
-            // || iden == SATNAV10_IDEN
+            // || iden == SATNAV_STATUS_1_IDEN
+            // || iden == SATNAV_STATUS_2_IDEN
+            // || iden == SATNAV_STATUS_3_IDEN
+            // || iden == SATNAV_GUIDANCE_DATA_IDEN
+            // || iden == SATNAV_GUIDANCE_IDEN
+            // || iden == SATNAV_REPORT_IDEN
+            // || iden == MFD_TO_SATNAV_IDEN
+            // || iden == SATNAV_TO_MFD_IDEN
+            // || iden == SATNAV_DOWNLOADING_IDEN
+            // || iden == SATNAV_DOWNLOADED1_IDEN
+            // || iden == SATNAV_DOWNLOADED2_IDEN
             // || iden == WHEEL_SPEED_IDEN
             // || iden == ODOMETER_IDEN
             // || iden == COM2000_IDEN
@@ -2939,20 +3242,20 @@ void loop()
             // && iden != TIME_IDEN
             // && iden != AUDIO_SETTINGS_IDEN
             // && iden != MFD_STATUS_IDEN
-            // && iden != SATNAV_GUIDANCE_IDEN
             // && iden != AIRCON_IDEN
             // && iden != AIRCON2_IDEN
             // && iden != CDCHANGER_IDEN
-            // && iden != SATNAV1_IDEN
-            // && iden != SATNAV2_IDEN
-            // && iden != SATNAV3_IDEN
-            // && iden != SATNAV4_IDEN
-            // && iden != SATNAV5_IDEN
-            // && iden != SATNAV6_IDEN
-            // && iden != SATNAV7_IDEN
-            // && iden != SATNAV8_IDEN
-            // && iden != SATNAV9_IDEN
-            // && iden != SATNAV10_IDEN
+            // && iden != SATNAV_STATUS_1_IDEN
+            // && iden != SATNAV_STATUS_2_IDEN
+            // && iden != SATNAV_STATUS_3_IDEN
+            // && iden != SATNAV_GUIDANCE_DATA_IDEN
+            // && iden != SATNAV_GUIDANCE_IDEN
+            // && iden != SATNAV_REPORT_IDEN
+            // && iden != MFD_TO_SATNAV_IDEN
+            // && iden != SATNAV_TO_MFD_IDEN
+            // && iden != SATNAV_DOWNLOADING_IDEN
+            // && iden != SATNAV_DOWNLOADED1_IDEN
+            // && iden != SATNAV_DOWNLOADED2_IDEN
             // && iden != WHEEL_SPEED_IDEN
             // && iden != ODOMETER_IDEN
             // && iden != COM2000_IDEN
