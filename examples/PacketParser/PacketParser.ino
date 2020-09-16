@@ -241,17 +241,17 @@ const char* SatNavRequestStr(uint8_t data)
 //
 // A detailed SatNnav guidance instruction consists of 8 bytes:
 // * 0   : turn angle in increments of 22.5 degrees, measured clockwise, starting with 0 at 6 o-clock.
-//         E.g.: 0x4 == 90 deg left, 0x8 = 180 deg = straight ahead, 0xC = 270 deg = 90 deg right. Turn angle is
-//         shown as (vertical) (d|sl)ash ('\', '|', '/', or '-').
+//         E.g.: 0x4 == 90 deg left, 0x8 = 180 deg = straight ahead, 0xC = 270 deg = 90 deg right.
+//         Turn angle is shown here as (vertical) (d|sl)ash ('\', '|', '/', or '-').
 // * 1   : always 0x00 ??
 // * 2, 3: bit pattern indicating which legs are present in the junction or roundabout. Each bit set is for one leg.
 //         Lowest bit of byte 3 corresponds to the leg of 0 degrees (straight down, which is
 //         always there, because that is where we are currently driving), running clockwise up to the
 //         highest bit of byte 2, which corresponds to a leg of 337.5 degrees (very sharp right).
-//         A leg is shown as a '.'.
+//         A leg is shown here as a '.'.
 // * 4, 5: bit pattern indicating which legs in the junction are "no entry". The coding of the bits is the same
 //         as for bytes 2 and 3.
-//         A "no-entry" is shown as "(-)".
+//         A "no-entry" is shown here as "(-)".
 // * 6   : always 0x00 ??
 // * 7   : always 0x00 ??
 //
@@ -551,14 +551,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#8C4
 
             // Examples:
-            // 0E 8C4 WA0 8AE1403D54 ACK
-            // 0E 8C4 WA0 8A21403D54 ACK
-            // 0E 8C4 WA0 8A24409B32 ACK
 
-            // Raw: #7797 ( 2/15) 8 0E 8C4 WA0 07-40-00-E6-2C ACK OK E62C CRC_OK
-            // Raw: #7819 ( 9/15) 6 0E 8C4 WA0 96-D8-48 ACK OK D848 CRC_OK
-            // Raw: #7820 (10/15) 8 0E 8C4 WA0 8A-21-40-3D-54 ACK OK 3D54 CRC_OK
-            // Raw: #7970 (10/15) 7 0E 8C4 WA0 52-20-A8-0E ACK OK A80E CRC_OK
 
             if (dataLen < 1 || dataLen > 3)
             {
@@ -573,6 +566,11 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 // I'm sure that these messages are sent by the head unit: when no other device than the head unit is
                 // on the bus, these packets are seen (unACKed; ACKs appear when the MFD is plugged back in to the bus).
 
+                // Examples:
+                // Raw: #xxxx (xx/15)  8 0E 8C4 WA0 8A-24-40-9B-32 ACK OK 9B32 CRC_OK
+                // Raw: #7820 (10/15)  8 0E 8C4 WA0 8A-21-40-3D-54 ACK OK 3D54 CRC_OK
+                // Raw: #0345 ( 1/15)  8 0E 8C4 WA0 8A-28-40-F9-96 ACK OK F996 CRC_OK
+
                 SERIAL.print("Head unit: ");
 
                 if (dataLen != 3)
@@ -582,17 +580,23 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 } // if
 
                 // data[1] values seen:
-                // 0x20 - Tuner info - reply to 8D4 WA0 D1 (any source)
-                // 0x21 - Audio settings announcement (source = satnav, tuner or CD changer)
-                // 0x22 - Button press announcement (source = satnav, tuner or CD changer)
-                // 0x24 - Tuner info announcement (any source)
-                // 0x30 - Internal CD (or tape?) presence announcement (any source)
-                // 0x40 - Tuner presets available - reply to 8D4 WA0 27-11
-                // 0xC0 - Internal CD track data available - reply to 8D4 WA0 D6
-                // 0xC1 - Audio settings announcement (source = internal CD (or tape?))
-                // 0xC2 - Button press announcement (source = internal CD (or tape?))
-                // 0xC4 - Searching announcement (source = internal CD (or tape?))
-                // 0xD0 - Track info announcement (source = internal CD (or tape?))
+                // 0x20: Tuner info - reply to 8D4 WA0 D1 (any source)
+                // 0x21: Audio settings announcement (source = satnav, tuner or CD changer)
+                // 0x22: Button press announcement (source = satnav, tuner or CD changer)
+                // 0x24: Tuner info announcement (any source)
+                // 0x28: Cassette tape presence announcement (any source)
+                // 0x30: Internal CD presence announcement (any source)
+                // 0x40: Tuner presets available - reply to 8D4 WA0 27-11
+                // 0x60: Cassette tape data available - reply to 8D4 WA0 D2
+                // 0x61: Audio settings announcement (source = cassette tape)
+                // 0x62: Button press announcement (source = cassette tape)
+                // 0x64: Start tape announcement (source = cassette tape)
+                // 0x68: Info announcement (source = cassette tape)
+                // 0xC0: Internal CD track data available - reply to 8D4 WA0 D6
+                // 0xC1: Audio settings announcement (source = internal CD)
+                // 0xC2: Button press announcement (source = internal CD)
+                // 0xC4: Searching announcement (source = internal CD)
+                // 0xD0: Track info announcement (source = internal CD)
                 //
                 SERIAL.printf(
                     "%s\n",
@@ -600,8 +604,14 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     data[1] == 0x21 ? "AUDIO_SETTINGS_ANNOUNCE" :
                     data[1] == 0x22 ? "BUTTON_PRESS_ANNOUNCE" :
                     data[1] == 0x24 ? "TUNER_ANNOUNCEMENT" :
-                    data[1] == 0x30 ? "CD_OR_TAPE_PRESENT" :
+                    data[1] == 0x28 ? "TAPE_PRESENCE_ANNOUNCEMENT" :
+                    data[1] == 0x30 ? "CD_PRESENT" :
                     data[1] == 0x40 ? "TUNER_PRESETS - REPLY" :
+                    data[1] == 0x60 ? "TAPE_INFO - REPLY" :
+                    data[1] == 0x61 ? "TAPE_PLAYING - AUDIO_SETTINGS_ANNOUNCE" :
+                    data[1] == 0x62 ? "TAPE_PLAYING - BUTTON_PRESS_ANNOUNCE" :
+                    data[1] == 0x64 ? "TAPE_PLAYING - STARTING" :
+                    data[1] == 0x68 ? "TAPE_PLAYING - INFO" :
                     data[1] == 0xC0 ? "INTERNAL_CD_TRACK_INFO - REPLY" :
                     data[1] == 0xC1 ? "INTERNAL_CD_PLAYING - AUDIO_SETTINGS_ANNOUNCE" :
                     data[1] == 0xC2 ? "INTERNAL_CD_PLAYING - BUTTON_PRESS_ANNOUNCE" :
@@ -618,7 +628,8 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 // 0xF0 - 0x20 = Tuner (radio)
                 //      - 0x30 = CD track found
                 //      - 0x40 = Tuner preset
-                //      - 0xC0 = CD or tape playing
+                //      - 0x60 = Cassette tape playing
+                //      - 0xC0 = CD playing
                 //      - 0xD0 = CD track info
                 //
                 // SERIAL.printf(
@@ -642,6 +653,8 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                         // (data[1] & 0x0F) == 0x04 ? "STATUS_UPDATE_ANNOUNCE" :  // max 3 retries
                         // "??"
                 // );
+
+                // Button-press announcement?
                 if ((data[1] & 0x0F) == 0x02)
                 {
                     char buffer[5];
@@ -673,6 +686,9 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             }
             else if (data[0] == 0x96)
             {
+                // Examples:
+                // Raw: #7819 ( 9/15)  6 0E 8C4 WA0 96-D8-48 ACK OK D848 CRC_OK
+
                 if (dataLen != 1)
                 {
                     SERIAL.println("[unexpected packet length]");
@@ -744,9 +760,10 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 // - SatNav system
                 // - Instrument panel
 
-                // Examples (the only two I had):
+                // Examples:
                 // Raw: #2641 ( 1/15)  7 0E 8C4 WA0 52-08-97-D0 ACK OK 97D0 CRC_OK
                 // Raw: #0000 ( 0/15)  7 0E 8C4 WA0 52-20-A8-0E NO_ACK OK A80E CRC_OK
+                // Raw: #7970 (10/15)  7 0E 8C4 WA0 52-20-A8-0E ACK OK A80E CRC_OK
 
                 // data[1] is usually 0x08, sometimes 0x20
                 //  & 0x08 - Contact key in "ON" position?
@@ -1271,12 +1288,20 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                         return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                     } // if
 
-                    // TODO - check
-                    SERIAL.printf("%s, %s, %s, %s\n",
-                        data[2] & 0x10 ? "FAST_FORWARD" : "",
-                        data[2] & 0x30 ? "REWIND" : "",
-                        data[2] & 0x0C == 0x0C ? "PLAY" : data[2] & 0x0C == 0x00 ? "STOP"  : "??",
-                        data[2] & 0x01 ? "SIDE 1" : "SIDE 2"
+                    uint8_t status = data[2] & 0x3C;
+                    char buffer[5];
+                    sprintf_P(buffer, PSTR("0x%02X"), status);
+
+                    SERIAL.printf("%s, side=%s\n",
+                        status == 0x00 ? "STOPPED" :
+                            status == 0x04 ? "LOADING" :
+                            status == 0x0C ? "PLAYING" :
+                            status == 0x10 ? "FAST_FORWARD" :
+                            status == 0x14 ? "NEXT_TRACK" :
+                            status == 0x30 ? "REWIND" :
+                            status == 0x34 ? "PREVIOUS_TRACK" :
+                            buffer,
+                        data[2] & 0x01 ? "2" : "1"
                     );
                 }
                 break;
@@ -1432,7 +1457,10 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
                 (data[4] & 0x0F) == 0x00 ? "NONE" :  // source
                     (data[4] & 0x0F) == 0x01 ? "TUNER" :
-                    (data[4] & 0x0F) == 0x02 ? "INTERNAL_CD_OR_TAPE" :
+                    (data[4] & 0x0F) == 0x02 ?
+                        data[4] & 0x20 ? "TAPE" : 
+                        data[4] & 0x40 ? "INTERNAL_CD" : 
+                        "INTERNAL_CD_OR_TAPE" :
                     (data[4] & 0x0F) == 0x03 ? "CD_CHANGER" :
 
                     // This is the "default" mode for the head unit, to sit there and listen to the navigation
@@ -1442,13 +1470,13 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
                     "???",
 
-                data[1] & 0x02 ? "ON" : "OFF",  // ext_mute
-                data[1] & 0x01 ? "ON" : "OFF",  // mute
+                data[1] & 0x02 ? "ON" : "OFF",  // ext_mute. Activated when head unit ISO connector A pin 1 ("Phone mute") is pulled down.
+                data[1] & 0x01 ? "ON" : "OFF",  // mute. To activate: press both VOL_UP and VOL_DOWN buttons on stalk.
 
                 data[5] & 0x7F,  // volume
                 data[5] & 0x80 ? "<UPD>" : "",
 
-                // audio_menu. Bug: if CD changer is playing, this one is always "OPEN"...
+                // audio_menu. Bug: if CD changer is playing, this one is always "OPEN" (even if it isn't).
                 data[1] & 0x20 ? "OPEN" : "CLOSED",
 
                 (sint8_t)(data[8] & 0x7F) - 0x3F,  // bass
@@ -1786,8 +1814,10 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             SERIAL.printf(
                 "status=%s%s\n",
                 status == 0x0000 ? "NOT_OPERATING" :
+                    status == 0x0001 ? "0x0001" :
                     status == 0x0020 ? "0x0020" : // Nearly at destination ??
                     status == 0x0080 ? "READY" :
+                    status == 0x0101 ? "0x0101" :
                     status == 0x0200 ? "INITIALISING" : // No, definitely not this
                     status == 0x0300 ? "0x0300" :
                     status == 0x0301 ? "GUIDANCE_STARTED" :
@@ -1797,10 +1827,11 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     status == 0x0700 ? "0x0700" :
                     status == 0x0701 ? "0x0701" : // 
                     status == 0x0800 ? "PLAYING_AUDIO_MESSAGE" :
-                    status == 0x4001 ? "0x4001" :
                     status == 0x4000 ? "GUIDANCE_STOPPED" :
+                    status == 0x4001 ? "0x4001" :
                     status == 0x4200 ? "0x4200" :  // Arrived at destination ??
                     status == 0x9000 ? "READING_DISC" :
+                    status == 0x9080 ? "0x9080" :
                     buffer,
                 data[4] == 0x0B ? " reason=0x0B" :  // Seen with status == 0x4001
                     data[4] == 0x0C ? " reason=NO_DISC" :
@@ -2020,7 +2051,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
                 int at = 1;
 
-                // Max 28 data bytes, minus header (1), plus terminating 0
+                // Max 28 data bytes, minus header (1), plus terminating '\0'
                 char txt[MAX_DATA_BYTES - 1 + 1];
 
                 while (at < dataLen)
@@ -2054,29 +2085,29 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             //
             // Meanings of data:
             //
-            // - data[0] & 0x0F , data[15] & 0x0F = sequence number
+            // - data[0] & 0x0F , data[15] & 0x0F: sequence number
             //
-            // - data[1], [2] = current heading in degrees
+            // - data[1], [2]: current heading in compass degrees (0...359)
             //
-            // - data[3], [4] = heading to destination in degrees
+            // - data[3], [4]: heading to destination in compass degrees (0...359)
             //
-            // - (data[5] & 0x7F) << 8 | data[6] = remaining distance to destination
+            // - (data[5] & 0x7F) << 8 | data[6]: remaining distance to destination
             //   Unit (kilometers or meters) is encoded in most significant bit:
             //   & 0x80: 1 = in kilometers (>= 10 km), 0 = in meters (< 10 km)
             //
-            // - (data[7] & 0x7F) << 8 | data[8] = distance to destination in straight line
+            // - (data[7] & 0x7F) << 8 | data[8]: distance to destination in straight line
             //   Unit (kilometers or meters) is encoded in most significant bit:
             //   & 0x80: 1 = in kilometers (>= 10 km), 0 = in meters (< 10 km)
             //
-            // - (data[9] & 0x7F) << 8 | data[10] = distance to next guidance instruction
+            // - (data[9] & 0x7F) << 8 | data[10]: distance to next guidance instruction
             //   Unit (kilometers or meters) is encoded in most significant bit:
             //   & 0x80: 1 = in kilometers (>= 10 km), 0 = in meters (< 10 km)
             //
-            // - data [11] << 8 & data[12] = Usually 0x7FFF. If not, low values (maximum value seen is 0x0167). Some
+            // - data [11] << 8 & data[12]: Usually 0x7FFF. If not, low values (maximum value seen is 0x0167). Some
             //   kind of heading indication? Seen only when driving on a roundabout. For indicating when to take the
             //   exit of a roundabout?
             //
-            // - data [13] << 8 & data[14] = Some distance value?? If so, always in km. Or: remaining time in minutes
+            // - data [13] << 8 & data[14]: Some distance value?? If so, always in km. Or: remaining time in minutes
             //   (TTG)? Or: the number of remaining guidance instructions until destination?
             //   Decreases steadily while driving, but can jump up after a route has been recalculated. When
             //   decreasing, sometimes just skips a value.
@@ -2087,13 +2118,13 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             uint16_t gpsDistanceToDestination = (uint16_t)(data[7] & 0x7F) << 8 | data[8];
             uint16_t distanceToNextTurn = (uint16_t)(data[9] & 0x7F) << 8 | data[10];
             uint16_t headingOnRoundabout = (uint16_t)data[11] << 8 | data[12];
-            uint16_t xxxDistanceToDestination = (uint16_t)data[13] << 8 | data[14];
+            uint16_t minutesToTravel = (uint16_t)data[13] << 8 | data[14];
 
             char floatBuf[MAX_FLOAT_SIZE];
             SERIAL.printf(
                 "curr_heading=%u deg, heading_to_dest=%u deg, distance_to_dest=%u %s,"
                 " distance_to_dest_straight_line=%u %s, turn_at=%u %s,\n"
-                " heading_on_roundabout=%s deg, distance_to_dest_xxx=%u\n",
+                " heading_on_roundabout=%s deg, minutes_to_travel=%u\n",
                 currHeading,
                 headingToDestination,
                 distanceToDestination,
@@ -2103,7 +2134,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 distanceToNextTurn,
                 data[9] & 0x80 ? "Km" : "m",
                 headingOnRoundabout == 0x7FFF ? "---" : FloatToStr(floatBuf, headingOnRoundabout, 0),
-                xxxDistanceToDestination
+                minutesToTravel
             );
         }
         break;
@@ -2126,7 +2157,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             //
             // Meanings of data:
             //
-            // - data[0] & 0x0F , data[dataLen - 1] & 0x0F = sequence number
+            // - data[0] & 0x0F , data[dataLen - 1] & 0x0F: sequence number
             //
             // - data[1]: current instruction (large icon in left of MFD)
             //   0x01: Single turn instruction ("Turn left",  dataLen = 6 or 13)
@@ -2138,7 +2169,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // If data[1] == 0x01 or data[1] == 0x03, then the remaining bytes (data[4], data[4...11] or
             // data[6...21]) describe the detailed shape of the large navigation icon as shown in the left of the MFD.
             // Note: the basic shape (junction or roundabout) is determined by the data[2] value as found in the
-            // last received packet with data[1] == 0x05 ("wait for next instruction").
+            // last received packet with data[1] == 0x05 ("Follow current road until next instruction").
             //
             // - If data[1] == 0x01 and data[2] == 0x02: fork or exit instruction; dataLen = 6
             //   * data[4]:
@@ -2171,17 +2202,17 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             //   data[2]: small icon (between current street and next street, indicating next instruction)
             //     Note: the icon indicated here is shown in the large icon as soon as the "detailed instruction"
             //       (see above) is received.
-            //     0x00 = No icon
-            //     0x01 = Junction: turn right
-            //     0x02 = Junction: turn left
-            //     0x04 = Roundabout
-            //     0x08 = Go straight
-            //     0x10 = Retrieving next instruction
+            //     0x00: No icon
+            //     0x01: Junction: turn right
+            //     0x02: Junction: turn left
+            //     0x04: Roundabout
+            //     0x08: Go straight
+            //     0x10: Retrieving next instruction
             //
             // - If data[1] == 0x06: not on map; follow heading (dataLen = 4)
             //   data[2]: angle of heading to maintain, in increments of 22.5 degrees, measured clockwise, starting
             //      with 0 at 6 o-clock.
-            //      E.g.: 0x4 == 90 deg left, 0x8 = 180 deg = straight ahead, 0xC = 270 deg = 90 deg right.
+            //      E.g.: 0x4 is 90 deg left, 0x8 is 180 deg (straight ahead), 0xC is 270 deg (90 deg right).
             //
             // - data[3]: ?? Seen values: 0x00, 0x01, 0x20, 0x42, 0x53
             //
@@ -2256,7 +2287,6 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             //       (turn right 270 deg; no ahead; left = 112.5 deg)
             //
             //     01-01-53-09-00-22-21-00-00-00-00 is:
-            //
             //                /
             //               /
             //             --+
@@ -3063,8 +3093,16 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 } // if
 
                 SERIAL.printf("command=REQUEST_TUNER_INFO\n");
+            }
+            else if (data[0] == 0xD2)
+            {
+                if (dataLen != 1)
+                {
+                    SERIAL.println("[unexpected packet length]");
+                    return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
+                } // if
 
-                // data[1] seems to be always 0x7D
+                SERIAL.printf("command=REQUEST_TAPE_INFO\n");
             }
             else if (data[0] == 0xD6)
             {
