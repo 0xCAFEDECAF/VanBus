@@ -36,18 +36,21 @@ uint16_t _crc(const uint8_t bytes[], int size)
     return crc16;
 } // _crc
 
-uint16_t txPacket[MAX_PACKET_SIZE];
+uint16_t txPacket[MAX_PACKET_SIZE + 2]; // Adding 2 extra "bytes" for 20 bits of inter-frame spacing (EOF)
 unsigned int atByte = 0;
 unsigned int atBit = 0;
 unsigned int txPacketSize = 0;
 
-// TODO - find a suitable output pin, set pin mode: pinMode(txPin, OUTPUT);
+// TODO - find a suitable output pin, set pin mode: pinMode(vanBusTxPin, OUTPUT);
 //
 #if defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
-// For ESP-01 board we use GPIO 0
-#define D3 (0)
+// // For ESP-01 board we use GPIO 0
+// #define D3 (0)
+// For ESP-01 board we use GPIO 2 (internal pull-up, keep disconnected or high at boot time)
+#define D2 (2)
 #endif
-uint8_t vanBusTxPin = D3;
+//uint8_t vanBusTxPin = D3;
+uint8_t vanBusTxPin = D2;
 
 // Send one bit on the VAN bus
 void ICACHE_RAM_ATTR SendBitIsr()
@@ -67,9 +70,7 @@ void ICACHE_RAM_ATTR SendBitIsr()
             // Finished sending packet
             GPOS = (1 << vanBusTxPin);  // Set pin to '1'
             timer1_disable();
-
-            // TODO - make sure that the next packet is sent only after EOF (5 time slots) from now. I think in
-            // practice there are always at least 13 time slots between subsequent packets.
+            timer1_detachInterrupt();
         } // if
     } // if
 } // SendBitIsr
@@ -101,11 +102,16 @@ void SendPacket(uint16_t iden, uint8_t flags, const char* data, size_t len)
     // to indicate EOD
     txPacket[len + 4] &= 0xFFFC;
 
+    // Add another 20 "1"-bits for inter-frame spacing. EOF is officially 5 time slots, but I think in practice there
+    // are always at least 13 time slots between subsequent packets.
+    txPacket[len + 5] = 0xFFFF;
+    txPacket[len + 6] = 0xFFFF;
+    txPacketSize = len + 5 + 2;  // Adding 2 for the last 20 "1"-bits
+
     atByte = 0;
     atBit = 0;
-    txPacketSize = len + 5;
 
-    // For now, simply dump all the bits to Serial
+    // For debugging: dump all the bits to Serial
     // TODO - remove
     Serial.print(F("SendPacket: "));
     for (int i = 0; i < len + 5; i++)
@@ -119,6 +125,8 @@ void SendPacket(uint16_t iden, uint8_t flags, const char* data, size_t len)
         Serial.print(' ');
     } // for
     Serial.println();
+
+    // For now. TODO - remove
     return;
 
     // Sending a packet is done completely by interrupt-servicing
@@ -221,17 +229,18 @@ bool TVanPacketRxDesc::CheckCrcAndRepair()
 // Optionally specify the last character; default is "\n" (newline).
 void TVanPacketRxDesc::DumpRaw(Stream& s, char last) const
 {
-    s.printf("Raw: #%04u (%*u/%u) %2d ",
+    s.printf("Raw: #%04u (%*u/%u) %2d(%2d) ",
         seqNo % 10000,
         RX_QUEUE_SIZE > 100 ? 3 : RX_QUEUE_SIZE > 10 ? 2 : 1,  // This is all compile-time
         isrDebugPacket.samples[0].slot + 1,
         RX_QUEUE_SIZE,
+        size - 5 < 0 ? 0 : size - 5,
         size);
 
     if (size >= 1) s.printf("%02X ", bytes[0]);  // SOF
     if (size >= 3) s.printf("%03X %s ", Iden(), FlagsStr());
 
-    for (int i = 3; i < size; i++) s.printf("%02X%c", bytes[i], i < size - 1 ? '-' : ' ');
+    for (int i = 3; i < size; i++) s.printf("%02X%c", bytes[i], i == size - 3 ? ':' : i < size - 1 ? '-' : ' ');
 
     s.print(AckStr());
     s.print(" ");
