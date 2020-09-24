@@ -203,7 +203,7 @@ const char* PtyStr(uint8_t ptyCode)
 // Seems to be used in bus packets with IDEN:
 //
 // - SATNAV_REPORT_IDEN (0x6CE): data[1]. Following values of data[1] seen:
-//   0x02, 0x05, 0x08, 0x09, 0x0E, 0x0F, 0x10, 0x11, 0x13, 0x1B, 0x1D,
+//   0x02, 0x05, 0x08, 0x09, 0x0E, 0x0F, 0x10, 0x11, 0x13, 0x1B, 0x1D
 // - SATNAV_TO_MFD_IDEN (0x74E): data[1]. Following values of data[1] seen:
 //   0x02, 0x05, 0x08, 0x09, 0x1B, 0x1C
 // - MFD_TO_SATNAV_IDEN (0x94E): data[0]. Following values of data[1] seen:
@@ -1132,10 +1132,19 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     //   - One or more bits stay '1' when tuned in to a "crappy" station (e.g. pirate).
                     //   - During the process of tuning in to another station, switches to e.g. 0x20, 0x60, but
                     //     (usually) ends up 0x00.
-                    //   & 0x10 --> Looking for RDS text?
-                    //   & 0x20 --> Looking for RDS text?
-                    //   & 0x40 --> Looking for RDS available bit?
-                    //   & 0x80 --> Looking for TA available bit?
+                    //   Just guessing for the possible meaning of the bits:
+                    //   - Mono (not stereo)
+                    //   - Music/Speech (MS)
+                    //   - No RDS available / Searching for RDS
+                    //   - No TA available / Searching for TA
+                    //   - No AF (Alternative Frequencies) available
+                    //   - No PTY (Program TYpe) available
+                    //   - No PI (Program Identification) available
+                    //   - Number (0..15) indicating the quality of the RDS stream
+                    //   & 0x10:
+                    //   & 0x20:
+                    //   & 0x40:
+                    //   & 0x80:
                     //
                     // & 0x0F = signal strength: increases with antenna plugged in and decreases with antenna plugged
                     //          out. Updated when a station is being tuned in to, or when the MAN button is pressed.
@@ -1797,9 +1806,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // data[0] & 0xF0, data[dataLen - 1] & 0xF0: always 0x80
             // data[0] & 0x07, data[dataLen - 1] & 0x07: sequence number
             //
-            // data[1]: status ??
-            //
-            // data[2]: status ??
+            // data[1...2]: status ?? See below
             //
             // data[3]: usually 0x00, sometimes 0x02
             //
@@ -1818,19 +1825,23 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     status == 0x0020 ? "0x0020" : // Nearly at destination ??
                     status == 0x0080 ? "READY" :
                     status == 0x0101 ? "0x0101" :
-                    status == 0x0200 ? "INITIALISING" : // No, definitely not this
-                    status == 0x0300 ? "0x0300" :
-                    status == 0x0301 ? "GUIDANCE_STARTED" :
-                    status == 0x0320 ? "0x0320" :
-                    status == 0x0400 ? "TERMS_AND_CONDITIONS_ACCEPTED" : // No, definitely not this
-                    status == 0x0410 ? "0x0410" :  // Arrived at destination ??
-                    status == 0x0700 ? "0x0700" :
-                    status == 0x0701 ? "0x0701" : // 
-                    status == 0x0800 ? "PLAYING_AUDIO_MESSAGE" :
+                    //status == 0x0200 ? "INITIALISING" : // No, definitely not this
+                    status == 0x0200 ? "READING_DISC_1" :
+                    status == 0x0220 ? "0x0220" :
+                    status == 0x0300 ? "IN_GUIDANCE_MODE_1" :
+                    status == 0x0301 ? "IN_GUIDANCE_MODE_2" :
+                    status == 0x0320 ? "STOPPING_GUIDANCE" :
+                    //status == 0x0400 ? "TERMS_AND_CONDITIONS_ACCEPTED" : // No, definitely not this
+                    status == 0x0400 ? "START_OF_AUDIO_MESSAGE" :
+                    status == 0x0410 ? "ARRIVED_AT_DESTINATION_1" :
+                    status == 0x0600 ? "0x0600" :
+                    status == 0x0700 ? "INSTRUCTION_AUDIO_MESSAGE_START_1" :
+                    status == 0x0701 ? "INSTRUCTION_AUDIO_MESSAGE_START_2" :
+                    status == 0x0800 ? "END_OF_AUDIO_MESSAGE" :  // Follows 0x0400, 0x0700, 0x0701
                     status == 0x4000 ? "GUIDANCE_STOPPED" :
                     status == 0x4001 ? "0x4001" :
-                    status == 0x4200 ? "0x4200" :  // Arrived at destination ??
-                    status == 0x9000 ? "READING_DISC" :
+                    status == 0x4200 ? "ARRIVED_AT_DESTINATION_2" :
+                    status == 0x9000 ? "READING_DISC_2" :
                     status == 0x9080 ? "0x9080" :
                     buffer,
                 data[4] == 0x0B ? " reason=0x0B" :  // Seen with status == 0x4001
