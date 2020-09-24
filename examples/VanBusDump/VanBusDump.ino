@@ -16,7 +16,7 @@
  * There are various possibilities to hook up a ESP8266 based board to your vehicle's VAN bus:
  *
  * 1. Use a MCP2551 transceiver, connected with its CANH and CANL pins to the vehicle's VAN bus.
- *    As the MCP2551 has 5V logic, a 5V <-> 3.3V level converter is needed to connect the  CRX / RXD / R pin of the
+ *    As the MCP2551 has 5V logic, a 5V <-> 3.3V level converter is needed to connect the CRX / RXD / R pin of the
  *    transceiver to (in this example) GPIO pin 2 (RECV_PIN) of your ESP8266 board.
  *
  * 2. Use a SN65HVD230 transceiver, connected with its CANH and CANL pins to the vehicle's VAN bus.
@@ -35,25 +35,27 @@
  * Raw packets will be printed line by line on the serial port, e.g. like this:
  *
  * Starting VAN bus receiver
- * Raw: #0000 ( 0/15)  5 0E 7CE RA1 21-14 NO_ACK OK 2114 CRC_OK
- * Raw: #0001 ( 1/15)  5 0E 4EC RA1 97-68 NO_ACK OK 9768 CRC_OK
- * Raw: #0002 ( 2/15) 16 0E 4D4 RA0 82-0C-01-00-11-00-3F-3F-3F-3F-82-7B-A4 ACK OK 7BA4 CRC_OK
- * Raw: #0003 ( 3/15)  7 0E 5E4 WA0 00-FF-1F-F8 NO_ACK OK 1FF8 CRC_OK
+ * Raw: #0000 ( 0/15)  0( 5) 0E 7CE RA1 21-14 NO_ACK OK 2114 CRC_OK
+ * Raw: #0001 ( 1/15)  0( 5) 0E 4EC RA1 97-68 NO_ACK OK 9768 CRC_OK
+ * Raw: #0002 ( 2/15) 11(16) 0E 4D4 RA0 82-0C-01-00-11-00-3F-3F-3F-3F-82:7B-A4 ACK OK 7BA4 CRC_OK
+ * Raw: #0003 ( 3/15)  2( 7) 0E 5E4 WA0 00-FF:1F-F8 NO_ACK OK 1FF8 CRC_OK
  *
  * Legend:
  *
- * Raw: #0002 ( 2/15) 16 0E 4D4 RA0 82-0C-01-00-11-00-3F-3F-3F-3F-82-7B-A4 ACK OK 7BA4 CRC_OK
- *         |    |      |  |  |   |   |                             |   |    |   |   |    |
- *         |    |      |  |  |   |   |                             |   |    |   |   |    +-- Packet CRC value is correct
- *         |    |      |  |  |   |   |                             |   |    |   |   +-- Calculated CRC value
- *         |    |      |  |  |   |   |                             |   |    |   +-- Packet read result is OK
- *         |    |      |  |  |   |   |                             |   |    +-- Packet was ACKnowledged by receiver
- *         |    |      |  |  |   |   |                             |   +--------------- CRC value in packet
- *         |    |      |  |  |   |   +<-------- Packet data ------>+
- *         |    |      |  |  |   +--- "Command" FLAGS field; "R" = Read; "A" = requesting Ack; "0" = no RTR
- *         |    |      |  |  +--- IDEN field
- *         |    |      |  +--- SOF field (always 0x0E)
- *         |    |      +--- Total number of bytes in packet
+ * Raw: #0002 ( 2/15) 11(16) 0E 4D4 RA0 82-0C-01-00-11-00-3F-3F-3F-3F-82:7B-A4 ACK OK 7BA4 CRC_OK
+ *         |    |  |   |  |   |  |   |   |                             |   |    |   |   |    |
+ *         |    |  |   |  |   |  |   |   |                             |   |    |   |   |    +-- CRC value is correct
+ *         |    |  |   |  |   |  |   |   |                             |   |    |   |   +-- Calculated CRC value
+ *         |    |  |   |  |   |  |   |   |                             |   |    |   +-- Packet read result is OK
+ *         |    |  |   |  |   |  |   |   |                             |   |    +-- Packet was ACKnowledged by receiver
+ *         |    |  |   |  |   |  |   |   |                             |   +--------------- CRC value in packet
+ *         |    |  |   |  |   |  |   |   +<-------- Packet data ------>+
+ *         |    |  |   |  |   |  |   +--- "Command" FLAGS field; "R" = Read; "A" = requesting Ack; "0" = no RTR
+ *         |    |  |   |  |   |  +--- IDEN field
+ *         |    |  |   |  |   +--- SOF field (always 0x0E)
+ *         |    |  |   |  +--- Total number of bytes in packet
+ *         |    |  |   +--- Number of packet "data" bytes
+ *         |    |  +--- Number of slots in circular RX queue
  *         |    +--- Occupied slot in circular RX queue
  *         +--- Packet sequence number (modulo 10000)
  */
