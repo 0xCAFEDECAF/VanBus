@@ -1,15 +1,18 @@
 
 0.1.2
     Various small improvements, including:
+    * Added 'PacketParser.ino' example sketch, showing all packets that I could decode from my vehicle.
     * FloatToStr(...) - save 12 statically allocated bytes of precious RAM.
-    * TVanPacketRxQueue::Receive(...) - Optionally, passes queue overrun condition.
     * nBitsFromCycles(...) - Small correction seems to decrease number of CRC errors.
     * TIsrDebugPacket::Dump(...) - Fix to be in line with the parsing by PinChangeIsr().
-    * TVanPacketRxDesc::DumpRaw - right-align printed slot number
-    * class TVanPacketRxQueue -
-      - '_full' flag not really necessary.
+    * class TVanPacketRxQueue:
+      - 'Receive' method: optionally pass queue overrun condition
+      - 'DumpRaw' method: various changes in output formatting, added option to change last character, e.g. to '\0'
+        for dumping into char array.
+      - Removed '_full' flag: not necessary
       - Added private method _IsQueueOverrun()
       - Removed private method _IsFull()
+    * Updated 'library.json' and 'library.properties'
 
 0.1.1
     * Removed mentioning ESP32 as supported hardware
