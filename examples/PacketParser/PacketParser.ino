@@ -3250,17 +3250,17 @@ void loop()
             // || iden == TIME_IDEN
             // || iden == AUDIO_SETTINGS_IDEN
             // || iden == MFD_STATUS_IDEN
+            // || iden == SATNAV_GUIDANCE_DATA_IDEN
             // || iden == AIRCON_IDEN
             // || iden == AIRCON2_IDEN
             // || iden == CDCHANGER_IDEN
             // || iden == SATNAV_STATUS_1_IDEN
-            // || iden == SATNAV_STATUS_2_IDEN
-            // || iden == SATNAV_STATUS_3_IDEN
-            // || iden == SATNAV_GUIDANCE_DATA_IDEN
             // || iden == SATNAV_GUIDANCE_IDEN
             // || iden == SATNAV_REPORT_IDEN
-            // || iden == MFD_TO_SATNAV_IDEN
             // || iden == SATNAV_TO_MFD_IDEN
+            // || iden == SATNAV_STATUS_2_IDEN
+            // || iden == SATNAV_STATUS_3_IDEN
+            // || iden == MFD_TO_SATNAV_IDEN
             // || iden == SATNAV_DOWNLOADING_IDEN
             // || iden == SATNAV_DOWNLOADED1_IDEN
             // || iden == SATNAV_DOWNLOADED2_IDEN
@@ -3293,17 +3293,17 @@ void loop()
             // && iden != TIME_IDEN
             // && iden != AUDIO_SETTINGS_IDEN
             // && iden != MFD_STATUS_IDEN
+            // && iden != SATNAV_GUIDANCE_DATA_IDEN
             // && iden != AIRCON_IDEN
             // && iden != AIRCON2_IDEN
             // && iden != CDCHANGER_IDEN
             // && iden != SATNAV_STATUS_1_IDEN
-            // && iden != SATNAV_STATUS_2_IDEN
-            // && iden != SATNAV_STATUS_3_IDEN
-            // && iden != SATNAV_GUIDANCE_DATA_IDEN
             // && iden != SATNAV_GUIDANCE_IDEN
             // && iden != SATNAV_REPORT_IDEN
-            // && iden != MFD_TO_SATNAV_IDEN
             // && iden != SATNAV_TO_MFD_IDEN
+            // && iden != SATNAV_STATUS_2_IDEN
+            // && iden != SATNAV_STATUS_3_IDEN
+            // && iden != MFD_TO_SATNAV_IDEN
             // && iden != SATNAV_DOWNLOADING_IDEN
             // && iden != SATNAV_DOWNLOADED1_IDEN
             // && iden != SATNAV_DOWNLOADED2_IDEN
