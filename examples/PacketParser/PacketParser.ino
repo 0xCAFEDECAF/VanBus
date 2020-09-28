@@ -4,7 +4,7 @@
  *
  * Written by Erik Tromp
  *
- * Version 0.0.1 - July, 2020
+ * Version 0.0.2 - September, 2020
  *
  * MIT license, all text above must be included in any redistribution.   
  *
