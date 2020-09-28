@@ -166,38 +166,38 @@ const char* PtyStr(uint8_t ptyCode)
     // https://www.electronics-notes.com/articles/audio-video/broadcast-audio/rds-radio-data-system-pty-codes.php
     return
         ptyCode == 0 ? "Not defined" :
-            ptyCode == 1 ? "News" :
-            ptyCode == 2 ? "Current affairs" :
-            ptyCode == 3 ? "Information" :
-            ptyCode == 4 ? "Sport" :
-            ptyCode == 5 ? "Education" :
-            ptyCode == 6 ? "Drama" :
-            ptyCode == 7 ? "Culture" :
-            ptyCode == 8 ? "Science" :
-            ptyCode == 9 ? "Varied" :
-            ptyCode == 10 ? "Pop Music" :
-            ptyCode == 11 ? "Rock Music" :
-            ptyCode == 12 ? "Easy Listening" :  // also: "Middle of the road music"
-            ptyCode == 13 ? "Light Classical" :
-            ptyCode == 14 ? "Serious Classical" :
-            ptyCode == 15 ? "Other Music" :
-            ptyCode == 16 ? "Weather" :
-            ptyCode == 17 ? "Finance" :
-            ptyCode == 18 ? "Children's Programmes" :
-            ptyCode == 19 ? "Social Affairs" :
-            ptyCode == 20 ? "Religion" :
-            ptyCode == 21 ? "Phone-in" :
-            ptyCode == 22 ? "Travel" :
-            ptyCode == 23 ? "Leisure" :
-            ptyCode == 24 ? "Jazz Music" :
-            ptyCode == 25 ? "Country Music" :
-            ptyCode == 26 ? "National Music" :
-            ptyCode == 27 ? "Oldies Music" :
-            ptyCode == 28 ? "Folk Music" :
-            ptyCode == 29 ? "Documentary" :
-            ptyCode == 30 ? "Alarm Test" :
-            ptyCode == 31 ? "Alarm" :
-            "??";
+        ptyCode == 1 ? "News" :
+        ptyCode == 2 ? "Current affairs" :
+        ptyCode == 3 ? "Information" :
+        ptyCode == 4 ? "Sport" :
+        ptyCode == 5 ? "Education" :
+        ptyCode == 6 ? "Drama" :
+        ptyCode == 7 ? "Culture" :
+        ptyCode == 8 ? "Science" :
+        ptyCode == 9 ? "Varied" :
+        ptyCode == 10 ? "Pop Music" :
+        ptyCode == 11 ? "Rock Music" :
+        ptyCode == 12 ? "Easy Listening" :  // also: "Middle of the road music"
+        ptyCode == 13 ? "Light Classical" :
+        ptyCode == 14 ? "Serious Classical" :
+        ptyCode == 15 ? "Other Music" :
+        ptyCode == 16 ? "Weather" :
+        ptyCode == 17 ? "Finance" :
+        ptyCode == 18 ? "Children's Programmes" :
+        ptyCode == 19 ? "Social Affairs" :
+        ptyCode == 20 ? "Religion" :
+        ptyCode == 21 ? "Phone-in" :
+        ptyCode == 22 ? "Travel" :
+        ptyCode == 23 ? "Leisure" :
+        ptyCode == 24 ? "Jazz Music" :
+        ptyCode == 25 ? "Country Music" :
+        ptyCode == 26 ? "National Music" :
+        ptyCode == 27 ? "Oldies Music" :
+        ptyCode == 28 ? "Folk Music" :
+        ptyCode == 29 ? "Documentary" :
+        ptyCode == 30 ? "Alarm Test" :
+        ptyCode == 31 ? "Alarm" :
+        "??";
 } // PtyStr
 
 // Seems to be used in bus packets with IDEN:
@@ -216,25 +216,25 @@ const char* SatNavRequestStr(uint8_t data)
 
     return
         data == 0x00 ? "ENTER_COUNTRY" :  // Never seen, just guessing
-            data == 0x01 ? "ENTER_PROVINCE" :  // Never seen, just guessing
-            data == 0x02 ? "ENTER_CITY" :
-            data == 0x03 ? "ENTER_DISTRICT" :  // Never seen, just guessing
-            data == 0x04 ? "ENTER_NEIGHBORHOOD" :  // Never seen, just guessing
-            data == 0x05 ? "ENTER_STREET" :
-            data == 0x06 ? "ENTER_HOUSE_NUMBER" :
-            data == 0x07 ? "ENTER_HOUSE_NUMBER_LETTER" :  // Never seen, just guessing
-            data == 0x08 ? "PLACE_OF_INTEREST_CATEGORY_LIST" :
-            data == 0x09 ? "PLACE_OF_INTEREST_CATEGORY" :
-            data == 0x0E ? "GPS_FOR_PLACE_OF_INTEREST" :
-            data == 0x0F ? "NEXT_STREET" : // Shown during navigation in the (solid line) top box
-            data == 0x10 ? "CURRENT_STREET" : // Shown during navigation in the (dashed line) bottom box
-            data == 0x11 ? "PRIVATE_ADDRESS" :
-            data == 0x12 ? "BUSINESS_ADDRESS" :
-            data == 0x13 ? "SOFTWARE_MODULE_VERSIONS" :
-            data == 0x1B ? "PRIVATE_ADDRESS_LIST" :
-            data == 0x1C ? "BUSINESS_ADDRESS_LIST" :
-            data == 0x1D ? "GPS_CHOOSE_DESTINATION" :
-            buffer;
+        data == 0x01 ? "ENTER_PROVINCE" :  // Never seen, just guessing
+        data == 0x02 ? "ENTER_CITY" :
+        data == 0x03 ? "ENTER_DISTRICT" :  // Never seen, just guessing
+        data == 0x04 ? "ENTER_NEIGHBORHOOD" :  // Never seen, just guessing
+        data == 0x05 ? "ENTER_STREET" :
+        data == 0x06 ? "ENTER_HOUSE_NUMBER" :
+        data == 0x07 ? "ENTER_HOUSE_NUMBER_LETTER" :  // Never seen, just guessing
+        data == 0x08 ? "PLACE_OF_INTEREST_CATEGORY_LIST" :
+        data == 0x09 ? "PLACE_OF_INTEREST_CATEGORY" :
+        data == 0x0E ? "GPS_FOR_PLACE_OF_INTEREST" :
+        data == 0x0F ? "NEXT_STREET" : // Shown during navigation in the (solid line) top box
+        data == 0x10 ? "CURRENT_STREET" : // Shown during navigation in the (dashed line) bottom box
+        data == 0x11 ? "PRIVATE_ADDRESS" :
+        data == 0x12 ? "BUSINESS_ADDRESS" :
+        data == 0x13 ? "SOFTWARE_MODULE_VERSIONS" :
+        data == 0x1B ? "PRIVATE_ADDRESS_LIST" :
+        data == 0x1C ? "BUSINESS_ADDRESS_LIST" :
+        data == 0x1D ? "GPS_CHOOSE_DESTINATION" :
+        buffer;
 } // SatNavRequestStr
 
 // Attempt to show a detailed SatNnav guidance instruction in "Ascii art"
@@ -422,7 +422,8 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 data[0] & 0x04 ? "VOL_DOWN" : "",
                 data[0] & 0x02 ? "SOURCE" : "",
                 data[1] - 0x80,
-                data[0] >> 4 & 0x03);
+                data[0] >> 4 & 0x03
+            );
         }
         break;
 
@@ -486,7 +487,8 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 data[5] & 0x20 ? "FOG_FRONT " : "",
                 data[5] & 0x10 ? "FOG_REAR " : "",
                 data[5] & 0x08 ? "INDICATOR_RIGHT " : "",
-                data[5] & 0x04 ? "INDICATOR_LEFT " : "");
+                data[5] & 0x04 ? "INDICATOR_LEFT " : ""
+            );
 
             if (data[6] != 0xFF)
             {
@@ -762,7 +764,6 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
                 // Examples:
                 // Raw: #2641 ( 1/15)  7 0E 8C4 WA0 52-08-97-D0 ACK OK 97D0 CRC_OK
-                // Raw: #0000 ( 0/15)  7 0E 8C4 WA0 52-20-A8-0E NO_ACK OK A80E CRC_OK
                 // Raw: #7970 (10/15)  7 0E 8C4 WA0 52-20-A8-0E ACK OK A80E CRC_OK
 
                 // data[1] is usually 0x08, sometimes 0x20
@@ -1188,8 +1189,9 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     rdsTxt[8] = 0;
 
                     char piBuffer[40];
-                    sprintf_P(piBuffer, PSTR("%04X(%s, %s)"),
-
+                    sprintf_P(
+                        piBuffer,
+                        PSTR("%04X(%s, %s)"),
                         piCode,
 
                         // https://radio-tv-nederland.nl/rds/PI%20codes%20Europe.jpg
