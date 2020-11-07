@@ -94,7 +94,7 @@ Returns ```true``` if a VAN packet is available in the receive queue.
 ### 3. ```bool Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun = NULL)``` <a name = "Receive"></a>
 
 Copy a VAN packet out of the receive queue, if available. Otherwise, returns ```false```.
-Optionally, passes queue overrun condition into ```isQueueOverrun```.
+If a valid pointer is passed to 'isQueueOverrun', will report then clear any queue overrun condition.
 
 ### 4. ```uint32_t GetCount()``` <a name = "GetCount"></a>
 
@@ -110,18 +110,18 @@ On a VAN bus, the electrical signals are the same as CAN. However, CAN and VAN u
 line which makes it impossible to use CAN interfaces on a VAN bus.
 
 For background reading:
-- https://en.wikipedia.org/wiki/Vehicle_Area_Network
-- http://graham.auld.me.uk/projects/vanbus/lineprotocol.html
-- http://graham.auld.me.uk/projects/vanbus/datasheets/
-- http://www.educauto.org/files/file_fields/2013/11/18/mux1.pdf
-- http://www.educauto.org/files/file_fields/2013/11/18/mux3.pdf
-- http://www.i3s.unice.fr/~map/Cours/MASTER_STIC_SE/COURS32007.pdf
-- http://ebajic.free.fr/Ecole%20Printemps%20Reseau%20Mars%202006/Supports/J%20MERCKLE%20CANopen.pdf
-- http://igm.univ-mlv.fr/~duris/NTREZO/20042005/Guerrin-Guers-Guinchard-VAN-CAN-rapport.pdf
-- https://www.amazon.com/bus-VAN-vehicle-area-network/dp/2100031600
-- https://github.com/morcibacsi/VanAnalyzer/
-- [Atmel TSS463C VAN Data Link Controller with Serial Interface]
-- [Multiplexed BSI Operating Principle for the Xsara Picasso And Xsara - The VAN protocol]
+- [Wiki page on VAN](https://en.wikipedia.org/wiki/Vehicle_Area_Network)
+- [VAN line protocol - Graham Auld - November 27, 2011](http://graham.auld.me.uk/projects/vanbus/lineprotocol.html)
+- [Collection of data sheets - Graham Auld](http://graham.auld.me.uk/projects/vanbus/datasheets/)
+- [Lecture on Enhanced Manchester Coding (in French) - Alain Chautar - June 30, 2003](http://www.educauto.org/files/file_fields/2013/11/18/mux1.pdf)
+- [Lecture on frame format (in French)- Alain Chautar - January 22, 2004](http://www.educauto.org/files/file_fields/2013/11/18/mux3.pdf)
+- [Industrial networks CAN / VAN - Master Course - Marie-Agnès Peraldi-Frati - January 2008](http://www.i3s.unice.fr/~map/Cours/MASTER_STIC_SE/COURS32007.pdf)
+- [De CAN à CANopen en passant par VAN (in French) - Jean Mercklé - March 2006](http://ebajic.free.fr/Ecole%20Printemps%20Reseau%20Mars%202006/Supports/J%20MERCKLE%20CANopen.pdf)
+- [Les réseaux VAN - CAN - Guerrin Guillaume, Guers Jérôme, Guinchard Sébastien - February 2005](http://igm.univ-mlv.fr/~duris/NTREZO/20042005/Guerrin-Guers-Guinchard-VAN-CAN-rapport.pdf)
+- [Le bus VAN, vehicle area network: Fondements du protocole (French) Paperback – June 4, 1997](https://www.amazon.com/bus-VAN-vehicle-area-network/dp/2100031600)
+- [Vehicle Area Network (VAN bus) Analyzer for Saleae USB logic analyzer - Peter Pinter](https://github.com/morcibacsi/VanAnalyzer/)
+- [Atmel TSS463C VAN Data Link Controller with Serial Interface](http://ww1.microchip.com/downloads/en/DeviceDoc/doc7601.pdf)
+- [Multiplexed BSI Operating Principle for the Xsara Picasso And Xsara - The VAN protocol](http://milajda22.sweb.cz/Manual_k_ridici_jednotce.pdf#page=17)
 
 The following methods are available for ```TVanPacketRxDesc``` packet objects as obtained from
 ```VanBus.Receive(...)```:
@@ -259,5 +259,3 @@ Do whatever you like with it, but contributions are appreciated!
 [SN65HVD230]: https://www.ti.com/lit/ds/symlink/sn65hvd230.pdf?ts=1592992149874
 [voltage divider]: https://www.quora.com/How-many-pins-on-Arduino-Uno-give-a3-3v-pin-output
 [ESP32 RMT peripheral Vehicle Area Network (VAN bus) reader]: https://github.com/morcibacsi/esp32_rmt_van_rx
-[Atmel TSS463C VAN Data Link Controller with Serial Interface]: http://ww1.microchip.com/downloads/en/DeviceDoc/doc7601.pdf
-[Multiplexed BSI Operating Principle for the Xsara Picasso And Xsara - The VAN protocol]: http://milajda22.sweb.cz/Manual_k_ridici_jednotce.pdf#page=17
