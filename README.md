@@ -14,7 +14,7 @@
 
 ## 🎈 Description <a name = "description"></a>
 
-This module allows you to receive packets on the "VAN" bus of your Peugeot or Citroen vehicle.
+This module allows you to receive and transmit packets on the "VAN" bus of your Peugeot or Citroen vehicle.
 
 VAN bus is pretty similar to CAN bus. It was used in many cars (Peugeot, Citroen) made by PSA.
 
@@ -34,17 +34,19 @@ There are various possibilities to hook up a ESP8266 based board to your vehicle
 
 1. Use a [MCP2551] transceiver, connected with its CANH and CANL pins to the vehicle's VAN bus.
    As the MCP2551 has 5V logic, a 5V ↔️ 3.3V [level converter] is needed to connect the CRX / RXD / R pin of the
-   transceiver to a GPIO pin of your ESP8266 board.
+   transceiver, via the level converter, to a GPIO pin of your ESP8266 board. For transmitting packets, also connect
+   the CTX / TXD / D pins of the transceiver, via the level converter, to a GPIO pin of your ESP8266 board.
    ![schema](extras/schematics/Schematic%20using%20MCP2551_bb.png)
 
 2. Use a [SN65HVD230] transceiver, connected with its CANH and CANL pins to the vehicle's VAN bus.
    The SN65HVD230 transceiver already has 3.3V logic, so it is possible to directly connect the CRX / RXD / R pin of
-   the transceiver to a GPIO pin of your ESP8266 board.
+   the transceiver to a GPIO pin of your ESP8266 board. For transmitting packets, also connect the CTX / TXD / D pins
+   of the transceiver to a GPIO pin of your ESP8266 board.
    ![schema](extras/schematics/Schematic%20using%20SN65HVD230_bb.png)
    
 3. The simplest schematic is not to use a transceiver at all, but connect the VAN DATA line to GrouND using
    two 4.7 kOhm resistors. Connect the GPIO pin of your ESP8266 board to the 1:2 [voltage divider] that is thus
-   formed by the two resistors. Results may vary.
+   formed by the two resistors. This is only for receiving packets, not for transmitting. Results may vary.
    ![schema](extras/schematics/Schematic%20using%20voltage%20divider_bb.png)
    
    👉 Note: I used this schematic during many long debugging hours, but I cannot guarantee that it won't ultimately
@@ -59,50 +61,94 @@ Add the following line to your ```.ino``` sketch:
 #include <VanBus.h>
 ```
 
-Add the following lines to your initialisation block ```void setup()```:
+For receiving and transmitting packets:
+
+1. Add the following lines to your initialisation block ```void setup()```:
 ```
-int RECV_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
-VanBus.Setup(RECV_PIN);
+int TX_PIN = D3; // Set to GPIO pin connected to VAN bus transceiver input
+int RX_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
+TVanBus::Setup(RX_PIN, TX_PIN);
 ```
 
-Add the following line to your main loop ```void loop()```:
+2. Add e.g. the following lines to your main loop ```void loop()```:
 ```
 TVanPacketRxDesc pkt;
 if (VanBus.Receive(pkt)) pkt.DumpRaw(Serial);
+
+uint8_t rmtTemperatureBytes[] = {0x0F, 0x07, 0x00, 0x00, 0x00, 0x00, 0x70};
+VanBus.SyncSendPacket(0x8A4, 0x08, rmtTemperatureBytes, sizeof(rmtTemperatureBytes));
+```
+
+If you only want to receive packets, you may save a few hundred precious bytes by using directly the ```VanBusRx```
+object:
+
+1. Add the following lines to your initialisation block ```void setup()```:
+```
+int RX_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
+VanBusRx.Setup(RX_PIN);
+```
+
+2. Add the following lines to your main loop ```void loop()```:
+```
+TVanPacketRxDesc pkt;
+if (VanBusRx.Receive(pkt)) pkt.DumpRaw(Serial);
 ```
 
 ### ```VanBus``` object
 
 The following methods are available for the ```VanBus``` object:<a name = "functions"></a>
 
-1. [```void Setup(uint8_t rxPin)```](#Setup)
-2. [```bool Available()```](#Available)
-3. [```bool Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun = NULL)```](#Receive)
-4. [```uint32_t GetCount()```](#GetCount)
-5. [```void DumpStats(Stream& s)```](#DumpStats)
+Interfaces for both receiving and transmitting of packets:
+
+1. [```void Setup(uint8_t rxPin, uint8_t txPin)```](#Setup)
+2. [```void DumpStats(Stream& s)```](#DumpStats)
+
+Interfaces for receiving packets:
+
+3. [```bool Available()```](#Available)
+4. [```bool Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun = NULL)```](#Receive)
+5. [```uint32_t GetRxCount()```](#GetRxCount)
+
+Interfaces for transmitting packets:
+
+6. [```bool SyncSendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)```](#SyncSendPacket)
+7. [```bool SendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)```](#SendPacket)
+8. [```uint32_t GetTxCount()```](#GetTxCount)
 
 ---
 
-### 1. ```void Setup(uint8_t rxPin)``` <a name = "Setup"></a>
+### 1. ```void Setup(uint8_t rxPin, uint8_t txPin)``` <a name = "Setup"></a>
 
-Start the receiver listening on GPIO pin ```rxPin```.
+Start the receiver listening on GPIO pin ```rxPin```. The transmitter will transmit on GPIO pin ```txPin```.
 
-### 2. ```bool Available()``` <a name = "Available"></a>
+### 2. ```void DumpStats(Stream& s)``` <a name = "DumpStats"></a>
+
+Dumps a few packet statistics on the passed stream.
+
+### 3. ```bool Available()``` <a name = "Available"></a>
 
 Returns ```true``` if a VAN packet is available in the receive queue.
 
-### 3. ```bool Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun = NULL)``` <a name = "Receive"></a>
+### 4. ```bool Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun = NULL)``` <a name = "Receive"></a>
 
 Copy a VAN packet out of the receive queue, if available. Otherwise, returns ```false```.
 If a valid pointer is passed to 'isQueueOverrun', will report then clear any queue overrun condition.
 
-### 4. ```uint32_t GetCount()``` <a name = "GetCount"></a>
+### 5. ```uint32_t GetRxCount()``` <a name = "GetRxCount"></a>
 
 Returns the number of received VAN packets since power-on. Counter may roll over.
 
-### 5. ```void DumpStats(Stream& s)``` <a name = "DumpStats"></a>
+### 6. ```bool SyncSendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)``` <a name = "SyncSendPacket"></a>
 
-Dumps a few packet statistics on the passed stream.
+Sends a packet for transmission. Returns ```true``` if the packet was successfully transmitted.
+
+### 7. ```bool SendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)``` <a name = "SendPacket"></a>
+
+Queues a packet for transmission. Returns ```true``` if the packet was successfully queued.
+
+### 8. ```uint32_t GetTxCount()``` <a name = "GetTxCount"></a>
+
+Returns the number of VAN packets, offered for transmitting, since power-on. Counter may roll over.
 
 ### VAN packets
 
@@ -114,20 +160,21 @@ For background reading:
 - [VAN line protocol - Graham Auld - November 27, 2011](http://graham.auld.me.uk/projects/vanbus/lineprotocol.html)
 - [Collection of data sheets - Graham Auld](http://graham.auld.me.uk/projects/vanbus/datasheets/)
 - [Lecture on Enhanced Manchester Coding (in French) - Alain Chautar - June 30, 2003](http://www.educauto.org/files/file_fields/2013/11/18/mux1.pdf)
-- [Lecture on frame format (in French)- Alain Chautar - January 22, 2004](http://www.educauto.org/files/file_fields/2013/11/18/mux3.pdf)
+- [Lecture on VAN bus access: collisions and arbitration (in French) - Alain Chautar - October 10, 2003](http://www.educauto.org/sites/www.educauto.org/files/file_fields/2013/11/18/mux2.pdf)
+- [Lecture on frame format (in French) - Alain Chautar - January 22, 2004](http://www.educauto.org/files/file_fields/2013/11/18/mux3.pdf)
 - [Industrial networks CAN / VAN - Master Course - Marie-Agnès Peraldi-Frati - January 2008](http://www.i3s.unice.fr/~map/Cours/MASTER_STIC_SE/COURS32007.pdf)
 - [De CAN à CANopen en passant par VAN (in French) - Jean Mercklé - March 2006](http://ebajic.free.fr/Ecole%20Printemps%20Reseau%20Mars%202006/Supports/J%20MERCKLE%20CANopen.pdf)
-- [Les réseaux VAN - CAN - Guerrin Guillaume, Guers Jérôme, Guinchard Sébastien - February 2005](http://igm.univ-mlv.fr/~duris/NTREZO/20042005/Guerrin-Guers-Guinchard-VAN-CAN-rapport.pdf)
+- [Les réseaux VAN - CAN (in French) - Guerrin Guillaume, Guers Jérôme, Guinchard Sébastien - February 2005](http://igm.univ-mlv.fr/~duris/NTREZO/20042005/Guerrin-Guers-Guinchard-VAN-CAN-rapport.pdf)
 - [Le bus VAN, vehicle area network: Fondements du protocole (French) Paperback – June 4, 1997](https://www.amazon.com/bus-VAN-vehicle-area-network/dp/2100031600)
 - [Vehicle Area Network (VAN bus) Analyzer for Saleae USB logic analyzer - Peter Pinter](https://github.com/morcibacsi/VanAnalyzer/)
 - [Atmel TSS463C VAN Data Link Controller with Serial Interface](http://ww1.microchip.com/downloads/en/DeviceDoc/doc7601.pdf)
 - [Multiplexed BSI Operating Principle for the Xsara Picasso And Xsara - The VAN protocol](http://milajda22.sweb.cz/Manual_k_ridici_jednotce.pdf#page=17)
 
 The following methods are available for ```TVanPacketRxDesc``` packet objects as obtained from
-```VanBus.Receive(...)```:
+```VanBusRx.Receive(...)```:
 
 1. [```uint16_t Iden()```](#Iden)
-2. [```uint16_t Flags()```](#Flags)
+2. [```uint16_t CommandFlags()```](#CommandFlags)
 3. [```const uint8_t* Data()```](#Data)
 4. [```int DataLen()```](#DataLen)
 5. [```uint16_t Crc()```](#Crc)
@@ -135,7 +182,7 @@ The following methods are available for ```TVanPacketRxDesc``` packet objects as
 7. [```bool CheckCrcAndRepair()```](#CheckCrcAndRepair)
 8. [```void DumpRaw(Stream& s, char last = '\n')```](#DumpRaw)
 9. [```const TIsrDebugPacket& getIsrDebugPacket()```](#getIsrDebugPacket)
-10. [```const char* FlagsStr()```](#FlagsStr)
+10. [```const char* CommandFlagsStr()```](#CommandFlagsStr)
 11. [```const char* AckStr()```](#AckStr)
 12. [```const char* ResultStr()```](#ResultStr)
 
@@ -150,7 +197,7 @@ An overview of known IDEN values can be found e.g. at:
 - http://pinterpeti.hu/psavanbus/PSA-VAN.html
 - http://graham.auld.me.uk/projects/vanbus/protocol.html
 
-### 2. ```uint16_t Flags()``` <a name = "Flags"></a>
+### 2. ```uint16_t CommandFlags()``` <a name = "CommandFlags"></a>
 
 Returns the "command" FLAGS field of the VAN packet. Each VAN packet has 4 "command" flags:
 - EXT : always 1
@@ -214,7 +261,7 @@ version 1.2.0 .
 
 Retrieves a debug structure that can be used to analyse (observed) bit timings.
 
-### 10. ```const char* FlagsStr()``` <a name = "FlagsStr"></a>
+### 10. ```const char* CommandFlagsStr()``` <a name = "CommandFlagsStr"></a>
 
 Returns the "command" FLAGS field of the VAN packet as a string
 
@@ -230,7 +277,7 @@ Returns the RESULT field of the VAN packet as a string, either "OK" or a string 
 
 ## ⚠️ Limitations, Caveats
 
-The library times the incoming bits using an interrupt service routine (ISR) that triggers on pin "change" events (see the internal function ```PinChangeIsr``` in [VanBus.cpp](https://github.com/0xCAFEDECAF/VanBus/blob/master/VanBus.cpp#L319)). It seems that the invocation of the ISR is often quite late (or maybe the bits are wobbly on the line already).
+The library times the incoming bits using an interrupt service routine (ISR) that triggers on pin "change" events (see the internal function ```PinChangeIsr``` in [VanBusRx.cpp](https://github.com/0xCAFEDECAF/VanBus/blob/master/VanBusRx.cpp#L319)). It seems that the invocation of the ISR is often quite late (or maybe the bits are wobbly on the line already).
 
 I had to do a bit of tweaking to be able to reconstruct the real bits from the number of CPU cycles that have elapsed between the ISR invocations. Still, not all packets are received error-free. Even after trying to "repair" a packet (see function [```bool CheckCrcAndRepair()```](#CheckCrcAndRepair)), the long-term average packet loss is around 0.01% ... 0.015% (between 1 in 10,000 and 1 in 6,666), which is ok(-ish). I am investigating how to improve on this.
 
@@ -239,7 +286,7 @@ I had to do a bit of tweaking to be able to reconstruct the real bits from the n
 ### Near future
 
 Currently the library supports only 125 kbit/s VAN bus. Need to add support for different rate, like 62.5 kbit/s, which can be
-passed as an optional parameter to ```VanBus.Setup(...)```.
+passed as an optional parameter to ```VanBusRx.Setup(...)```.
 
 ### Looking forward
 

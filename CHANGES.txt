@@ -1,21 +1,34 @@
 
+0.2.0
+    Added function to transmit packets onto the VAN bus:
+    * New class 'TVanBus' with single instance 'VanBus'.
+    * New class 'TVanPacketTxQueue' with single instance 'VanBusTx'.
+    * Renamed existing class instance 'VanBus' to 'VanBusRx'.
+
+    Still lots of TODOs: see code. Also:
+    * Transmitting an in-frame response
+    * Transmitting a "read" packet then receiving the in-frame response
+
+    Various small improvements.
+
 0.1.2
+    Added 'PacketParser.ino' example sketch, showing all packets that I could decode from my vehicle.
+
     Various small improvements, including:
-    * Added 'PacketParser.ino' example sketch, showing all packets that I could decode from my vehicle.
-    * FloatToStr(...) - save 12 statically allocated bytes of precious RAM.
-    * nBitsFromCycles(...) - Small correction seems to decrease number of CRC errors.
-    * TIsrDebugPacket::Dump(...) - Fix to be in line with the parsing by PinChangeIsr().
+    * FloatToStr(...): save 12 statically allocated bytes of precious RAM.
+    * nBitsFromCycles(...): small correction seems to decrease number of CRC errors.
+    * TIsrDebugPacket::Dump(...): fix to be in line with the parsing by PinChangeIsr().
     * class TVanPacketRxQueue:
-      - 'Receive' method: optionally pass queue overrun condition
+      - 'Receive' method: optionally report queue overrun condition.
       - 'DumpRaw' method: various changes in output formatting, added option to change last character, e.g. to '\0'
         for dumping into char array.
-      - Removed '_full' flag: not necessary
-      - Added private method _IsQueueOverrun()
-      - Removed private method _IsFull()
-    * Updated 'library.json' and 'library.properties'
+      - Removed '_full' flag: not necessary.
+      - Added private method '_IsQueueOverrun()'.
+      - Removed private method '_IsFull()'.
+    * Updated 'library.json' and 'library.properties'.
 
 0.1.1
-    * Removed mentioning ESP32 as supported hardware
+    Removed mentioning ESP32 as supported hardware
 
 0.1
-    * Initial version
+    Initial version

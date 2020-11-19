@@ -8,6 +8,7 @@
 
 TVanPacketRxQueue	KEYWORD1
 TVanPacketRxDesc	KEYWORD1
+TVanBus	KEYWORD1
 
 #######################################
 # Methods and Functions (KEYWORD2)
@@ -17,16 +18,20 @@ Setup 	KEYWORD2
 Available 	KEYWORD2
 Receive 	KEYWORD2
 GetCount 	KEYWORD2
+GetRxCount 	KEYWORD2
+GetTxCount 	KEYWORD2
 DumpStats 	KEYWORD2
+SyncSendPacket 	KEYWORD2
+SendPacket 	KEYWORD2
 Iden 	KEYWORD2
-Flags 	KEYWORD2
+CommandFlags 	KEYWORD2
 Data 	KEYWORD2
 DataLen	KEYWORD2
 Crc	KEYWORD2
 CheckCrc	KEYWORD2
 CheckCrcAndRepair	KEYWORD2
 DumpRaw	KEYWORD2
-FlagsStr	KEYWORD2
+CommandFlagsStr	KEYWORD2
 AckStr	KEYWORD2
 ResultStr	KEYWORD2
 
