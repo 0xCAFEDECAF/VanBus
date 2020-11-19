@@ -3292,7 +3292,7 @@ void loop()
             // || iden == AUDIO_SETTINGS_IDEN
             // || iden == MFD_STATUS_IDEN
             // || iden == SATNAV_GUIDANCE_DATA_IDEN
-            // || iden == AIRCON_IDEN
+            // || iden == AIRCON1_IDEN
             // || iden == AIRCON2_IDEN
             // || iden == CDCHANGER_IDEN
             // || iden == SATNAV_STATUS_1_IDEN
@@ -3335,7 +3335,7 @@ void loop()
             // && iden != AUDIO_SETTINGS_IDEN
             // && iden != MFD_STATUS_IDEN
             // && iden != SATNAV_GUIDANCE_DATA_IDEN
-            // && iden != AIRCON_IDEN
+            // && iden != AIRCON1_IDEN
             // && iden != AIRCON2_IDEN
             // && iden != CDCHANGER_IDEN
             // && iden != SATNAV_STATUS_1_IDEN
