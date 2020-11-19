@@ -1,8 +1,8 @@
-<h3 align="center">PSA VAN bus reader for Arduino-ESP8266</h3>
+<h3 align="center">PSA VAN bus reader/writer for Arduino-ESP8266</h3>
 
 ---
 
-<p align="center">Reading packets from PSA vehicles' VAN bus.<br></p>
+<p align="center">Reading and writing packets from/to PSA vehicles' VAN bus.<br></p>
 
 ## 📝 Table of Contents
 - [Description](#description)
