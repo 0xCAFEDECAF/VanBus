@@ -5,7 +5,7 @@
  *
  * Version 0.1.2 - September, 2020
  *
- * MIT license, all text above must be included in any redistribution.   
+ * MIT license, all text above must be included in any redistribution.
  *
  * -----
  * Wiring
@@ -17,7 +17,7 @@
  *
  * 1. Use a MCP2551 transceiver, connected with its CANH and CANL pins to the vehicle's VAN bus.
  *    As the MCP2551 has 5V logic, a 5V <-> 3.3V level converter is needed to connect the CRX / RXD / R pin of the
- *    transceiver to (in this example) GPIO pin 2 (RECV_PIN) of your ESP8266 board.
+ *    transceiver to (in this example) GPIO pin 2 (RX_PIN) of your ESP8266 board.
  *
  * 2. Use a SN65HVD230 transceiver, connected with its CANH and CANL pins to the vehicle's VAN bus.
  *    The SN65HVD230 transceiver already has 3.3V logic, so it is possible to directly connect the CRX / RXD / R pin of
@@ -60,25 +60,26 @@
  *         +--- Packet sequence number (modulo 10000)
  */
 
-#include <VanBus.h>
+#include <VanBusRx.h>
 
 #if defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
 // For ESP-01 board we use GPIO 2 (internal pull-up, keep disconnected or high at boot time)
 #define D2 (2)
 #endif
-int RECV_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
+const int RX_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
 
 void setup()
 {
+    delay(1000);
     Serial.begin(115200);
     Serial.println("Starting VAN bus receiver");
-    VanBus.Setup(RECV_PIN);
+    VanBusRx.Setup(RX_PIN);
 } // setup
 
 void loop()
 {
     TVanPacketRxDesc pkt;
-    if (VanBus.Receive(pkt))
+    if (VanBusRx.Receive(pkt))
     {
         // Fully dump bit timings for packets that have CRC ERROR, for further analysis
         if (! pkt.CheckCrcAndRepair()) pkt.getIsrDebugPacket().Dump(Serial);
@@ -92,6 +93,6 @@ void loop()
     if (millis() - lastUpdate >= 60000UL) // Arithmetic has safe roll-over
     {
         lastUpdate = millis();
-        VanBus.DumpStats(Serial);
+        VanBusRx.DumpStats(Serial);
     } // if
 } // loop
