@@ -6,7 +6,7 @@
  *
  * Version 0.0.2 - September, 2020
  *
- * MIT license, all text above must be included in any redistribution.   
+ * MIT license, all text above must be included in any redistribution.
  *
  * -----
  * Description
@@ -43,21 +43,24 @@
  *
  */
 
-#include <VanBus.h>
+#include <VanBusRx.h>
 
 #if defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
 // For ESP-01 board we use GPIO 2 (internal pull-up, keep disconnected or high at boot time)
 #define D2 (2)
 #endif
-int RECV_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
+int RX_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
 
 // Packet parsing
-#define VAN_PACKET_DUPLICATE (1)
-#define VAN_PACKET_PARSE_OK (0)
-#define VAN_PACKET_PARSE_CRC_ERROR (-1)
-#define VAN_PACKET_PARSE_UNEXPECTED_LENGTH (-2)
-#define VAN_PACKET_PARSE_UNRECOGNIZED_IDEN (-3)
-#define VAN_PACKET_PARSE_TO_BE_DECODED_IDEN (-4)
+enum VanPacketParseResult_t
+{
+    VAN_PACKET_DUPLICATE  = 1, // Packet was the same as the last with this IDEN field
+    VAN_PACKET_PARSE_OK = 0,  // Packet was parsed OK
+    VAN_PACKET_PARSE_CRC_ERROR = -1,  // Packet had a CRC error
+    VAN_PACKET_PARSE_UNEXPECTED_LENGTH = -2,  // Packet had unexpected length
+    VAN_PACKET_PARSE_UNRECOGNIZED_IDEN = -3,  // Packet had unrecognized IDEN field
+    VAN_PACKET_PARSE_TO_BE_DECODED = -4  // IDEN recognized but the correct parsing of this packet is not yet known
+}; // enum VanPacketParseResult_t
 
 // VAN IDENtifiers
 #define VIN_IDEN 0xE24
@@ -73,7 +76,7 @@ int RECV_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
 #define TIME_IDEN 0x984
 #define AUDIO_SETTINGS_IDEN 0x4D4
 #define MFD_STATUS_IDEN 0x5E4
-#define AIRCON_IDEN 0x464
+#define AIRCON1_IDEN 0x464
 #define AIRCON2_IDEN 0x4DC
 #define CDCHANGER_IDEN 0x4EC
 #define SATNAV_STATUS_1_IDEN 0x54E
@@ -113,7 +116,7 @@ enum TunerBand_t
     TB_FMAST,  // Auto-station
     TB_AM,
     TB_PTY_SELECT = 7
-};
+}; // enum TunerBand_t
 
 const char* TunerBandStr(uint8_t data)
 {
@@ -147,7 +150,7 @@ enum TunerScanMode_t
     TS_BY_FREQUENCY = 2,
     TS_BY_MATCHING_PTY = 4,
     TS_FM_AST = 7
-};
+}; // enum TunerScanMode_t
 
 const char* TunerScanModeStr(uint8_t data)
 {
@@ -199,6 +202,39 @@ const char* PtyStr(uint8_t ptyCode)
         ptyCode == 31 ? "Alarm" :
         "??";
 } // PtyStr
+
+const char* RadioPiCountry(uint8_t countryCode)
+{
+    // https://radio-tv-nederland.nl/rds/PI%20codes%20Europe.jpg
+    // More than one country is assigned to the same code, just listing the most likely.
+    return
+        countryCode == 0x01 || countryCode == 0x0D ? "Germany" :
+        countryCode == 0x02 ? "Ireland" :
+        countryCode == 0x03 ? "Poland" :
+        countryCode == 0x04 ? "Switzerland" :
+        countryCode == 0x05 ? "Italy" :
+        countryCode == 0x06 ? "Belgium" :
+        countryCode == 0x07 ? "Luxemburg" :
+        countryCode == 0x08 ? "Netherlands" :
+        countryCode == 0x09 ? "Denmark" :
+        countryCode == 0x0A ? "Austria" :
+        countryCode == 0x0B ? "Hungary" :
+        countryCode == 0x0C ? "UK" :
+        countryCode == 0x0E ? "Spain" :
+        countryCode == 0x0F ? "France" :
+        "???";
+} // RadioPiCountry
+
+const char* RadioPiAreaCoverage(uint8_t coverageCode)
+{
+    // https://www.pira.cz/rds/show.asp?art=rds_encoder_support
+    return
+        coverageCode == 0x00 ? "local" :
+        coverageCode == 0x01 ? "international" :
+        coverageCode == 0x02 ? "national" :
+        coverageCode == 0x03 ? "supra-regional" :
+        "regional";
+} // RadioPiAreaCoverage
 
 // Seems to be used in bus packets with IDEN:
 //
@@ -305,14 +341,7 @@ void PrintGuidanceInstruction(const uint8_t data[8])
 } // PrintGuidanceInstruction
 
 // Parse a VAN packet
-// Result:
-// VAN_PACKET_DUPLICATE (1): Packet was the same as the last with this IDEN field
-// VAN_PACKET_PARSE_OK (0): Packet was parsed OK
-// VAN_PACKET_PARSE_CRC_ERROR (-1): Packet had a CRC error
-// VAN_PACKET_PARSE_UNEXPECTED_LENGTH (-2): Packet had unexpected length
-// VAN_PACKET_PARSE_UNRECOGNIZED_IDEN (-3): Packet had unrecognized IDEN field
-// VAN_PACKET_PARSE_TO_BE_DECODED_IDEN (-4): IDEN recognized but the correct parsing of this packet is not yet known
-int ParseVanPacket(TVanPacketRxDesc* pkt)
+VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 {
     if (! pkt->CheckCrc()) return VAN_PACKET_PARSE_CRC_ERROR;
 
@@ -330,7 +359,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#E24
 
             // Print only if not duplicate of previous packet
-            static uint8_t packetData[MAX_DATA_BYTES] = "";  // Previous packet data
+            static uint8_t packetData[VAN_MAX_DATA_BYTES] = "";  // Previous packet data
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
@@ -356,7 +385,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#8A4
 
             // Print only if not duplicate of previous packet
-            static uint8_t packetData[MAX_DATA_BYTES] = "";  // Previous packet data
+            static uint8_t packetData[VAN_MAX_DATA_BYTES] = "";  // Previous packet data
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
@@ -402,7 +431,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#9C4
 
             // Print only if not duplicate of previous packet
-            static uint8_t packetData[MAX_DATA_BYTES] = "";  // Previous packet data
+            static uint8_t packetData[VAN_MAX_DATA_BYTES] = "";  // Previous packet data
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
@@ -434,7 +463,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // https://github.com/morcibacsi/PSAVanCanBridge/blob/master/src/Van/Structs/VanInstrumentClusterV1Structs.h
 
             // Print only if not duplicate of previous packet
-            static uint8_t packetData[MAX_DATA_BYTES] = "";  // Previous packet data
+            static uint8_t packetData[VAN_MAX_DATA_BYTES] = "";  // Previous packet data
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
@@ -503,7 +532,8 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 SERIAL.printf("Fuel level: %u %%\n", data[7]);  // Never seen this
             } // if
 
-            SERIAL.printf("    - Oil level: %s\n",
+            SERIAL.printf("    - Oil level: raw=%u,dash=%s\n",
+                data[8],
                 data[8] <= 0x0B ? "------" :
                 data[8] <= 0x19 ? "O-----" :
                 data[8] <= 0x27 ? "OO----" :
@@ -552,9 +582,6 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // http://graham.auld.me.uk/projects/vanbus/packets.html#8C4
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#8C4
 
-            // Examples:
-
-
             if (dataLen < 1 || dataLen > 3)
             {
                 SERIAL.println("[unexpected packet length]");
@@ -602,23 +629,23 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 //
                 SERIAL.printf(
                     "%s\n",
-                    data[1] == 0x20 ? "TUNER - REPLY" :
+                    data[1] == 0x20 ? "TUNER_REPLY" :
                     data[1] == 0x21 ? "AUDIO_SETTINGS_ANNOUNCE" :
                     data[1] == 0x22 ? "BUTTON_PRESS_ANNOUNCE" :
                     data[1] == 0x24 ? "TUNER_ANNOUNCEMENT" :
                     data[1] == 0x28 ? "TAPE_PRESENCE_ANNOUNCEMENT" :
                     data[1] == 0x30 ? "CD_PRESENT" :
-                    data[1] == 0x40 ? "TUNER_PRESETS - REPLY" :
-                    data[1] == 0x60 ? "TAPE_INFO - REPLY" :
-                    data[1] == 0x61 ? "TAPE_PLAYING - AUDIO_SETTINGS_ANNOUNCE" :
-                    data[1] == 0x62 ? "TAPE_PLAYING - BUTTON_PRESS_ANNOUNCE" :
-                    data[1] == 0x64 ? "TAPE_PLAYING - STARTING" :
-                    data[1] == 0x68 ? "TAPE_PLAYING - INFO" :
-                    data[1] == 0xC0 ? "INTERNAL_CD_TRACK_INFO - REPLY" :
-                    data[1] == 0xC1 ? "INTERNAL_CD_PLAYING - AUDIO_SETTINGS_ANNOUNCE" :
-                    data[1] == 0xC2 ? "INTERNAL_CD_PLAYING - BUTTON_PRESS_ANNOUNCE" :
-                    data[1] == 0xC4 ? "INTERNAL_CD_PLAYING - SEARCHING" :
-                    data[1] == 0xD0 ? "INTERNAL_CD_PLAYING - TRACK_INFO" :
+                    data[1] == 0x40 ? "TUNER_PRESETS_REPLY" :
+                    data[1] == 0x60 ? "TAPE_INFO_REPLY" :
+                    data[1] == 0x61 ? "TAPE_PLAYING_AUDIO_SETTINGS_ANNOUNCE" :
+                    data[1] == 0x62 ? "TAPE_PLAYING_BUTTON_PRESS_ANNOUNCE" :
+                    data[1] == 0x64 ? "TAPE_PLAYING_STARTING" :
+                    data[1] == 0x68 ? "TAPE_PLAYING_INFO" :
+                    data[1] == 0xC0 ? "INTERNAL_CD_TRACK_INFO_REPLY" :
+                    data[1] == 0xC1 ? "INTERNAL_CD_PLAYING_AUDIO_SETTINGS_ANNOUNCE" :
+                    data[1] == 0xC2 ? "INTERNAL_CD_PLAYING_BUTTON_PRESS_ANNOUNCE" :
+                    data[1] == 0xC4 ? "INTERNAL_CD_PLAYING_SEARCHING" :
+                    data[1] == 0xD0 ? "INTERNAL_CD_PLAYING_TRACK_INFO" :
                     "??"
                 );
 
@@ -664,23 +691,23 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
                     SERIAL.printf(
                         "    Head unit button pressed: %s%s%s\n",
-                        (data[2] & 0x1F) == 0x01 ? "1" :
-                            (data[2] & 0x1F) == 0x02 ? "'2'" :
-                            (data[2] & 0x1F) == 0x03 ? "'3'" :
-                            (data[2] & 0x1F) == 0x04 ? "'4'" :
-                            (data[2] & 0x1F) == 0x05 ? "'5'" :
-                            (data[2] & 0x1F) == 0x06 ? "'6'" :
-                            (data[2] & 0x1F) == 0x11 ? "AUDIO_DOWN" :
-                            (data[2] & 0x1F) == 0x12 ? "AUDIO_UP" :
-                            (data[2] & 0x1F) == 0x13 ? "SEEK_BACKWARD" :
-                            (data[2] & 0x1F) == 0x14 ? "SEEK_FORWARD" :
-                            (data[2] & 0x1F) == 0x16 ? "AUDIO" :
-                            (data[2] & 0x1F) == 0x17 ? "MAN" :
-                            (data[2] & 0x1F) == 0x1B ? "TUNER" :
-                            (data[2] & 0x1F) == 0x1C ? "TAPE" :
-                            (data[2] & 0x1F) == 0x1D ? "INTERNAL_CD" :
-                            (data[2] & 0x1F) == 0x1E ? "CD_CHANGER" :
-                            buffer,
+                        (data[2] & 0x1F) == 0x01 ? "'1'" :
+                        (data[2] & 0x1F) == 0x02 ? "'2'" :
+                        (data[2] & 0x1F) == 0x03 ? "'3'" :
+                        (data[2] & 0x1F) == 0x04 ? "'4'" :
+                        (data[2] & 0x1F) == 0x05 ? "'5'" :
+                        (data[2] & 0x1F) == 0x06 ? "'6'" :
+                        (data[2] & 0x1F) == 0x11 ? "AUDIO_DOWN" :
+                        (data[2] & 0x1F) == 0x12 ? "AUDIO_UP" :
+                        (data[2] & 0x1F) == 0x13 ? "SEEK_BACKWARD" :
+                        (data[2] & 0x1F) == 0x14 ? "SEEK_FORWARD" :
+                        (data[2] & 0x1F) == 0x16 ? "AUDIO" :
+                        (data[2] & 0x1F) == 0x17 ? "MAN" :
+                        (data[2] & 0x1F) == 0x1B ? "TUNER" :
+                        (data[2] & 0x1F) == 0x1C ? "TAPE" :
+                        (data[2] & 0x1F) == 0x1D ? "INTERNAL_CD" :
+                        (data[2] & 0x1F) == 0x1E ? "CD_CHANGER" :
+                        buffer,
                         data[2] & 0x40 ? " (released)" : "",
                         data[2] & 0x80 ? " (repeat)" : ""
                     );
@@ -745,7 +772,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     data[2]
                 );
 
-                return VAN_PACKET_PARSE_TO_BE_DECODED_IDEN;
+                return VAN_PACKET_PARSE_TO_BE_DECODED;
             }
             else if (data[0] == 0x52)
             {
@@ -776,7 +803,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     data[1]
                 );
 
-                return VAN_PACKET_PARSE_TO_BE_DECODED_IDEN;
+                return VAN_PACKET_PARSE_TO_BE_DECODED;
             }
             else
             {
@@ -784,7 +811,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     "0x%02X [to be decoded]\n",
                     data[0]);
 
-                return VAN_PACKET_PARSE_TO_BE_DECODED_IDEN;
+                return VAN_PACKET_PARSE_TO_BE_DECODED;
             } // if
         }
         break;
@@ -795,7 +822,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#564
 
             // Print only if not duplicate of previous packet; ignore different sequence numbers
-            static uint8_t packetData[MAX_DATA_BYTES] = "";  // Previous packet data
+            static uint8_t packetData[VAN_MAX_DATA_BYTES] = "";  // Previous packet data
             if (memcmp(data + 1, packetData, dataLen - 2) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data + 1, dataLen - 2);
 
@@ -857,7 +884,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // https://github.com/morcibacsi/PSAVanCanBridge/blob/master/src/Van/Structs/VanDisplayStructsV2.h
 
             // Print only if not duplicate of previous packet
-            static uint8_t packetData[MAX_DATA_BYTES] = "";  // Previous packet data
+            static uint8_t packetData[VAN_MAX_DATA_BYTES] = "";  // Previous packet data
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
@@ -984,10 +1011,11 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 {
                     if (data[byte] >> bit & 0x01)
                     {
-                        char buffer[80];  // Make sure this is large enough for the largest string it must hold
-                        strcpy_P(buffer, (char *)pgm_read_dword(&(msgTable[byte * 8 + bit])));
+                        char alarmText[80];  // Make sure this is large enough for the largest string it must hold
+                        strncpy_P(alarmText, (char *)pgm_read_dword(&(msgTable[byte * 8 + bit])), sizeof(alarmText) - 1);
+                        alarmText[sizeof(alarmText) - 1] = 0;
                         SERIAL.print("    - ");
-                        SERIAL.println(buffer);
+                        SERIAL.println(alarmText);
                     } // if
                 } // for
             } // for
@@ -1000,7 +1028,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#824
 
             // Print only if not duplicate of previous packet
-            static uint8_t packetData[MAX_DATA_BYTES] = "";  // Previous packet data
+            static uint8_t packetData[VAN_MAX_DATA_BYTES] = "";  // Previous packet data
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
@@ -1032,7 +1060,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#664
 
             // Print only if not duplicate of previous packet
-            static uint8_t packetData[MAX_DATA_BYTES] = "";  // Previous packet data
+            static uint8_t packetData[VAN_MAX_DATA_BYTES] = "";  // Previous packet data
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
@@ -1079,7 +1107,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 INFO_TYPE_PRESET,
                 INFO_TYPE_CDCHANGER = 0xD5, // TODO - Not sure
                 INFO_TYPE_CD,
-            };
+            }; // enum HeatUnitInfoType_t
 
             switch (infoType)
             {
@@ -1095,7 +1123,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     // 0E554E 87D10110CA030F60FFFFA10000000000000000000080 62E6
 
                     // Print only if not duplicate of previous packet
-                    static uint8_t packetData[MAX_DATA_BYTES] = "";  // Previous packet data
+                    static uint8_t packetData[VAN_MAX_DATA_BYTES] = "";  // Previous packet data
                     if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
                     memcpy(packetData, data, dataLen);
 
@@ -1134,8 +1162,8 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     //   - During the process of tuning in to another station, switches to e.g. 0x20, 0x60, but
                     //     (usually) ends up 0x00.
                     //   Just guessing for the possible meaning of the bits:
-                    //   - Mono (not stereo)
-                    //   - Music/Speech (MS)
+                    //   - Mono (not stereo) bit
+                    //   - Music/Speech (MS) bit
                     //   - No RDS available / Searching for RDS
                     //   - No TA available / Searching for TA
                     //   - No AF (Alternative Frequencies) available
@@ -1189,33 +1217,10 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     rdsTxt[8] = 0;
 
                     char piBuffer[40];
-                    sprintf_P(
-                        piBuffer,
-                        PSTR("%04X(%s, %s)"),
+                    sprintf_P(piBuffer, PSTR("%04X(%s, %s)"),
                         piCode,
-
-                        // https://radio-tv-nederland.nl/rds/PI%20codes%20Europe.jpg
-                        // More than one country is assigned to the same code, just listing the most likely.
-                        countryCode == 0x01 || countryCode == 0x0D ? "Germany" :
-                            countryCode == 0x02 ? "Ireland" :
-                            countryCode == 0x03 ? "Poland" :
-                            countryCode == 0x04 ? "Switzerland" :
-                            countryCode == 0x05 ? "Italy" :
-                            countryCode == 0x06 ? "Belgium" :
-                            countryCode == 0x07 ? "Luxemburg" :
-                            countryCode == 0x08 ? "Netherlands" :
-                            countryCode == 0x09 ? "Denmark" :
-                            countryCode == 0x0A ? "Austria" :
-                            countryCode == 0x0B ? "Hungary" :
-                            countryCode == 0x0C ? "UK" :
-                            countryCode == 0x0E ? "Spain" :
-                            countryCode == 0x0F ? "France" :
-                            "???",
-                        coverageCode == 0x00 ? "local" :
-                            coverageCode == 0x01 ? "international" :
-                            coverageCode == 0x02 ? "national" :
-                            coverageCode == 0x03 ? "supra-regional" :
-                            "regional"
+                        RadioPiCountry(countryCode),
+                        RadioPiAreaCoverage(coverageCode)
                     );
 
                     char currPtyBuffer[40];
@@ -1305,13 +1310,13 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
                     SERIAL.printf("%s, side=%s\n",
                         status == 0x00 ? "STOPPED" :
-                            status == 0x04 ? "LOADING" :
-                            status == 0x0C ? "PLAYING" :
-                            status == 0x10 ? "FAST_FORWARD" :
-                            status == 0x14 ? "NEXT_TRACK" :
-                            status == 0x30 ? "REWIND" :
-                            status == 0x34 ? "PREVIOUS_TRACK" :
-                            buffer,
+                        status == 0x04 ? "LOADING" :
+                        status == 0x0C ? "PLAYING" :
+                        status == 0x10 ? "FAST_FORWARD" :
+                        status == 0x14 ? "NEXT_TRACK" :
+                        status == 0x30 ? "REWIND" :
+                        status == 0x34 ? "PREVIOUS_TRACK" :
+                        buffer,
                         data[2] & 0x01 ? "2" : "1"
                     );
                 }
@@ -1348,6 +1353,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
                     SERIAL.print("--> CD track info: ");
 
+                    // TODO - do we know the fixed numbers? Seems like this can only be 10 or 12.
                     if (dataLen < 10)
                     {
                         SERIAL.println("[unexpected packet length]");
@@ -1356,13 +1362,13 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
                     SERIAL.printf("%s",
                         data[3] == 0x11 ? "INSERTED" :
-                            data[3] == 0x12 ? "PAUSE-SEARCHING" :
-                            data[3] == 0x13 ? "PLAY-SEARCHING" :
-                            data[3] == 0x02 ? "PAUSE" :
-                            data[3] == 0x03 ? "PLAY" :
-                            data[3] == 0x04 ? "FAST_FORWARD" :
-                            data[3] == 0x05 ? "REWIND" :
-                            "??"
+                        data[3] == 0x12 ? "PAUSE-SEARCHING" :
+                        data[3] == 0x13 ? "PLAY-SEARCHING" :
+                        data[3] == 0x02 ? "PAUSE" :
+                        data[3] == 0x03 ? "PLAY" :
+                        data[3] == 0x04 ? "FAST_FORWARD" :
+                        data[3] == 0x05 ? "REWIND" :
+                        "??"
                     );
 
                     SERIAL.printf(" - %um:%us in track %u",
@@ -1394,10 +1400,18 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
                     SERIAL.println("[to be decoded]");
 
-                    return VAN_PACKET_PARSE_TO_BE_DECODED_IDEN;
+                    return VAN_PACKET_PARSE_TO_BE_DECODED;
                 }
                 break;
-            }
+
+                default:
+                {
+                    SERIAL.printf("--> Unknown head unit info type 0x%02X: ", infoType);
+                    SERIAL.println("[to be decoded]");
+                    return VAN_PACKET_PARSE_TO_BE_DECODED;
+                }
+                break;
+            } // switch
         }
         break;
 
@@ -1443,7 +1457,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // 0E 4D4 RA0 84-0C-01-02-11-11-3F-3F-3F-3F-84-1E-2E ACK OK 1E2E CRC_OK
 
             // Most of these packets are the same. So print only if not duplicate of previous packet.
-            static uint8_t packetData[MAX_DATA_BYTES] = "";  // Previous packet data
+            static uint8_t packetData[VAN_MAX_DATA_BYTES] = "";  // Previous packet data
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
@@ -1467,38 +1481,41 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 data[4] & 0x40 ? "PRESENT" : "NOT_PRESENT",  // cd
 
                 (data[4] & 0x0F) == 0x00 ? "NONE" :  // source
-                    (data[4] & 0x0F) == 0x01 ? "TUNER" :
-                    (data[4] & 0x0F) == 0x02 ?
-                        data[4] & 0x20 ? "TAPE" : 
-                        data[4] & 0x40 ? "INTERNAL_CD" : 
-                        "INTERNAL_CD_OR_TAPE" :
-                    (data[4] & 0x0F) == 0x03 ? "CD_CHANGER" :
+                (data[4] & 0x0F) == 0x01 ? "TUNER" :
+                (data[4] & 0x0F) == 0x02 ?
+                    data[4] & 0x20 ? "TAPE" : 
+                    data[4] & 0x40 ? "INTERNAL_CD" : 
+                    "INTERNAL_CD_OR_TAPE" :
+                (data[4] & 0x0F) == 0x03 ? "CD_CHANGER" :
 
-                    // This is the "default" mode for the head unit, to sit there and listen to the navigation
-                    // audio. The navigation audio volume is also always set (usually a lot higher than the radio)
-                    // whenever this source is chosen.
-                    (data[4] & 0x0F) == 0x05 ? "NAVIGATION_AUDIO" :
+                // This is the "default" mode for the head unit, to sit there and listen to the navigation
+                // audio. The navigation audio volume is also always set (usually a lot higher than the radio)
+                // whenever this source is chosen.
+                (data[4] & 0x0F) == 0x05 ? "NAVIGATION_AUDIO" :
 
-                    "???",
+                "???",
 
-                data[1] & 0x02 ? "ON" : "OFF",  // ext_mute. Activated when head unit ISO connector A pin 1 ("Phone mute") is pulled down.
-                data[1] & 0x01 ? "ON" : "OFF",  // mute. To activate: press both VOL_UP and VOL_DOWN buttons on stalk.
+                // ext_mute. Activated when head unit ISO connector A pin 1 ("Phone mute") is pulled LOW (to Ground).
+                data[1] & 0x02 ? "ON" : "OFF",
+
+                // mute. To activate: press both VOL_UP and VOL_DOWN buttons on stalk.
+                data[1] & 0x01 ? "ON" : "OFF",
 
                 data[5] & 0x7F,  // volume
-                data[5] & 0x80 ? "<UPD>" : "",
+                data[5] & 0x80 ? "(UPD)" : "",
 
                 // audio_menu. Bug: if CD changer is playing, this one is always "OPEN" (even if it isn't).
                 data[1] & 0x20 ? "OPEN" : "CLOSED",
 
                 (sint8_t)(data[8] & 0x7F) - 0x3F,  // bass
-                data[8] & 0x80 ? "<UPD>" : "",
+                data[8] & 0x80 ? "(UPD)" : "",
                 (sint8_t)(data[9] & 0x7F) - 0x3F,  // treble
-                data[9] & 0x80 ? "<UPD>" : "",
+                data[9] & 0x80 ? "(UPD)" : "",
                 data[1] & 0x10 ? "ON" : "OFF",  // loudness
                 (sint8_t)(0x3F) - (data[7] & 0x7F),  // fader
-                data[7] & 0x80 ? "<UPD>" : "",
+                data[7] & 0x80 ? "(UPD)" : "",
                 (sint8_t)(0x3F) - (data[6] & 0x7F),  // balance
-                data[6] & 0x80 ? "<UPD>" : "",
+                data[6] & 0x80 ? "(UPD)" : "",
                 data[1] & 0x04 ? "ON" : "OFF"  // auto_volume
             );
         }
@@ -1512,7 +1529,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // Example: 0E5E4C00FF1FF8
 
             // Most of these packets are the same. So print only if not duplicate of previous packet.
-            static uint8_t packetData[MAX_DATA_BYTES] = "";  // Previous packet data
+            static uint8_t packetData[VAN_MAX_DATA_BYTES] = "";  // Previous packet data
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
@@ -1541,13 +1558,13 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 // received any packets that show connectivity to e.g. the BSI?
                 data[0] == 0x00 && data[1] == 0xFF ? "MFD_SCREEN_OFF" :
 
-                    data[0] == 0x20 && data[1] == 0xFF ? "MFD_SCREEN_ON" :
-                    buffer
+                data[0] == 0x20 && data[1] == 0xFF ? "MFD_SCREEN_ON" :
+                buffer
             );
         }
         break;
 
-        case AIRCON_IDEN:
+        case AIRCON1_IDEN:
         {
             // http://graham.auld.me.uk/projects/vanbus/packets.html#464
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#464
@@ -1564,11 +1581,11 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // Raw: #7808 (13/15) 10 0E 464 WA0 00-00-00-00-00-8C-DA ACK OK 8CDA CRC_OK
 
             // Most of these packets are the same. So print only if not duplicate of previous packet.
-            static uint8_t packetData[MAX_DATA_BYTES] = "";  // Previous packet data
+            static uint8_t packetData[VAN_MAX_DATA_BYTES] = "";  // Previous packet data
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
-            SERIAL.print("--> Aircon: ");
+            SERIAL.print("--> Aircon 1: ");
 
             if (dataLen != 5)
             {
@@ -1586,8 +1603,8 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
             // data[4] - reported fan speed
             //
-            // Real-world tests: reported fan_speed values with various settings of the fan speed icon (NO icon
-            // visible ... all blades full, 0...7), under varying conditions:
+            // Real-world tests: reported fan_speed values with various settings of the fan speed icon (0 = fan icon
+            // not visible at all ... 7 = all four blades visible), under varying conditions:
             //
             // 1.) Recirculation = OFF, rear window heater = OFF, A/C = OFF:
             //     Fan icon not visible at all = 0
@@ -1643,10 +1660,10 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             //
             // In "AUTO" mode, the fan speed varies gradually over time in increments or decrements of 1.
 
-            bool rear_heat = data[0] & 0x01;
+            bool rear_heater = data[0] & 0x01;
             bool ac_icon = data[0] & 0x10;
             uint8_t setFanSpeed = data[4];
-            if (rear_heat) setFanSpeed -= 12;
+            if (rear_heater) setFanSpeed -= 12;
             if (ac_icon) setFanSpeed -= 2;
             setFanSpeed =
                 setFanSpeed >= 18 ? 7 : // Four blades
@@ -1659,10 +1676,10 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 0; // Fan icon not visible at all
 
             SERIAL.printf(
-                "ac_icon=%s; recirc=%s, rear_heat=%s, reported_fan_speed=%u, set_fan_speed=%u\n",
+                "ac_icon=%s; recirc=%s, rear_heater=%s, reported_fan_speed=%u, set_fan_speed=%u\n",
                 ac_icon ? "ON" : "OFF",
                 data[0] & 0x04 ? "ON" : "OFF",
-                rear_heat ? "YES" : "NO",
+                rear_heater ? "YES" : "NO",
                 data[4],
                 setFanSpeed
             );
@@ -1677,7 +1694,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
             // Evaporator temperature is constantly toggling between 2 values, while the rest of the data is the same.
             // So print only if not duplicate of previous 2 packets.
-            static uint8_t packetData[2][MAX_DATA_BYTES];  // Previous packet data
+            static uint8_t packetData[2][VAN_MAX_DATA_BYTES];  // Previous packet data
 
             if (memcmp(data, packetData[0], dataLen) == 0) return VAN_PACKET_DUPLICATE;
             if (memcmp(data, packetData[1], dataLen) == 0) return VAN_PACKET_DUPLICATE;
@@ -1695,17 +1712,18 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
             char floatBuf[2][MAX_FLOAT_SIZE];
             SERIAL.printf(
-                "contact_key_on=%s; enabled=%s; rear_window=%s; aircon_compressor=%s; contact_key_position=%s;\n"
-                "    condenserTemperature=%s, evaporatorTemperature=%s\n",
+                "contact_key_on=%s; enabled=%s; rear_heater=%s; aircon_compressor=%s; contact_key_position=%s;\n"
+                "    condenser_temperature=%s, evaporator_temperature=%s\n",
                 data[0] & 0x80 ? "YES" : "NO",
                 data[0] & 0x40 ? "YES" : "NO",
                 data[0] & 0x20 ? "ON" : "OFF",
                 data[0] & 0x01 ? "ON" : "OFF",
+
                 data[1] == 0x1C ? "ACC_OR_OFF" :
-                    data[1] == 0x18 ? "ACC-->OFF" :
-                    data[1] == 0x04 ? "ON-->ACC" :
-                    data[1] == 0x00 ? "ON" :
-                    "??",
+                data[1] == 0x18 ? "ACC-->OFF" :
+                data[1] == 0x04 ? "ON-->ACC" :
+                data[1] == 0x00 ? "ON" :
+                "??",
 
                 // This is not interior temperature. This rises quite rapidly if the aircon compressor is
                 // running, and drops again when the aircon compressor is off. So I think this is the condenser
@@ -1726,7 +1744,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // Example: 0E4ECF9768
 
             // Most of these packets are the same. So print only if not duplicate of previous packet.
-            static uint8_t packetData[MAX_DATA_BYTES] = "";  // Previous packet data
+            static uint8_t packetData[VAN_MAX_DATA_BYTES] = "";  // Previous packet data
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
@@ -1819,40 +1837,42 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             char buffer[10];
             sprintf_P(buffer, PSTR("0x%02X-0x%02X"), data[1], data[2]);
 
-            // TODO - check; total guess
             SERIAL.printf(
                 "status=%s%s\n",
+
+                // TODO - check; total guess
                 status == 0x0000 ? "NOT_OPERATING" :
-                    status == 0x0001 ? "0x0001" :
-                    status == 0x0020 ? "0x0020" : // Nearly at destination ??
-                    status == 0x0080 ? "READY" :
-                    status == 0x0101 ? "0x0101" :
-                    //status == 0x0200 ? "INITIALISING" : // No, definitely not this
-                    status == 0x0200 ? "READING_DISC_1" :
-                    status == 0x0220 ? "0x0220" :
-                    status == 0x0300 ? "IN_GUIDANCE_MODE_1" :
-                    status == 0x0301 ? "IN_GUIDANCE_MODE_2" :
-                    status == 0x0320 ? "STOPPING_GUIDANCE" :
-                    //status == 0x0400 ? "TERMS_AND_CONDITIONS_ACCEPTED" : // No, definitely not this
-                    status == 0x0400 ? "START_OF_AUDIO_MESSAGE" :
-                    status == 0x0410 ? "ARRIVED_AT_DESTINATION_1" :
-                    status == 0x0600 ? "0x0600" :
-                    status == 0x0700 ? "INSTRUCTION_AUDIO_MESSAGE_START_1" :
-                    status == 0x0701 ? "INSTRUCTION_AUDIO_MESSAGE_START_2" :
-                    status == 0x0800 ? "END_OF_AUDIO_MESSAGE" :  // Follows 0x0400, 0x0700, 0x0701
-                    status == 0x4000 ? "GUIDANCE_STOPPED" :
-                    status == 0x4001 ? "0x4001" :
-                    status == 0x4200 ? "ARRIVED_AT_DESTINATION_2" :
-                    status == 0x9000 ? "READING_DISC_2" :
-                    status == 0x9080 ? "0x9080" :
-                    buffer,
+                status == 0x0001 ? "0x0001" :
+                status == 0x0020 ? "0x0020" : // Nearly at destination ??
+                status == 0x0080 ? "READY" :
+                status == 0x0101 ? "0x0101" :
+                //status == 0x0200 ? "INITIALISING" : // No, definitely not this
+                status == 0x0200 ? "READING_DISC_1" :
+                status == 0x0220 ? "0x0220" :
+                status == 0x0300 ? "IN_GUIDANCE_MODE_1" :
+                status == 0x0301 ? "IN_GUIDANCE_MODE_2" :
+                status == 0x0320 ? "STOPPING_GUIDANCE" :
+                //status == 0x0400 ? "TERMS_AND_CONDITIONS_ACCEPTED" : // No, definitely not this
+                status == 0x0400 ? "START_OF_AUDIO_MESSAGE" :
+                status == 0x0410 ? "ARRIVED_AT_DESTINATION_1" :
+                status == 0x0600 ? "0x0600" :
+                status == 0x0700 ? "INSTRUCTION_AUDIO_MESSAGE_START_1" :
+                status == 0x0701 ? "INSTRUCTION_AUDIO_MESSAGE_START_2" :
+                status == 0x0800 ? "END_OF_AUDIO_MESSAGE" :  // Follows 0x0400, 0x0700, 0x0701
+                status == 0x4000 ? "GUIDANCE_STOPPED" :
+                status == 0x4001 ? "0x4001" :
+                status == 0x4200 ? "ARRIVED_AT_DESTINATION_2" :
+                status == 0x9000 ? "READING_DISC_2" :
+                status == 0x9080 ? "0x9080" :
+                buffer,
+
                 data[4] == 0x0B ? " reason=0x0B" :  // Seen with status == 0x4001
-                    data[4] == 0x0C ? " reason=NO_DISC" :
-                    data[4] == 0x0E ? " reason=NO_DISC" :
-                    ""
+                data[4] == 0x0C ? " reason=NO_DISC" :
+                data[4] == 0x0E ? " reason=NO_DISC" :
+                ""
             );
 
-            return VAN_PACKET_PARSE_TO_BE_DECODED_IDEN;
+            return VAN_PACKET_PARSE_TO_BE_DECODED;
         }
         break;
 
@@ -1871,7 +1891,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // Raw: #1635 ( 0/15) 25 0E 7CE RA0 87-21-3C-00-07-06-01-00-00-00-00-00-00-00-00-00-00-28-00-87-1A-78 ACK OK 1A78 CRC_OK
 
             // Most of these packets are the same. So print only if not duplicate of previous packet.
-            static uint8_t packetData[MAX_DATA_BYTES] = "";  // Previous packet data
+            static uint8_t packetData[VAN_MAX_DATA_BYTES] = "";  // Previous packet data
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
@@ -1965,20 +1985,23 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // );
 
             SERIAL.printf("status=%s",
+
                 data[1] == 0x11 ? "STOPPING_GUIDANCE" :
-                    data[1] == 0x15 ? "IN_GUIDANCE_MODE" :
-                    data[1] == 0x20 ? "IDLE_NOT_READY" :
-                    data[1] == 0x21 ? "IDLE_READY" :
-                    data[1] == 0x25 ? "CALCULATING_ROUTE" :
-                    data[1] == 0x41 ? "???" :
-                    data[1] == 0xC1 ? "FINISHED_DOWNLOADING" :
-                    "??"
+                data[1] == 0x15 ? "IN_GUIDANCE_MODE" :
+                data[1] == 0x20 ? "IDLE_NOT_READY" :
+                data[1] == 0x21 ? "IDLE_READY" :
+                data[1] == 0x25 ? "CALCULATING_ROUTE" :
+                data[1] == 0x41 ? "???" :
+                data[1] == 0xC1 ? "FINISHED_DOWNLOADING" :
+                "??"
             );
 
             SERIAL.printf(", disc=%s, gps_fix=%s, gps_fix_lost=%s, gps_scanning=%s",
+
                 (data[2] & 0x70) == 0x70 ? "NONE_PRESENT" :
-                    (data[2] & 0x70) == 0x30 ? "RECOGNIZED" :
-                    "??",
+                (data[2] & 0x70) == 0x30 ? "RECOGNIZED" :
+                "??",
+
                 data[2] & 0x01 ? "YES" : "NO",
                 data[2] & 0x02 ? "YES" : "NO",
                 data[2] & 0x04 ? "YES" : "NO"
@@ -1992,11 +2015,12 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     data[17] & 0x04 ? "NEW_GUIDANCE_INSTRUCTION " : "",
                     data[17] & 0x08 ? "READING_DISC " : "",
                     data[17] & 0x10 ? "CALCULATING_ROUTE " : "",
-                    data[17] & 0x20 ? "DISC_PRESENT" : "",
-                    data[17] & 0x80 ? "REACHED_DESTINATION" : ""
+                    data[17] & 0x20 ? "DISC_PRESENT " : "",
+                    data[17] & 0x80 ? "REACHED_DESTINATION " : ""
                 );
             } // if
 
+            // TODO - what is this?
             uint16_t zzz = (uint16_t)data[9] << 8 | data[10];
             if (zzz != 0x00) SERIAL.printf(", zzz=%u", zzz);
 
@@ -2048,13 +2072,13 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 SERIAL.printf(
                     "status=%s\n",
                     status == 0x0000 ? "CALCULATING_ROUTE" :
-                        status == 0x0001 ? "STOPPING_NAVIGATION" :
-                        status == 0x0C01 ? "CD_ROM_FOUND" :
-                        status == 0x0C02 ? "POWERING_OFF" :
-                        status == 0x0140 ? "GPS_POS_FOUND" :
-                        status == 0x0120 ? "ACCEPTED_TERMS_AND_CONDITIONS" :
-                        status == 0x0108 ? "NAVIGATION_MENU_ENTERED" :
-                        buffer
+                    status == 0x0001 ? "STOPPING_NAVIGATION" :
+                    status == 0x0C01 ? "CD_ROM_FOUND" :
+                    status == 0x0C02 ? "POWERING_OFF" :
+                    status == 0x0140 ? "GPS_POS_FOUND" :
+                    status == 0x0120 ? "ACCEPTED_TERMS_AND_CONDITIONS" :
+                    status == 0x0108 ? "NAVIGATION_MENU_ENTERED" :
+                    buffer
                 );
             }
             else if (dataLen == 17 && data[0] == 0x20)
@@ -2062,11 +2086,9 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 // Some set of ID strings. Stays the same even when the navigation CD is changed.
                 SERIAL.print("system_id=");
 
+                char txt[VAN_MAX_DATA_BYTES - 1 + 1];  // Max 28 data bytes, minus header (1), plus terminating '\0'
+
                 int at = 1;
-
-                // Max 28 data bytes, minus header (1), plus terminating '\0'
-                char txt[MAX_DATA_BYTES - 1 + 1];
-
                 while (at < dataLen)
                 {
                     strncpy(txt, (const char*) data + at, dataLen - at);
@@ -2368,14 +2390,14 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
             SERIAL.printf("guidance_instruction=%s\n",
                 data[1] == 0x01 ? "SINGLE_TURN" :
-                    data[1] == 0x03 ? "DOUBLE_TURN" :
-                    data[1] == 0x04 ? "TURN_AROUND_IF_POSSIBLE" :
-                    data[1] == 0x05 ? "FOLLOW_ROAD" :
-                    data[1] == 0x06 ? "NOT_ON_MAP" :
-                    buffer
+                data[1] == 0x03 ? "DOUBLE_TURN" :
+                data[1] == 0x04 ? "TURN_AROUND_IF_POSSIBLE" :
+                data[1] == 0x05 ? "FOLLOW_ROAD" :
+                data[1] == 0x06 ? "NOT_ON_MAP" :
+                buffer
             );
 
-            if (data[1] == 0x01)
+            if (data[1] == 0x01)  // Single turn
             {
                 if (data[2] == 0x00 || data[2] == 0x01)
                 {
@@ -2400,9 +2422,9 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     // Fork or exit instruction
                     SERIAL.printf("    current_instruction=%s\n",
                         data[4] == 0x41 ? "KEEP_LEFT_ON_FORK" :
-                            data[4] == 0x14 ? "KEEP_RIGHT_ON_FORK" :
-                            data[4] == 0x12 ? "TAKE_RIGHT_EXIT" :
-                            "??"
+                        data[4] == 0x14 ? "KEEP_RIGHT_ON_FORK" :
+                        data[4] == 0x12 ? "TAKE_RIGHT_EXIT" :
+                        "??"
                     );
                 }
                 else
@@ -2410,7 +2432,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     SERIAL.printf("%s\n", buffer);
                 } // if
             }
-            else if (data[1] == 0x03)
+            else if (data[1] == 0x03)  // Double turn
             {
                 if (dataLen != 23)
                 {
@@ -2424,7 +2446,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 SERIAL.print("    next_instruction=\n");
                 PrintGuidanceInstruction(data + 14);
             }
-            else if (data[1] == 0x04)
+            else if (data[1] == 0x04)  // Turn around if possible
             {
                 if (dataLen != 3)
                 {
@@ -2432,8 +2454,9 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
+                SERIAL.print("    current_instruction=TURN_AROUND_IF_POSSIBLE\n");
             } // if
-            else if (data[1] == 0x05)
+            else if (data[1] == 0x05)  // Follow road
             {
                 if (dataLen != 4)
                 {
@@ -2443,15 +2466,15 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
                 SERIAL.printf("    follow_road_next_instruction=%s\n",
                     data[2] == 0x00 ? "NONE" :
-                        data[2] == 0x01 ? "TURN_RIGHT" :
-                        data[2] == 0x02 ? "TURN_LEFT" :
-                        data[2] == 0x04 ? "ROUNDABOUT" :
-                        data[2] == 0x08 ? "GO_STRAIGHT_AHEAD" :
-                        data[2] == 0x10 ? "RETRIEVING_NEXT_INSTRUCTION" :
-                        "??"
+                    data[2] == 0x01 ? "TURN_RIGHT" :
+                    data[2] == 0x02 ? "TURN_LEFT" :
+                    data[2] == 0x04 ? "ROUNDABOUT" :
+                    data[2] == 0x08 ? "GO_STRAIGHT_AHEAD" :
+                    data[2] == 0x10 ? "RETRIEVING_NEXT_INSTRUCTION" :
+                    "??"
                 );
             }
-            else if (data[1] == 0x06)
+            else if (data[1] == 0x06)  // Not on map
             {
                 if (dataLen != 4)
                 {
@@ -2497,7 +2520,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // See also: https://bytetool.web.app/en/ascii/
             //
             // Address format:
-            // - Starts with "V" (Ville? Vers?) or "C" (Country? Courant? Chosen?)
+            // - Starts with "V" (Ville? Vers?) or "C" (Country? Courant? Chosen? Choisi?)
             // - Country
             // - Province
             // - City
@@ -2513,7 +2536,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             //     destination.
 
             #define MAX_SATNAV_STRING_SIZE 128
-            static char buffer[128];
+            static char buffer[MAX_SATNAV_STRING_SIZE];
             static int offsetInBuffer = 0;
 
             int offsetInPacket = 1;
@@ -2609,6 +2632,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // data[7] << 8 | data[8]: number of items or length, or 0 if not applicable.
             //
             uint16_t request = (uint16_t)data[0] << 8 | data[1];
+            uint8_t type = data[2];
 
             char buffer[7];
             sprintf_P(buffer, PSTR("0x%04X"), request);
@@ -2654,12 +2678,12 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 //   - type = 2: choose line in data[5] << 8 | data[6]
                 // * request == 0x08FF:
                 //   - type = 1: request list starting at data[5] << 8 | data[6], length in data[7] << 8 | data[8]
+                type,
 
-                data[2],
-                data[2] == 0x00 ? "REQ_LIST_LENGTH" :
-                    data[2] == 0x01 ? "REQ_LIST" :
-                    data[2] == 0x02 ? "CHOOSE" :
-                    "??"
+                type == 0x00 ? "REQ_LIST_LENGTH" :
+                type == 0x01 ? "REQ_LIST" :
+                type == 0x02 ? "CHOOSE" :
+                "??"
             );
 
             if (data[3] != 0x00)
@@ -2836,7 +2860,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#8FC
 
             // Print only if not duplicate of previous packet
-            static uint8_t packetData[MAX_DATA_BYTES] = "";  // Previous packet data
+            static uint8_t packetData[VAN_MAX_DATA_BYTES] = "";  // Previous packet data
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
@@ -2916,7 +2940,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // 0E8ECC 1181 30F0
 
             // Print only if not duplicate of previous packet
-            static uint8_t packetData[MAX_DATA_BYTES] = "";  // Previous packet data
+            static uint8_t packetData[VAN_MAX_DATA_BYTES] = "";  // Previous packet data
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
@@ -2940,12 +2964,12 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 cdcCommand == 0x1183 ? "PLAY" :
                 cdcCommand == 0x31FE ? "PREVIOUS_TRACK" :
                 cdcCommand == 0x31FF ? "NEXT_TRACK" :
-                cdcCommand == 0x4101 ? "CD 1" :
-                cdcCommand == 0x4102 ? "CD 2" :
-                cdcCommand == 0x4103 ? "CD 3" :
-                cdcCommand == 0x4104 ? "CD 4" :
-                cdcCommand == 0x4105 ? "CD 5" :
-                cdcCommand == 0x4106 ? "CD 6" :
+                cdcCommand == 0x4101 ? "CD_1" :
+                cdcCommand == 0x4102 ? "CD_2" :
+                cdcCommand == 0x4103 ? "CD_3" :
+                cdcCommand == 0x4104 ? "CD_4" :
+                cdcCommand == 0x4105 ? "CD_5" :
+                cdcCommand == 0x4106 ? "CD_6" :
                 cdcCommand == 0x41FE ? "PREVIOUS_CD" :
                 cdcCommand == 0x41FF ? "NEXT_CD" :
                 buffer
@@ -2959,7 +2983,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#8D4
 
             // Print only if not duplicate of previous packet
-            static uint8_t packetData[MAX_DATA_BYTES] = "";  // Previous packet data
+            static uint8_t packetData[VAN_MAX_DATA_BYTES] = "";  // Previous packet data
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
@@ -3011,22 +3035,35 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 if (dataLen == 11)
                 {
                     SERIAL.printf(
-                        "    power=%s, source=%s,%s,%s,\n"
+                        "    power=%s, source=%s,\n"
                         "    volume=%u%s, balance=%d%s, fader=%d%s, bass=%d%s, treble=%d%s\n",
                         data[2] & 0x01 ? "ON" : "OFF",
-                        data[4] & 0x04 ? "CD_CHANGER" : "",
-                        data[4] & 0x02 ? "INTERNAL_CD_OR_TAPE" : "",
-                        data[4] & 0x01 ? "TUNER" : "",
+
+                        (data[4] & 0x0F) == 0x00 ? "NONE" :  // source
+                        (data[4] & 0x0F) == 0x01 ? "TUNER" :
+                        (data[4] & 0x0F) == 0x02 ? "INTERNAL_CD_OR_TAPE" :
+                            // TODO - is this applicable:
+                            // data[4] & 0x20 ? "TAPE" : 
+                            // data[4] & 0x40 ? "INTERNAL_CD" : 
+                        (data[4] & 0x0F) == 0x03 ? "CD_CHANGER" :
+
+                        // This is the "default" mode for the head unit, to sit there and listen to the navigation
+                        // audio. The navigation audio volume is also always set (usually a lot higher than the radio)
+                        // whenever this source is chosen.
+                        (data[4] & 0x0F) == 0x05 ? "NAVIGATION_AUDIO" :
+
+                        "???",
+
                         data[5] & 0x7F,
-                        data[5] & 0x80 ? "<UPD>" : "",
+                        data[5] & 0x80 ? "(UPD)" : "",
                         (sint8_t)(0x3F) - (data[6] & 0x7F),
-                        data[6] & 0x80 ? "<UPD>" : "",
+                        data[6] & 0x80 ? "(UPD)" : "",
                         (sint8_t)(0x3F) - (data[7] & 0x7F),
-                        data[7] & 0x80 ? "<UPD>" : "",
+                        data[7] & 0x80 ? "(UPD)" : "",
                         (sint8_t)(data[8] & 0x7F) - 0x3F,
-                        data[8] & 0x80 ? "<UPD>" : "",
+                        data[8] & 0x80 ? "(UPD)" : "",
                         (sint8_t)(data[9] & 0x7F) - 0x3F,
-                        data[9] & 0x80 ? "<UPD>" : ""
+                        data[9] & 0x80 ? "(UPD)" : ""
                     );
                 } // if
             }
@@ -3038,11 +3075,8 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
-                char buffer[3];
-                sprintf_P(buffer, PSTR("%u"), data[1] & 0x1F);
-
-                SERIAL.printf("command=HEAD_UNIT_UPDATE_VOLUME, param=%s(%s%s)\n",
-                    buffer,
+                SERIAL.printf("command=HEAD_UNIT_UPDATE_VOLUME, param=%u(%s%s)\n",
+                    data[1] & 0x1F,
                     data[1] & 0x40 ? "relative: " : "absolute",
                     data[1] & 0x40 ?
                         data[1] & 0x20 ? "decrease" : "increase" :
@@ -3076,6 +3110,12 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             }
             else if (data[0] == 0x27)
             {
+                if (dataLen != 2)
+                {
+                    SERIAL.println("[unexpected packet length]");
+                    return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
+                } // if
+
                 SERIAL.printf("preset_request band=%s, preset=%u\n",
                     TunerBandStr(data[1] >> 4 & 0x07),
                     data[1] & 0x0F
@@ -3091,10 +3131,10 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
 
                 SERIAL.printf("command=REQUEST_CD, param=%s\n",
                     data[1] == 0x02 ? "PAUSE" :
-                        data[1] == 0x03 ? "PLAY" :
-                        data[3] == 0xFF ? "NEXT" :
-                        data[3] == 0xFE ? "PREVIOUS" :
-                        "??"
+                    data[1] == 0x03 ? "PLAY" :
+                    data[3] == 0xFF ? "NEXT" :
+                    data[3] == 0xFE ? "PREVIOUS" :
+                    "??"
                 );
             }
             else if (data[0] == 0xD1)
@@ -3131,7 +3171,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
             {
                 SERIAL.printf("0x%02X [to be decoded]\n", data[0]);
 
-                return VAN_PACKET_PARSE_TO_BE_DECODED_IDEN;
+                return VAN_PACKET_PARSE_TO_BE_DECODED;
             } // if
         }
         break;
@@ -3140,7 +3180,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
         {
             SERIAL.print("--> Aircon diag: ");
             SERIAL.println("[to be decoded]");
-            return VAN_PACKET_PARSE_TO_BE_DECODED_IDEN;
+            return VAN_PACKET_PARSE_TO_BE_DECODED;
         }
         break;
 
@@ -3148,7 +3188,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
         {
             SERIAL.print("--> Aircon diag command: ");
             SERIAL.println("[to be decoded]");
-            return VAN_PACKET_PARSE_TO_BE_DECODED_IDEN;
+            return VAN_PACKET_PARSE_TO_BE_DECODED;
         }
         break;
 
@@ -3194,7 +3234,7 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
                 (uint32_t)data[9] << 16 | (uint32_t)data[10] << 8 | data[11]
             );
 
-            return VAN_PACKET_PARSE_TO_BE_DECODED_IDEN;
+            return VAN_PACKET_PARSE_TO_BE_DECODED;
         }
         break;
 
@@ -3206,23 +3246,24 @@ int ParseVanPacket(TVanPacketRxDesc* pkt)
     } // switch
 
     return VAN_PACKET_PARSE_OK;
-}
+} // ParseVanPacket
 
 void setup()
 {
+    delay(1000);
     SERIAL.begin(115200);
     SERIAL.println("Starting VAN bus packet parser");
-    VanBus.Setup(RECV_PIN);
+    VanBusRx.Setup(RX_PIN);
 } // setup
 
 void loop()
 {
     int n = 0;
-    while (VanBus.Available())
+    while (VanBusRx.Available())
     {
         TVanPacketRxDesc pkt;
         bool isQueueOverrun;
-        VanBus.Receive(pkt, &isQueueOverrun);
+        VanBusRx.Receive(pkt, &isQueueOverrun);
 
         if (isQueueOverrun) SERIAL.print("QUEUE OVERRUN!\n");
 
@@ -3321,7 +3362,7 @@ void loop()
         // } // if
 
         // Show packet as parsed by ISR
-        int parseResult = ParseVanPacket(&pkt);
+        VanPacketParseResult_t parseResult = ParseVanPacket(&pkt);
 
         // Show byte content only for packets that are not a duplicate of a previously received packet
         if (parseResult != VAN_PACKET_DUPLICATE) pkt.DumpRaw(SERIAL);
@@ -3335,7 +3376,7 @@ void loop()
     if (millis() - lastUpdate >= 5000UL) // Arithmetic has safe roll-over
     {
         lastUpdate = millis();
-        VanBus.DumpStats(SERIAL);
+        VanBusRx.DumpStats(SERIAL);
     } // if
 
     delay(1); // Give some time to system to process other things?
