@@ -81,11 +81,13 @@ void loop()
     TVanPacketRxDesc pkt;
     if (VanBusRx.Receive(pkt))
     {
-        // Fully dump bit timings for packets that have CRC ERROR, for further analysis
-        if (! pkt.CheckCrcAndRepair()) pkt.getIsrDebugPacket().Dump(Serial);
+        bool crcOk = pkt.CheckCrcAndRepair();
 
         // Show byte content of packet
         pkt.DumpRaw(Serial);
+
+        // Fully dump bit timings for packets that have CRC ERROR, for further analysis
+        if (! crcOk) pkt.getIsrDebugPacket().Dump(Serial);
     } // if
 
     // Print some boring statistics every minute or so
