@@ -69,7 +69,7 @@ struct TIsrDebugData
     uint32_t nCyclesProcessing;
     uint8_t pinLevel;
     uint8_t pinLevelAtReturnFromIsr;
-    uint8_t slot;
+    uint8_t slot;  // in RxQueue
 }; // struct TIsrDebugData
 
 // Buffer of ISR invocation data
@@ -166,6 +166,7 @@ class TVanPacketRxDesc
     PacketAck_t ack;
     TIsrDebugPacket isrDebugPacket;  // For debugging of packet reception inside ISR
     uint32_t seqNo;
+    uint8_t slot;  // in RxQueue
 
     void Init()
     {

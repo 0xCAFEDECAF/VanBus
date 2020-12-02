@@ -130,7 +130,7 @@ void TVanPacketRxDesc::DumpRaw(Stream& s, char last) const
     s.printf("Raw: #%04u (%*u/%u) %2d(%2d) ",
         seqNo % 10000,
         VAN_RX_QUEUE_SIZE > 100 ? 3 : VAN_RX_QUEUE_SIZE > 10 ? 2 : 1,  // This is all compile-time
-        isrDebugPacket.samples[0].slot + 1,
+        slot + 1,
         VAN_RX_QUEUE_SIZE,
         size - 5 < 0 ? 0 : size - 5,
         size);
@@ -305,7 +305,10 @@ void ICACHE_RAM_ATTR SetTxBitTimer()
     {
         // Turn on the Tx bit timer
         timer1_attachInterrupt(VanBusRx.txTimerIsr);
+
+        // Clock to timer (prescaler) is always 80MHz, even F_CPU is 160 MHz
         timer1_enable(TIM_DIV16, TIM_EDGE, TIM_LOOP);
+
         timer1_write(VanBusRx.txTimerTicks);
     } // if
 } // SetTxBitTimer
@@ -318,6 +321,8 @@ void ICACHE_RAM_ATTR WaitAckIsr()
 
     VanBusRx._AdvanceHead();
 } // WaitAckIsr
+
+//#define VAN_RX_ISR_DEBUGGING
 
 // Pin level change interrupt handler
 void ICACHE_RAM_ATTR RxPinChangeIsr()
@@ -332,8 +337,6 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     uint32_t curr = ESP.getCycleCount();  // Store CPU cycle counter value as soon as possible
 
     // Return quickly when it is a spurious interrupt (pin level not changed).
-    // If been away for a long time (~ 15 bit times) then skip this check.
-    //if (nCycles < 10000 && pinLevelChangedTo == prevPinLevelChangedTo) return;
     if (pinLevelChangedTo == prevPinLevelChangedTo) return;
     prevPinLevelChangedTo = pinLevelChangedTo;
 
@@ -352,8 +355,9 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
  
     TVanPacketRxDesc* rxDesc = VanBusRx._head;
     PacketReadState_t state = rxDesc->state;
+    rxDesc->slot = rxDesc - VanBusRx.pool;
 
-//#if 0
+#ifdef VAN_RX_ISR_DEBUGGING
     // Record some data to be used for debugging outside this ISR
 
     TIsrDebugPacket* isrDebugPacket = &rxDesc->isrDebugPacket;
@@ -364,7 +368,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     {
         debugIsr->pinLevel = pinLevelChangedTo;
         debugIsr->nCycles = nCycles;
-        debugIsr->slot = rxDesc - VanBusRx.pool;
+        debugIsr->slot = rxDesc->slot;
     } // if
 
     // Just before returning from this ISR, record some data for debugging
@@ -378,7 +382,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         } \
         return; \
     }
-//#endif
+#endif // VAN_RX_ISR_DEBUGGING
 
     static unsigned int atBit = 0;
     static uint16_t readBits = 0;
@@ -504,8 +508,12 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             // Set a timeout for the ACK bit
             timer1_disable();
             timer1_attachInterrupt(WaitAckIsr);
+
+            // Clock to timer (prescaler) is always 80MHz, even F_CPU is 160 MHz
             timer1_enable(TIM_DIV16, TIM_EDGE, TIM_SINGLE);
-            timer1_write(12 * 5); // 1.5 time slots = 1.5 * 8 us = 12 us. TODO - correct value?
+
+            //timer1_write(12 * 5); // 1.5 time slots = 1.5 * 8 us = 12 us
+            timer1_write(16 * 5); // 2 time slots = 2 * 8 us = 12 us
 
             return;
         } // if
@@ -550,6 +558,9 @@ void TVanPacketRxQueue::Setup(uint8_t rxPin)
 
 void TIsrDebugPacket::Dump(Stream& s) const
 {
+#ifndef VAN_RX_ISR_DEBUGGING
+    s.println(F("No ISR debug data; please re-compile with VAN_RX_ISR_DEBUGGING defined"));
+#else
     // Parse packet outside ISR
 
     unsigned int atBit = 0;
@@ -572,8 +583,8 @@ void TIsrDebugPacket::Dump(Stream& s) const
 
     while (at > 2 && i < at)
     {
-        const TIsrDebugData* tailBuffer = samples + i;
-        uint8_t slot = tailBuffer->slot + 1;
+        const TIsrDebugData* isrData = samples + i;
+        uint8_t slot = isrData->slot + 1;
         if (i == 0)
         {
             s.printf_P(PSTR("%sSlot # CPU nCycles -> nBits pinLVLs data\n"), slot >= 10 ? " " : "");
@@ -585,11 +596,11 @@ void TIsrDebugPacket::Dump(Stream& s) const
 
         s.printf("%4u", i);
 
-        uint32_t nCyclesProcessing = tailBuffer->nCyclesProcessing;
+        uint32_t nCyclesProcessing = isrData->nCyclesProcessing;
         if (nCyclesProcessing > 999) s.printf(">999 ");
         else s.printf("%4lu ", nCyclesProcessing);
 
-        uint32_t nCycles = tailBuffer->nCycles;
+        uint32_t nCycles = isrData->nCycles;
         if (nCycles > 999999)
         {
             totalCycles = 0;
@@ -633,8 +644,8 @@ void TIsrDebugPacket::Dump(Stream& s) const
             s.printf("*%u ", nBits);
         } // if
 
-        unsigned char pinLevelChangedTo = tailBuffer->pinLevel;
-        unsigned char pinLevelAtReturnFromIsr = tailBuffer->pinLevelAtReturnFromIsr;
+        unsigned char pinLevelChangedTo = isrData->pinLevel;
+        unsigned char pinLevelAtReturnFromIsr = isrData->pinLevelAtReturnFromIsr;
         s.printf(" \"%u\",\"%u\" ", pinLevelChangedTo, pinLevelAtReturnFromIsr);
 
         // Sometimes the ISR is called very late; this is recognized as difference in pin levels:
@@ -746,7 +757,7 @@ void TIsrDebugPacket::Dump(Stream& s) const
     } // while
 
     #undef reset()
-
+#endif // VAN_RX_ISR_DEBUGGING
 } // TIsrDebugPacket::Dump
 
 TVanPacketRxQueue VanBusRx;

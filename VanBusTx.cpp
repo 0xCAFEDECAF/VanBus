@@ -214,7 +214,10 @@ void TVanPacketTxQueue::StartBitSendTimer()
         // Set a repetitive timer
         timer1_disable();
         timer1_attachInterrupt(SendBitIsr);
+
+        // Clock to timer (prescaler) is always 80MHz, even F_CPU is 160 MHz
         timer1_enable(TIM_DIV16, TIM_EDGE, TIM_LOOP);
+
         timer1_write(VAN_BIT_TIMER_TICKS);
     } // if
     interrupts();
