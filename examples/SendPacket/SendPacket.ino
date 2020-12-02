@@ -48,23 +48,24 @@ void setup()
 
 void loop()
 {
-
     TVanPacketRxDesc pkt;
     if (VanBus.Receive(pkt))
     {
-        // Fully dump bit timings for packets that have CRC ERROR, for further analysis
-        if (! pkt.CheckCrcAndRepair()) pkt.getIsrDebugPacket().Dump(Serial);
+        bool crcOk = pkt.CheckCrcAndRepair();
 
         // Show byte content of packet
         pkt.DumpRaw(Serial);
+
+        // Fully dump bit timings for packets that have CRC ERROR, for further analysis
+        if (! crcOk) pkt.getIsrDebugPacket().Dump(Serial);
     } // if
 
-    static unsigned long lastSent = 0;
+    static unsigned long lastSentAt = 0;
 
     // Write packet every 0.1 seconds
-    if (millis() - lastSent >= 100UL) // Arithmetic has safe roll-over
+    if (millis() - lastSentAt >= 100UL) // Arithmetic has safe roll-over
     {
-        lastSent = millis();
+        lastSentAt = millis();
 
         // Alternately send exterior temperature 8 and 16 deg C to the multifunction display (MFD).
         // Note: the MFD will average out the received values, ending up showing 12 deg C.
