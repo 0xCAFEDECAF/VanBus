@@ -1,5 +1,5 @@
 /*
- * VanBus: AllMfdWarnings - send all MFD warnings, one by one
+ * VanBus: DisplayNotifications - send all MFD warnings, one by one
  *
  * Written by Erik Tromp
  *
@@ -43,7 +43,7 @@ void setup()
 
     delay(1000);
     Serial.begin(115200);
-    Serial.println("Starting to send all MFD warnings, one by one");
+    Serial.println("Starting to send all MFD notifications, one by one");
 } // setup
 
 void loop()
