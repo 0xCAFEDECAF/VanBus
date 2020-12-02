@@ -2531,7 +2531,7 @@ void PrintPacketDataDiff(TVanPacketRxDesc& pkt, IdenHandler_t* handler)
     const uint8_t* data = pkt.Data();
 
     // First print only the differing bytes from the previous packet
-    Serial.printf("%03X (%s) ", iden, handler->idenStr);
+    Serial.printf("DIFF: %03X (%s) ", iden, handler->idenStr);
     for (int i = 0; i < dataLen; i++)
     {
         char diffByte[3] = "  ";
@@ -2547,7 +2547,7 @@ void PrintPacketDataDiff(TVanPacketRxDesc& pkt, IdenHandler_t* handler)
     memcpy(handler->prevData, data, dataLen);
 
     // Now print the new packet's data
-    Serial.printf("%03X (%s) ", iden, handler->idenStr);
+    Serial.printf("FULL: %03X (%s) ", iden, handler->idenStr);
     for (int i = 0; i < dataLen; i++) Serial.printf("%02X%c", data[i], i < dataLen - 1 ? '-' : '\n');
 } // PrintPacketDataDiff
 
@@ -2629,14 +2629,15 @@ const char* ParseVanPacketToJson(TVanPacketRxDesc& pkt)
         PrintPacketDataDiff(pkt, handler);
 
         int result = handler->parser(handler->idenStr, pkt, jsonBuffer, JSON_BUFFER_SIZE);
+
+        #ifdef PRINT_JSON_BUFFERS_ON_SERIAL
         if (result == VAN_PACKET_PARSE_OK)
         {
-            Serial.printf_P(PSTR("Parsed: %s (0x%03X)"), handler->idenStr, iden);
-            #ifdef PRINT_JSON_BUFFERS_ON_SERIAL
-            Serial.print(F(": "));
+            Serial.printf_P(PSTR("Parsed: %s (0x%03X): "), handler->idenStr, iden);
             Serial.println(jsonBuffer);
-            #endif // PRINT_JSON_BUFFERS_ON_SERIAL
         } // if
+        #endif // PRINT_JSON_BUFFERS_ON_SERIAL
+
         return jsonBuffer;
     } // if
 
