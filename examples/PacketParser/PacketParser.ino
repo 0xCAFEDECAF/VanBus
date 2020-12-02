@@ -1439,7 +1439,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     SERIAL.printf_P(PSTR("band=%s, memory=%u, %S=\"%\"\n"),
                         TunerBandStr(data[2] >> 4 & 0x07),
                         data[2] & 0x0F,
-                        data[2] & 0x80 ? PSTR("RDS_TEXT") : PSTR("FREQUECY"),
+                        data[2] & 0x80 ? PSTR("RDS_TEXT") : PSTR("FREQUENCY"),
                         rdsOrFreqTxt
                     );
                 }
