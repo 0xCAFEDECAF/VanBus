@@ -1,10 +1,9 @@
 /*
- * VanBus packet parser
- * Shrink-wraps the data of recognized packets neatly into a JSON format
+ * VanBus packet parser - Shrink-wraps the data of recognized packets neatly into a JSON format
  *
  * Written by Erik Tromp
  *
- * Version 0.1 - June, 2020
+ * Version 0.0.2 - December, 2020
  *
  * MIT license, all text above must be included in any redistribution.   
  */
@@ -12,7 +11,7 @@
 // Uncomment to see the JSON buffers printed on the Serial port
 //#define PRINT_JSON_BUFFERS_ON_SERIAL
 
-#define JSON_BUFFER_SIZE 1024
+#define JSON_BUFFER_SIZE 2048
 char jsonBuffer[JSON_BUFFER_SIZE];
 
 enum VanPacketParseResult_t
@@ -33,13 +32,54 @@ struct IdenHandler_t
     char* idenStr;
     int dataLen;
     TPacketParser parser;
-    uint8_t prevData[VAN_MAX_DATA_BYTES];
+    uint8_t* prevData;
 }; // struct IdenHandler_t
+
+// Often used string constants
+static const char PROGMEM emptyStr[] = "";
+static const char PROGMEM onStr[] = "ON";
+static const char PROGMEM offStr[] = "OFF";
+static const char PROGMEM yesStr[] = "YES";
+static const char PROGMEM noStr[] = "NO";
+static const char PROGMEM presentStr[] = "PRESENT";
+static const char PROGMEM notPresentStr[] = "NOT_PRESENT";
+static const char PROGMEM noneStr[] = "NONE";
+static const char PROGMEM updatedStr[] = "(UPD)";
 
 inline uint8_t GetBcd(uint8_t bcd)
 {
     return (bcd >> 4 & 0x0F) * 10 + (bcd & 0x0F);
 } // GetBcd
+
+// Uses statically allocated buffer, so don't call twice within the same printf invocation 
+char* ToHexStr(uint8_t data)
+{
+    #define MAX_UINT8_HEX_STR_SIZE 5
+    static char buffer[MAX_UINT8_HEX_STR_SIZE];
+    sprintf_P(buffer, PSTR("0x%02X"), data);
+
+    return buffer;
+} // ToHexStr
+
+// Uses statically allocated buffer, so don't call twice within the same printf invocation 
+char* ToHexStr(uint8_t data1, uint8_t data2)
+{
+    #define MAX_2_UINT8_HEX_STR_SIZE 10
+    static char buffer[MAX_2_UINT8_HEX_STR_SIZE];
+    sprintf_P(buffer, PSTR("0x%02X-0x%02X"), data1, data2);
+
+    return buffer;
+} // ToHexStr
+
+// Uses statically allocated buffer, so don't call twice within the same printf invocation 
+char* ToHexStr(uint16_t data)
+{
+    #define MAX_UINT16_HEX_STR_SIZE 7
+    static char buffer[MAX_UINT16_HEX_STR_SIZE];
+    sprintf_P(buffer, PSTR("0x%04X"), data);
+
+    return buffer;
+} // ToHexStr
 
 // Tuner band
 enum TunerBand_t
@@ -53,17 +93,18 @@ enum TunerBand_t
     TB_PTY_SELECT = 7
 }; // enum TunerBand_t
 
+// Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
 const char* TunerBandStr(uint8_t data)
 {
     return
-        data == TB_NONE ? "NONE" :
-        data == TB_FM1 ? "FM1" :
-        data == TB_FM2 ? "FM2" :
-        data == TB_FM3 ? "FM3" :  // Never seen, just guessing
-        data == TB_FMAST ? "FMAST" :
-        data == TB_AM ? "AM" :
-        data == TB_PTY_SELECT ? "PTY_SELECT" :  // When selecting PTY to scan for
-        "??";
+        data == TB_NONE ? noneStr :
+        data == TB_FM1 ? PSTR("FM1") :
+        data == TB_FM2 ? PSTR("FM2") :
+        data == TB_FM3 ? PSTR("FM3") :  // Never seen, just guessing
+        data == TB_FMAST ? PSTR("FMAST") :
+        data == TB_AM ? PSTR("AM") :
+        data == TB_PTY_SELECT ? PSTR("PTY_SELECT") :  // When selecting PTY to scan for
+        ToHexStr(data);
 } // TunerBandStr
 
 // Tuner scan mode
@@ -87,88 +128,92 @@ enum TunerScanMode_t
     TS_FM_AST = 7
 }; // enum TunerScanMode_t
 
+// Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
 const char* TunerScanModeStr(uint8_t data)
 {
     return
-        data == TS_NOT_SEARCHING ? "NOT_SEARCHING" :
-        data == TS_MANUAL ? "MANUAL_TUNING" :
-        data == TS_BY_FREQUENCY ? "SCANNING_BY_FREQUENCY" :
-        data == TS_BY_MATCHING_PTY ? "SCANNING_MATCHING_PTY" : // Scanning for station with matching PTY
-        data == TS_FM_AST ? "FM_AST_SEARCH" : // Auto-station search in the FMAST band (long-press Radio Band button)
-        "??";
+        data == TS_NOT_SEARCHING ? PSTR("NOT_SEARCHING") :
+        data == TS_MANUAL ? PSTR("MANUAL_TUNING") :
+        data == TS_BY_FREQUENCY ? PSTR("SCANNING_BY_FREQUENCY") :
+        data == TS_BY_MATCHING_PTY ? PSTR("SCANNING_MATCHING_PTY") : // Scanning for station with matching PTY
+        data == TS_FM_AST ? PSTR("FM_AST_SEARCH") : // Auto-station search in the FMAST band (long-press Radio Band button)
+        ToHexStr(data);
 } // TunerScanModeStr
 
+// Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
 const char* PtyStr(uint8_t ptyCode)
 {
     // See also:
     // https://www.electronics-notes.com/articles/audio-video/broadcast-audio/rds-radio-data-system-pty-codes.php
     return
-        ptyCode == 0 ? "Not defined" :
-        ptyCode == 1 ? "News" :
-        ptyCode == 2 ? "Current affairs" :
-        ptyCode == 3 ? "Information" :
-        ptyCode == 4 ? "Sport" :
-        ptyCode == 5 ? "Education" :
-        ptyCode == 6 ? "Drama" :
-        ptyCode == 7 ? "Culture" :
-        ptyCode == 8 ? "Science" :
-        ptyCode == 9 ? "Varied" :
-        ptyCode == 10 ? "Pop Music" :
-        ptyCode == 11 ? "Rock Music" :
-        ptyCode == 12 ? "Easy Listening" :  // also: "Middle of the road music"
-        ptyCode == 13 ? "Light Classical" :
-        ptyCode == 14 ? "Serious Classical" :
-        ptyCode == 15 ? "Other Music" :
-        ptyCode == 16 ? "Weather" :
-        ptyCode == 17 ? "Finance" :
-        ptyCode == 18 ? "Children's Programmes" :
-        ptyCode == 19 ? "Social Affairs" :
-        ptyCode == 20 ? "Religion" :
-        ptyCode == 21 ? "Phone-in" :
-        ptyCode == 22 ? "Travel" :
-        ptyCode == 23 ? "Leisure" :
-        ptyCode == 24 ? "Jazz Music" :
-        ptyCode == 25 ? "Country Music" :
-        ptyCode == 26 ? "National Music" :
-        ptyCode == 27 ? "Oldies Music" :
-        ptyCode == 28 ? "Folk Music" :
-        ptyCode == 29 ? "Documentary" :
-        ptyCode == 30 ? "Alarm Test" :
-        ptyCode == 31 ? "Alarm" :
-        "??";
+        ptyCode == 0 ? PSTR("Not defined") :
+        ptyCode == 1 ? PSTR("News") :
+        ptyCode == 2 ? PSTR("Current affairs") :
+        ptyCode == 3 ? PSTR("Information") :
+        ptyCode == 4 ? PSTR("Sport") :
+        ptyCode == 5 ? PSTR("Education") :
+        ptyCode == 6 ? PSTR("Drama") :
+        ptyCode == 7 ? PSTR("Culture") :
+        ptyCode == 8 ? PSTR("Science") :
+        ptyCode == 9 ? PSTR("Varied") :
+        ptyCode == 10 ? PSTR("Pop Music") :
+        ptyCode == 11 ? PSTR("Rock Music") :
+        ptyCode == 12 ? PSTR("Easy Listening") :  // also: "Middle of the road music"
+        ptyCode == 13 ? PSTR("Light Classical") :
+        ptyCode == 14 ? PSTR("Serious Classical") :
+        ptyCode == 15 ? PSTR("Other Music") :
+        ptyCode == 16 ? PSTR("Weather") :
+        ptyCode == 17 ? PSTR("Finance") :
+        ptyCode == 18 ? PSTR("Children's Programmes") :
+        ptyCode == 19 ? PSTR("Social Affairs") :
+        ptyCode == 20 ? PSTR("Religion") :
+        ptyCode == 21 ? PSTR("Phone-in") :
+        ptyCode == 22 ? PSTR("Travel") :
+        ptyCode == 23 ? PSTR("Leisure") :
+        ptyCode == 24 ? PSTR("Jazz Music") :
+        ptyCode == 25 ? PSTR("Country Music") :
+        ptyCode == 26 ? PSTR("National Music") :
+        ptyCode == 27 ? PSTR("Oldies Music") :
+        ptyCode == 28 ? PSTR("Folk Music") :
+        ptyCode == 29 ? PSTR("Documentary") :
+        ptyCode == 30 ? PSTR("Alarm Test") :
+        ptyCode == 31 ? PSTR("Alarm") :
+        ToHexStr(ptyCode);
 } // PtyStr
 
+// Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
 const char* RadioPiCountry(uint8_t countryCode)
 {
     // https://radio-tv-nederland.nl/rds/PI%20codes%20Europe.jpg
     // More than one country is assigned to the same code, just listing the most likely.
     return
-        countryCode == 0x01 || countryCode == 0x0D ? "Germany" :
-        countryCode == 0x02 ? "Ireland" :
-        countryCode == 0x03 ? "Poland" :
-        countryCode == 0x04 ? "Switzerland" :
-        countryCode == 0x05 ? "Italy" :
-        countryCode == 0x06 ? "Belgium" :
-        countryCode == 0x07 ? "Luxemburg" :
-        countryCode == 0x08 ? "Netherlands" :
-        countryCode == 0x09 ? "Denmark" :
-        countryCode == 0x0A ? "Austria" :
-        countryCode == 0x0B ? "Hungary" :
-        countryCode == 0x0C ? "UK" :
-        countryCode == 0x0E ? "Spain" :
-        countryCode == 0x0F ? "France" :
-        "???";
+        countryCode == 0x01 || countryCode == 0x0D ? PSTR("Germany") :
+        countryCode == 0x02 ? PSTR("Ireland") :
+        countryCode == 0x03 ? PSTR("Poland") :
+        countryCode == 0x04 ? PSTR("Switzerland") :
+        countryCode == 0x05 ? PSTR("Italy") :
+        countryCode == 0x06 ? PSTR("Belgium") :
+        countryCode == 0x07 ? PSTR("Luxemburg") :
+        countryCode == 0x08 ? PSTR("Netherlands") :
+        countryCode == 0x09 ? PSTR("Denmark") :
+        countryCode == 0x0A ? PSTR("Austria") :
+        countryCode == 0x0B ? PSTR("Hungary") :
+        countryCode == 0x0C ? PSTR("UK") :
+        countryCode == 0x0E ? PSTR("Spain") :
+        countryCode == 0x0F ? PSTR("France") :
+        ToHexStr(countryCode);
 } // RadioPiCountry
 
+// Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
 const char* RadioPiAreaCoverage(uint8_t coverageCode)
 {
     // https://www.pira.cz/rds/show.asp?art=rds_encoder_support
     return
-        coverageCode == 0x00 ? "local" :
-        coverageCode == 0x01 ? "international" :
-        coverageCode == 0x02 ? "national" :
-        coverageCode == 0x03 ? "supra-regional" :
-        "regional";
+        coverageCode == 0x00 ? PSTR("local") :
+        coverageCode == 0x01 ? PSTR("international") :
+        coverageCode == 0x02 ? PSTR("national") :
+        coverageCode == 0x03 ? PSTR("supra-regional") :
+        PSTR("regional");
 } // RadioPiAreaCoverage
 
 // Seems to be used in bus packets with IDEN:
@@ -180,32 +225,30 @@ const char* RadioPiAreaCoverage(uint8_t coverageCode)
 // - MFD_TO_SATNAV_IDEN (0x94E): data[0]. Following values of data[1] seen:
 //   0x02, 0x05, 0x06, 0x08, 0x09, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x1B, 0x1C, 0x1D
 //
+// Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
 const char* SatNavRequestStr(uint8_t data)
 {
-    char buffer[5];
-    sprintf_P(buffer, PSTR("0x%02X"), data);
-
     return
-        data == 0x00 ? "ENTER_COUNTRY" :  // Never seen, just guessing
-        data == 0x01 ? "ENTER_PROVINCE" :  // Never seen, just guessing
-        data == 0x02 ? "ENTER_CITY" :
-        data == 0x03 ? "ENTER_DISTRICT" :  // Never seen, just guessing
-        data == 0x04 ? "ENTER_NEIGHBORHOOD" :  // Never seen, just guessing
-        data == 0x05 ? "ENTER_STREET" :
-        data == 0x06 ? "ENTER_HOUSE_NUMBER" :
-        data == 0x07 ? "ENTER_HOUSE_NUMBER_LETTER" :  // Never seen, just guessing
-        data == 0x08 ? "PLACE_OF_INTEREST_CATEGORY_LIST" :
-        data == 0x09 ? "PLACE_OF_INTEREST_CATEGORY" :
-        data == 0x0E ? "GPS_FOR_PLACE_OF_INTEREST" :
-        data == 0x0F ? "NEXT_STREET" : // Shown during navigation in the (solid line) top box
-        data == 0x10 ? "CURRENT_STREET" : // Shown during navigation in the (dashed line) bottom box
-        data == 0x11 ? "PRIVATE_ADDRESS" :
-        data == 0x12 ? "BUSINESS_ADDRESS" :
-        data == 0x13 ? "SOFTWARE_MODULE_VERSIONS" :
-        data == 0x1B ? "PRIVATE_ADDRESS_LIST" :
-        data == 0x1C ? "BUSINESS_ADDRESS_LIST" :
-        data == 0x1D ? "GPS_CHOOSE_DESTINATION" :
-        buffer;
+        data == 0x00 ? PSTR("ENTER_COUNTRY") :  // Never seen, just guessing
+        data == 0x01 ? PSTR("ENTER_PROVINCE") :  // Never seen, just guessing
+        data == 0x02 ? PSTR("ENTER_CITY") :
+        data == 0x03 ? PSTR("ENTER_DISTRICT") :  // Never seen, just guessing
+        data == 0x04 ? PSTR("ENTER_NEIGHBORHOOD") :  // Never seen, just guessing
+        data == 0x05 ? PSTR("ENTER_STREET") :
+        data == 0x06 ? PSTR("ENTER_HOUSE_NUMBER") :
+        data == 0x07 ? PSTR("ENTER_HOUSE_NUMBER_LETTER") :  // Never seen, just guessing
+        data == 0x08 ? PSTR("PLACE_OF_INTEREST_CATEGORY_LIST") :
+        data == 0x09 ? PSTR("PLACE_OF_INTEREST_CATEGORY") :
+        data == 0x0E ? PSTR("GPS_FOR_PLACE_OF_INTEREST") :
+        data == 0x0F ? PSTR("NEXT_STREET") : // Shown during navigation in the (solid line) top box
+        data == 0x10 ? PSTR("CURRENT_STREET") : // Shown during navigation in the (dashed line) bottom box
+        data == 0x11 ? PSTR("PRIVATE_ADDRESS") :
+        data == 0x12 ? PSTR("BUSINESS_ADDRESS") :
+        data == 0x13 ? PSTR("SOFTWARE_MODULE_VERSIONS") :
+        data == 0x1B ? PSTR("PRIVATE_ADDRESS_LIST") :
+        data == 0x1C ? PSTR("BUSINESS_ADDRESS_LIST") :
+        data == 0x1D ? PSTR("GPS_CHOOSE_DESTINATION") :
+        ToHexStr(data);
 } // SatNavRequestStr
 
 // Attempt to show a detailed SatNnav guidance instruction in "Ascii art"
@@ -228,50 +271,63 @@ const char* SatNavRequestStr(uint8_t data)
 //
 void PrintGuidanceInstruction(const uint8_t data[8])
 {
-    Serial.printf("      %s%s%s%s%s\n",
-        data[5] & 0x40 ? "(-)" : "   ",
-        data[5] & 0x80 ? "(-)" : "   ",
-        data[4] & 0x01 ? "(-)" : "   ",
-        data[4] & 0x02 ? "(-)" : "   ",
-        data[4] & 0x04 ? "(-)" : "   "
+    // String constants
+    static const char PROGMEM entryStr[] = "   ";
+    static const char PROGMEM noEntryStr[] = "(-)";
+    static const char PROGMEM legStr[] = ".";
+    static const char PROGMEM noLegStr[] = " ";
+    static const char PROGMEM goStraightAheadStr[] = "|";
+    static const char PROGMEM turnLeftStr[] = "-";
+    static const char PROGMEM turnRightStr[] = "-";
+    static const char PROGMEM turnHalfLeftStr[] = "\\";
+    static const char PROGMEM turnSharpRightStr[] = "\\";
+    static const char PROGMEM turnHalfRightStr[] = "/";
+    static const char PROGMEM turnSharpLeftStr[] = "/";
+
+    Serial.printf_P(PSTR("      %S%S%S%S%S\n"),
+        data[5] & 0x40 ? noEntryStr : entryStr,
+        data[5] & 0x80 ? noEntryStr : entryStr,
+        data[4] & 0x01 ? noEntryStr : entryStr,
+        data[4] & 0x02 ? noEntryStr : entryStr,
+        data[4] & 0x04 ? noEntryStr : entryStr
     );
-    Serial.printf("       %s  %s  %s  %s  %s\n",
-        data[0] == 6 ? "\\" : data[3] & 0x40 ? "." : " ",
-        data[0] == 7 ? "\\" : data[3] & 0x80 ? "." : " ",
-        data[0] == 8 ? "|" : data[2] & 0x01 ? "." : " ",
-        data[0] == 9 ? "/" : data[2] & 0x02 ? "." : " ",
-        data[0] == 10 ? "/" : data[2] & 0x04 ? "." : " "
+    Serial.printf_P(PSTR("       %S  %S  %S  %S  %S\n"),
+        data[0] == 6 ? turnHalfLeftStr : data[3] & 0x40 ? legStr : noLegStr,
+        data[0] == 7 ? turnHalfLeftStr : data[3] & 0x80 ? legStr : noLegStr,
+        data[0] == 8 ? goStraightAheadStr : data[2] & 0x01 ? legStr : noLegStr,
+        data[0] == 9 ? turnHalfRightStr : data[2] & 0x02 ? legStr : noLegStr,
+        data[0] == 10 ? turnHalfRightStr : data[2] & 0x04 ? legStr : noLegStr
     );
-    Serial.printf("    %s%s           %s%s\n",
-        data[5] & 0x20 ? "(-)" : "   ",
-        data[0] == 5 ? "-" : data[3] & 0x20 ? "." : " ",
-        data[0] == 11 ? "-" : data[2] & 0x08 ? "." : " ",
-        data[4] & 0x08 ? "(-)" : "   "
+    Serial.printf_P(PSTR("    %S%S           %S%S\n"),
+        data[5] & 0x20 ? noEntryStr : entryStr,
+        data[0] == 5 ? turnLeftStr : data[3] & 0x20 ? legStr : noLegStr,
+        data[0] == 11 ? turnRightStr : data[2] & 0x08 ? legStr : noLegStr,
+        data[4] & 0x08 ? noEntryStr : entryStr
     );
-    Serial.printf("    %s%s     +     %s%s\n",
-        data[5] & 0x10 ? "(-)" : "   ",
-        data[0] == 4 ? "-" : data[3] & 0x10 ? "." : " ",
-        data[0] == 12 ? "-" : data[2] & 0x10 ? "." : " ",
-        data[4] & 0x10 ? "(-)" : "   "
+    Serial.printf_P(PSTR("    %S%S     +     %S%S\n"),
+        data[5] & 0x10 ? noEntryStr : entryStr,
+        data[0] == 4 ? turnLeftStr : data[3] & 0x10 ? legStr : noLegStr,
+        data[0] == 12 ? turnRightStr : data[2] & 0x10 ? legStr : noLegStr,
+        data[4] & 0x10 ? noEntryStr : entryStr
     );
-    Serial.printf("    %s%s     |     %s%s\n",
-        data[5] & 0x08 ? "(-)" : "   ",
-        data[0] == 3 ? "-" : data[3] & 0x08 ? "." : " ",
-        data[0] == 13 ? "-" : data[2] & 0x20 ? "." : " ",
-        data[4] & 0x20 ? "(-)" : "   "
+    Serial.printf_P(PSTR("    %S%S     |     %S%S\n"),
+        data[5] & 0x08 ? noEntryStr : entryStr,
+        data[0] == 3 ? turnLeftStr : data[3] & 0x08 ? legStr : noLegStr,
+        data[0] == 13 ? turnRightStr : data[2] & 0x20 ? legStr : noLegStr,
+        data[4] & 0x20 ? noEntryStr : entryStr
     );
-    Serial.printf("       %s  %s  |  %s  %s\n",
-        data[0] == 2 ? "/" : data[3] & 0x04 ? "." : " ",
-        data[0] == 1 ? "/" : data[3] & 0x02 ? "." : " ",
-        data[0] == 14 ? "\\" : data[3] & 0x40 ? "." : " ",
-        data[0] == 15 ? "\\" : data[3] & 0x80 ? "." : " "
+    Serial.printf_P(PSTR("       %S  %S  |  %S  %S\n"),
+        data[0] == 2 ? turnSharpLeftStr : data[3] & 0x04 ? legStr : noLegStr,
+        data[0] == 1 ? turnSharpLeftStr : data[3] & 0x02 ? legStr : noLegStr,
+        data[0] == 14 ? turnSharpRightStr : data[3] & 0x40 ? legStr : noLegStr,
+        data[0] == 15 ? turnSharpRightStr : data[3] & 0x80 ? legStr : noLegStr
     );
-    Serial.printf("      %s%s%s%s%s\n",
-        data[5] & 0x04 ? "(-)" : "   ",
-        data[5] & 0x02 ? "(-)" : "   ",
-        data[5] & 0x01 ? "(-)" : "   ",
-        data[4] & 0x40 ? "(-)" : "   ",
-        data[4] & 0x80 ? "(-)" : "   "
+    Serial.printf_P(PSTR("      %S%S%S%S%S\n"),
+        data[5] & 0x04 ? noEntryStr : entryStr,
+        data[5] & 0x02 ? noEntryStr : entryStr,
+        data[5] & 0x01 ? noEntryStr : entryStr,
+        data[4] & 0x40 ? noEntryStr : entryStr,
+        data[4] & 0x80 ? noEntryStr : entryStr
     );
 } // PrintGuidanceInstruction
 
@@ -292,13 +348,14 @@ const char* PacketRawToStr(TVanPacketRxDesc& pkt)
 // Dump the raw packet data into a JSON object
 VanPacketParseResult_t DefaultPacketParser(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, int n)
 {
-    static char jsonFormatter[] PROGMEM = R"===(
-    {
-        "event": "display",
-        "data": {
-            "%s": "%s"
-        }
-    })===";
+    const static char jsonFormatter[] PROGMEM =
+    "{\n"
+        "\"event\": \"display\",\n"
+        "\"data\":\n"
+        "{\n"
+            "\"%s\": \"%s\"\n"
+        "}\n"
+    "}\n";
 
     snprintf_P(buf, n, jsonFormatter, idenStr, PacketRawToStr(pkt));
 
@@ -311,13 +368,14 @@ VanPacketParseResult_t ParseVinPkt(const char* idenStr, TVanPacketRxDesc& pkt, c
     // http://graham.auld.me.uk/projects/vanbus/packets.html#E24
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#E24
 
-    static char jsonFormatter[] PROGMEM = R"===(
-    {
-        "event": "display",
-        "data": {
-            "vin": "%-17.17s"
-        }
-    })===";
+    const static char jsonFormatter[] PROGMEM =
+    "{\n"
+        "\"event\": \"display\",\n"
+        "\"data\":\n"
+        "{\n"
+            "\"vin\": \"%-17.17s\"\n"
+        "}\n"
+    "}\n";
 
     snprintf_P(buf, n, jsonFormatter, pkt.Data());
 
@@ -331,22 +389,23 @@ VanPacketParseResult_t ParseEnginePkt(const char* idenStr, TVanPacketRxDesc& pkt
 
     const uint8_t* data = pkt.Data();
 
-    static char jsonFormatter[] PROGMEM = R"===(
-    {
-        "event": "display",
-        "data": {
-            "dash_light": "%S",
-            "dash_actual_brightness": "%u",
-            "contact_key_position": "%s",
-            "engine": "%s",
-            "economy_mode": "%s",
-            "in_reverse": "%s",
-            "trailer": "%s",
-            "water_temp": "%s",
-            "odometer_1": "%s",
-            "exterior_temperature": "%s"
-        }
-    })===";
+    const static char jsonFormatter[] PROGMEM =
+    "{\n"
+        "\"event\": \"display\",\n"
+        "\"data\":\n"
+        "{\n"
+            "\"dash_light\": \"%S\",\n"
+            "\"dash_actual_brightness\": \"%u\",\n"
+            "\"contact_key_position\": \"%S\",\n"
+            "\"engine\": \"%S\",\n"
+            "\"economy_mode\": \"%S\",\n"
+            "\"in_reverse\": \"%S\",\n"
+            "\"trailer\": \"%S\",\n"
+            "\"water_temp\": \"%s\",\n"
+            "\"odometer_1\": \"%s\",\n"
+            "\"exterior_temperature\": \"%s\"\n"
+        "}\n"
+    "}\n";
 
     char floatBuf[3][MAX_FLOAT_SIZE];
     snprintf_P(buf, n, jsonFormatter,
@@ -354,16 +413,16 @@ VanPacketParseResult_t ParseEnginePkt(const char* idenStr, TVanPacketRxDesc& pkt
         data[0] & 0x80 ? PSTR("FULL") : PSTR("DIMMED (LIGHTS ON)"),
         data[0] & 0x0F,
 
-        (data[1] & 0x03) == 0x00 ? "OFF" :
-            (data[1] & 0x03) == 0x01 ? "ACC" :
-            (data[1] & 0x03) == 0x03 ? "ON" :
-            (data[1] & 0x03) == 0x02 ? "START_ENGINE" :
-            "??",
+        (data[1] & 0x03) == 0x00 ? offStr :
+            (data[1] & 0x03) == 0x01 ? PSTR("ACC") :
+            (data[1] & 0x03) == 0x03 ? onStr :
+            (data[1] & 0x03) == 0x02 ? PSTR("START_ENGINE") :
+            ToHexStr((uint8_t)(data[1] & 0x03)),
 
-        data[1] & 0x04 ? "RUNNING" : "OFF",
-        data[1] & 0x10 ? "ON" : "OFF",
-        data[1] & 0x20 ? "YES" : "NO",
-        data[1] & 0x40 ? "PRESENT" : "NOT_PRESENT",
+        data[1] & 0x04 ? PSTR("RUNNING") : offStr,
+        data[1] & 0x10 ? onStr : offStr,
+        data[1] & 0x20 ? yesStr : noStr,
+        data[1] & 0x40 ? presentStr : notPresentStr,
         data[2] == 0xFF ? "---" : FloatToStr(floatBuf[0], data[2] - 39, 0),  // TODO - or: data[2] / 2
         FloatToStr(floatBuf[1], ((uint32_t)data[3] << 16 | (uint32_t)data[4] << 8 | data[5]) / 10.0, 1),
         FloatToStr(floatBuf[2], (data[6] - 0x50) / 2.0, 1)
@@ -379,23 +438,24 @@ VanPacketParseResult_t ParseHeadUnitStalkPkt(const char* idenStr, TVanPacketRxDe
 
     const uint8_t* data = pkt.Data();
 
-    static char jsonFormatter[] PROGMEM = R"===(
-    {
-        "event": "display",
-        "data": {
-            "head_unit_stalk_buttons": "%s %s %s %s %s",
-            "head_unit_stalk_wheel": "%d",
-            "head_unit_stalk_wheel_rollover": "%u"
-        }
-    })===";
+    const static char jsonFormatter[] PROGMEM =
+    "{\n"
+        "\"event\": \"display\",\n"
+        "\"data\":\n"
+        "{\n"
+            "\"head_unit_stalk_buttons\": \"%S %S %S %S %S\",\n"
+            "\"head_unit_stalk_wheel\": \"%d\",\n"
+            "\"head_unit_stalk_wheel_rollover\": \"%u\"\n"
+        "}\n"
+    "}\n";
 
     snprintf_P(buf, n, jsonFormatter,
 
-        data[0] & 0x80 ? "NEXT" : "",
-        data[0] & 0x40 ? "PREV" : "",
-        data[0] & 0x08 ? "VOL_UP" : "",
-        data[0] & 0x04 ? "VOL_DOWN" : "",
-        data[0] & 0x02 ? "SOURCE" : "",
+        data[0] & 0x80 ? PSTR("NEXT") : emptyStr,
+        data[0] & 0x40 ? PSTR("PREV") : emptyStr,
+        data[0] & 0x08 ? PSTR("VOL_UP") : emptyStr,
+        data[0] & 0x04 ? PSTR("VOL_DOWN") : emptyStr,
+        data[0] & 0x02 ? PSTR("SOURCE") : emptyStr,
 
         data[1] - 0x80,
         data[0] >> 4 & 0x03
@@ -415,57 +475,57 @@ VanPacketParseResult_t ParseLightsStatusPkt(const char* idenStr, TVanPacketRxDes
 
     const uint8_t* data = pkt.Data();
 
-    static char jsonFormatter[] PROGMEM = R"===(
-    {
-        "event": "display",
-        "data": {
-            "instrument_cluster": "%sENALED",
-            "speed_regulator_wheel": "%s",
-            "warning_led": "%s",
-            "diesel_glow_plugs": "%s",
-            "door_open": "%s",
-            "remaining_km_to_service": "%u",
-            "remaining_km_to_service_dash": "%u",
-            "lights": "%s%s%s%s%s%s"
-    )===";
+    const static char jsonFormatter[] PROGMEM =
+    "{\n"
+        "\"event\": \"display\",\n"
+        "\"data\":\n"
+        "{\n"
+            "\"instrument_cluster\": \"%SENALED\",\n"
+            "\"speed_regulator_wheel\": \"%S\",\n"
+            "\"warning_led\": \"%S\",\n"
+            "\"diesel_glow_plugs\": \"%S\",\n"
+            "\"door_open\": \"%S\",\n"
+            "\"remaining_km_to_service\": \"%u\",\n"
+            "\"remaining_km_to_service_dash\": \"%u\",\n"
+            "\"lights\": \"%S%S%S%S%S%S\"";
 
     int at = snprintf_P(buf, n, jsonFormatter,
 
-        data[0] & 0x80 ? "" : "NOT ",
-        data[0] & 0x40 ? "ON" : "OFF",
-        data[0] & 0x20 ? "ON" : "OFF",
-        data[0] & 0x04 ? "ON" : "OFF",
-        data[1] & 0x01 ? "YES" : "NO",
+        data[0] & 0x80 ? emptyStr : PSTR("NOT "),
+        data[0] & 0x40 ? onStr : offStr,
+        data[0] & 0x20 ? onStr : offStr,
+        data[0] & 0x04 ? onStr : offStr,
+        data[1] & 0x01 ? yesStr : noStr,
 
         ((uint16_t)data[2] << 8 | data[3]) * 20,
         (((uint16_t)data[2] << 8 | data[3]) * 20) / 100 * 100,
 
-        data[5] & 0x80 ? "DIPPED_BEAM " : "",
-        data[5] & 0x40 ? "HIGH_BEAM " : "",
-        data[5] & 0x20 ? "FOG_FRONT " : "",
-        data[5] & 0x10 ? "FOG_REAR " : "",
-        data[5] & 0x08 ? "INDICATOR_RIGHT " : "",
-        data[5] & 0x04 ? "INDICATOR_LEFT " : ""
+        data[5] & 0x80 ? PSTR("DIPPED_BEAM ") : emptyStr,
+        data[5] & 0x40 ? PSTR("HIGH_BEAM ") : emptyStr,
+        data[5] & 0x20 ? PSTR("FOG_FRONT ") : emptyStr,
+        data[5] & 0x10 ? PSTR("FOG_REAR ") : emptyStr,
+        data[5] & 0x08 ? PSTR("INDICATOR_RIGHT ") : emptyStr,
+        data[5] & 0x04 ? PSTR("INDICATOR_LEFT ") : emptyStr
     );
 
     if (data[5] & 0x02)
     {
         at += at >= JSON_BUFFER_SIZE ? 0 :
             snprintf_P(buf + at, n - at,
-                PSTR(",\n\"auto_gearbox\": \"%s%s%s%s\""),
-                (data[4] & 0x70) == 0x00 ? "P" :
-                (data[4] & 0x70) == 0x10 ? "R" :
-                (data[4] & 0x70) == 0x20 ? "N" :
-                (data[4] & 0x70) == 0x30 ? "D" :
-                (data[4] & 0x70) == 0x40 ? "4" :
-                (data[4] & 0x70) == 0x50 ? "3" :
-                (data[4] & 0x70) == 0x60 ? "2" :
-                (data[4] & 0x70) == 0x70 ? "1" :
-                "??",
+                PSTR(",\n\"auto_gearbox\": \"%S%S%S%S\""),
+                (data[4] & 0x70) == 0x00 ? PSTR("P") :
+                (data[4] & 0x70) == 0x10 ? PSTR("R") :
+                (data[4] & 0x70) == 0x20 ? PSTR("N") :
+                (data[4] & 0x70) == 0x30 ? PSTR("D") :
+                (data[4] & 0x70) == 0x40 ? PSTR("4") :
+                (data[4] & 0x70) == 0x50 ? PSTR("3") :
+                (data[4] & 0x70) == 0x60 ? PSTR("2") :
+                (data[4] & 0x70) == 0x70 ? PSTR("1") :
+                ToHexStr((uint8_t)(data[4] & 0x70)),
 
-                data[4] & 0x08 ? " - Snow" : "",
-                data[4] & 0x04 ? " - Sport" : "",
-                data[4] & 0x80 ? " (blinking)" : ""
+                data[4] & 0x08 ? PSTR(" - Snow") : emptyStr,
+                data[4] & 0x04 ? PSTR(" - Sport") : emptyStr,
+                data[4] & 0x80 ? PSTR(" (blinking)") : emptyStr
             );
     } // if
 
@@ -485,45 +545,45 @@ VanPacketParseResult_t ParseLightsStatusPkt(const char* idenStr, TVanPacketRxDes
         snprintf_P(buf + at, n - at, PSTR(",\n\"oil_level_raw\": \"%u\""), data[8]),
 
     at += at >= JSON_BUFFER_SIZE ? 0 :
-        snprintf_P(buf + at, n - at, PSTR(",\n\"oil_level_dash\": \"%s\""),
-            data[8] <= 0x0B ? "------" :
-            data[8] <= 0x19 ? "O-----" :
-            data[8] <= 0x27 ? "OO----" :
-            data[8] <= 0x35 ? "OOO---" :
-            data[8] <= 0x43 ? "OOOO--" :
-            data[8] <= 0x51 ? "OOOOO-" :
-            "OOOOOO"
+        snprintf_P(buf + at, n - at, PSTR(",\n\"oil_level_dash\": \"%S\""),
+            data[8] <= 0x0B ? PSTR("------") :
+            data[8] <= 0x19 ? PSTR("O-----") :
+            data[8] <= 0x27 ? PSTR("OO----") :
+            data[8] <= 0x35 ? PSTR("OOO---") :
+            data[8] <= 0x43 ? PSTR("OOOO--") :
+            data[8] <= 0x51 ? PSTR("OOOOO-") :
+            PSTR("OOOOOO")
         );
 
     if (data[10] != 0xFF)
     {
         // Never seen this; I don't have LPG
         at += at >= JSON_BUFFER_SIZE ? 0 :
-            snprintf_P(buf + at, n - at, PSTR(",\n\"lpg_fuel_level\": \"%s\""),
-                data[10] <= 0x08 ? "1" :
-                data[10] <= 0x11 ? "2" :
-                data[10] <= 0x21 ? "3" :
-                data[10] <= 0x32 ? "4" :
-                data[10] <= 0x43 ? "5" :
-                data[10] <= 0x53 ? "6" :
-                "7"
+            snprintf_P(buf + at, n - at, PSTR(",\n\"lpg_fuel_level\": \"%S\""),
+                data[10] <= 0x08 ? PSTR("1") :
+                data[10] <= 0x11 ? PSTR("2") :
+                data[10] <= 0x21 ? PSTR("3") :
+                data[10] <= 0x32 ? PSTR("4") :
+                data[10] <= 0x43 ? PSTR("5") :
+                data[10] <= 0x53 ? PSTR("6") :
+                PSTR("7")
             );
     } // if
 
     if (dataLen == 14)
     {
-        // Cars made in/after 2004?
+        // Vehicles made in/after 2004?
 
         // http://pinterpeti.hu/psavanbus/PSA-VAN.html#4FC_2
 
         at += at >= JSON_BUFFER_SIZE ? 0 :
-            snprintf_P(buf + at, n - at, PSTR(",\n\"cruise_control\": \"%s\""),
-                data[11] == 0x41 ? "OFF" :
-                data[11] == 0x49 ? "Cruise" :
-                data[11] == 0x59 ? "Cruise - speed" :
-                data[11] == 0x81 ? "Limiter" :
-                data[11] == 0x89 ? "Limiter - speed" :
-                "?"
+            snprintf_P(buf + at, n - at, PSTR(",\n\"cruise_control\": \"%S\""),
+                data[11] == 0x41 ? offStr :
+                data[11] == 0x49 ? PSTR("Cruise") :
+                data[11] == 0x59 ? PSTR("Cruise - speed") :
+                data[11] == 0x81 ? PSTR("Limiter") :
+                data[11] == 0x89 ? PSTR("Limiter - speed") :
+                ToHexStr(data[11])
             );
 
         at += at >= JSON_BUFFER_SIZE ? 0 :
@@ -531,6 +591,8 @@ VanPacketParseResult_t ParseLightsStatusPkt(const char* idenStr, TVanPacketRxDes
     } // if
 
     at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}"));
+
+    if (at >= JSON_BUFFER_SIZE) Serial.print(F("--> WARNING: JSON BUFFER OVERFLOW!\n"));
 
     return VAN_PACKET_PARSE_OK;
 } // ParseLightsStatusPkt
@@ -549,33 +611,33 @@ VanPacketParseResult_t ParseDeviceReportPkt(const char* idenStr, TVanPacketRxDes
     {
         if (dataLen != 3) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
-        static char jsonFormatter[] PROGMEM = R"===(
-        {
-            "event": "display",
-            "data": {
-                "head_unit_report": "%s"
-        )===";
+        const static char jsonFormatter[] PROGMEM =
+        "{\n"
+            "\"event\": \"display\",\n"
+            "\"data\":\n"
+            "{\n"
+                "\"head_unit_report\": \"%S\"";
 
         int at = snprintf_P(buf, n, jsonFormatter,
 
-            data[1] == 0x20 ? "TUNER_REPLY" :
-            data[1] == 0x21 ? "AUDIO_SETTINGS_ANNOUNCE" :
-            data[1] == 0x22 ? "BUTTON_PRESS_ANNOUNCE" :
-            data[1] == 0x24 ? "TUNER_ANNOUNCEMENT" :
-            data[1] == 0x28 ? "TAPE_PRESENCE_ANNOUNCEMENT" :
-            data[1] == 0x30 ? "CD_PRESENT" :
-            data[1] == 0x40 ? "TUNER_PRESETS_REPLY" :
-            data[1] == 0x60 ? "TAPE_INFO_REPLY" :
-            data[1] == 0x61 ? "TAPE_PLAYING_AUDIO_SETTINGS_ANNOUNCE" :
-            data[1] == 0x62 ? "TAPE_PLAYING_BUTTON_PRESS_ANNOUNCE" :
-            data[1] == 0x64 ? "TAPE_PLAYING_STARTING" :
-            data[1] == 0x68 ? "TAPE_PLAYING_INFO" :
-            data[1] == 0xC0 ? "INTERNAL_CD_TRACK_INFO_REPLY" :
-            data[1] == 0xC1 ? "INTERNAL_CD_PLAYING_AUDIO_SETTINGS_ANNOUNCE" :
-            data[1] == 0xC2 ? "INTERNAL_CD_PLAYING_BUTTON_PRESS_ANNOUNCE" :
-            data[1] == 0xC4 ? "INTERNAL_CD_PLAYING_SEARCHING" :
-            data[1] == 0xD0 ? "INTERNAL_CD_PLAYING_TRACK_INFO" :
-            "??"
+            data[1] == 0x20 ? PSTR("TUNER_REPLY") :
+            data[1] == 0x21 ? PSTR("AUDIO_SETTINGS_ANNOUNCE") :
+            data[1] == 0x22 ? PSTR("BUTTON_PRESS_ANNOUNCE") :
+            data[1] == 0x24 ? PSTR("TUNER_ANNOUNCEMENT") :
+            data[1] == 0x28 ? PSTR("TAPE_PRESENCE_ANNOUNCEMENT") :
+            data[1] == 0x30 ? PSTR("CD_PRESENT") :
+            data[1] == 0x40 ? PSTR("TUNER_PRESETS_REPLY") :
+            data[1] == 0x60 ? PSTR("TAPE_INFO_REPLY") :
+            data[1] == 0x61 ? PSTR("TAPE_PLAYING_AUDIO_SETTINGS_ANNOUNCE") :
+            data[1] == 0x62 ? PSTR("TAPE_PLAYING_BUTTON_PRESS_ANNOUNCE") :
+            data[1] == 0x64 ? PSTR("TAPE_PLAYING_STARTING") :
+            data[1] == 0x68 ? PSTR("TAPE_PLAYING_INFO") :
+            data[1] == 0xC0 ? PSTR("INTERNAL_CD_TRACK_INFO_REPLY") :
+            data[1] == 0xC1 ? PSTR("INTERNAL_CD_PLAYING_AUDIO_SETTINGS_ANNOUNCE") :
+            data[1] == 0xC2 ? PSTR("INTERNAL_CD_PLAYING_BUTTON_PRESS_ANNOUNCE") :
+            data[1] == 0xC4 ? PSTR("INTERNAL_CD_PLAYING_SEARCHING") :
+            data[1] == 0xD0 ? PSTR("INTERNAL_CD_PLAYING_TRACK_INFO") :
+            ToHexStr(data[1])
         );
 
         // Button-press announcement?
@@ -585,45 +647,50 @@ VanPacketParseResult_t ParseDeviceReportPkt(const char* idenStr, TVanPacketRxDes
             sprintf_P(buffer, PSTR("0x%02X"), data[2]);
 
             at += at >= JSON_BUFFER_SIZE ? 0 :
-                snprintf_P(buf + at, n - at, PSTR(",\n\"head_unit_button_pressed\": \"%s%s%s\""),
+                snprintf_P(buf + at, n - at,
+                    PSTR(",\n\"head_unit_button_pressed\": \"%S%S\""),
 
-                    (data[2] & 0x1F) == 0x01 ? "'1'" :
-                    (data[2] & 0x1F) == 0x02 ? "'2'" :
-                    (data[2] & 0x1F) == 0x03 ? "'3'" :
-                    (data[2] & 0x1F) == 0x04 ? "'4'" :
-                    (data[2] & 0x1F) == 0x05 ? "'5'" :
-                    (data[2] & 0x1F) == 0x06 ? "'6'" :
-                    (data[2] & 0x1F) == 0x11 ? "AUDIO_DOWN" :
-                    (data[2] & 0x1F) == 0x12 ? "AUDIO_UP" :
-                    (data[2] & 0x1F) == 0x13 ? "SEEK_BACKWARD" :
-                    (data[2] & 0x1F) == 0x14 ? "SEEK_FORWARD" :
-                    (data[2] & 0x1F) == 0x16 ? "AUDIO" :
-                    (data[2] & 0x1F) == 0x17 ? "MAN" :
-                    (data[2] & 0x1F) == 0x1B ? "TUNER" :
-                    (data[2] & 0x1F) == 0x1C ? "TAPE" :
-                    (data[2] & 0x1F) == 0x1D ? "INTERNAL_CD" :
-                    (data[2] & 0x1F) == 0x1E ? "CD_CHANGER" :
+                    (data[2] & 0x1F) == 0x01 ? PSTR("'1'") :
+                    (data[2] & 0x1F) == 0x02 ? PSTR("'2'") :
+                    (data[2] & 0x1F) == 0x03 ? PSTR("'3'") :
+                    (data[2] & 0x1F) == 0x04 ? PSTR("'4'") :
+                    (data[2] & 0x1F) == 0x05 ? PSTR("'5'") :
+                    (data[2] & 0x1F) == 0x06 ? PSTR("'6'") :
+                    (data[2] & 0x1F) == 0x11 ? PSTR("AUDIO_DOWN") :
+                    (data[2] & 0x1F) == 0x12 ? PSTR("AUDIO_UP") :
+                    (data[2] & 0x1F) == 0x13 ? PSTR("SEEK_BACKWARD") :
+                    (data[2] & 0x1F) == 0x14 ? PSTR("SEEK_FORWARD") :
+                    (data[2] & 0x1F) == 0x16 ? PSTR("AUDIO") :
+                    (data[2] & 0x1F) == 0x17 ? PSTR("MAN") :
+                    (data[2] & 0x1F) == 0x1B ? PSTR("TUNER") :
+                    (data[2] & 0x1F) == 0x1C ? PSTR("TAPE") :
+                    (data[2] & 0x1F) == 0x1D ? PSTR("INTERNAL_CD") :
+                    (data[2] & 0x1F) == 0x1E ? PSTR("CD_CHANGER") :
                     buffer,
-                    data[2] & 0x40 ? " (released)" : "",
-                    data[2] & 0x80 ? " (repeat)" : ""
+
+                    data[2] & 0xC0 ? PSTR(" (held)") :
+                    data[2] & 0x40 ? PSTR(" (released)") :
+                    data[2] & 0x80 ? PSTR(" (repeat)") :
+                    emptyStr
                 );
         } // if
 
         at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}"));
+
+        if (at >= JSON_BUFFER_SIZE) Serial.print(F("--> WARNING: JSON BUFFER OVERFLOW!\n"));
     }
     else if (data[0] == 0x96)
     {
         if (dataLen != 1) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
-        static char jsonFormatter[] PROGMEM = R"===(
-        {
-            "event": "display",
-            "data":
-            {
-                "cd_changer": "STATUS_UPDATE_ANNOUNCE"
-            }
-        }
-        )===";
+        const static char jsonFormatter[] PROGMEM =
+        "{\n"
+            "\"event\": \"display\",\n"
+            "\"data\":\n"
+            "{\n"
+                "\"cd_changer\": \"STATUS_UPDATE_ANNOUNCE\""
+            "}\n"
+        "}\n";
 
         snprintf_P(buf, n, jsonFormatter);
     }
@@ -662,32 +729,33 @@ VanPacketParseResult_t ParseCarStatus1Pkt(const char* idenStr, TVanPacketRxDesc&
     if (memcmp(data + 1, packetData, dataLen - 2) == 0) return VAN_PACKET_DUPLICATE;
     memcpy(packetData, data + 1, dataLen - 2);
 
-    static char jsonFormatter[] PROGMEM = R"===(
-    {
-        "event": "display",
-        "data": {
-            "doors": "%s %s %s %s %s",
-            "right_stalk_button": "%s",
-            "avg_speed_1": "%u",
-            "avg_speed_2": "%u",
-            "exp_moving_avg_speed": "%u",
-            "range_1": "%u",
-            "avg_consumption_1": "%s",
-            "range_2": "%u",
-            "avg_consumption_2": "%s",
-            "inst_consumption": "%s",
-            "mileage": "%u"
-        }
-    })===";
+    const static char jsonFormatter[] PROGMEM =
+    "{\n"
+        "\"event\": \"display\",\n"
+        "\"data\":\n"
+        "{\n"
+            "\"doors\": \"%S%S%S%S%S\",\n"
+            "\"right_stalk_button\": \"%S\",\n"
+            "\"avg_speed_1\": \"%u\",\n"
+            "\"avg_speed_2\": \"%u\",\n"
+            "\"exp_moving_avg_speed\": \"%u\",\n"
+            "\"range_1\": \"%u\",\n"
+            "\"avg_consumption_1\": \"%s\",\n"
+            "\"range_2\": \"%u\",\n"
+            "\"avg_consumption_2\": \"%s\",\n"
+            "\"inst_consumption\": \"%S\",\n"
+            "\"mileage\": \"%u\"\n"
+        "}\n"
+    "}\n";
 
     char floatBuf[3][MAX_FLOAT_SIZE];
     snprintf_P(buf, n, jsonFormatter,
-        data[7] & 0x80 ? "FRONT_RIGHT " : "",
-        data[7] & 0x40 ? "FRONT_LEFT " : "",
-        data[7] & 0x20 ? "REAR_RIGHT " : "",
-        data[7] & 0x10 ? "REAR_LEFT " : "",
-        data[7] & 0x08 ? "BOOT " : "",
-        data[10] & 0x01 ? "PRESSED" : "RELEASED",
+        data[7] & 0x80 ? PSTR("FRONT_RIGHT ") : emptyStr,
+        data[7] & 0x40 ? PSTR("FRONT_LEFT ") : emptyStr,
+        data[7] & 0x20 ? PSTR("REAR_RIGHT ") : emptyStr,
+        data[7] & 0x10 ? PSTR("REAR_LEFT ") : emptyStr,
+        data[7] & 0x08 ? PSTR("BOOT ") : emptyStr,
+        data[10] & 0x01 ? PSTR("PRESSED") : PSTR("RELEASED"),
         data[11],
         data[12],
 
@@ -710,7 +778,7 @@ VanPacketParseResult_t ParseCarStatus1Pkt(const char* idenStr, TVanPacketRxDesc&
         (uint16_t)data[18] << 8 | data[19],
         FloatToStr(floatBuf[1], ((uint16_t)data[20] << 8 | data[21]) / 10.0, 1),
         (uint16_t)data[22] << 8 | data[23] == 0xFFFF
-            ? "---"
+            ? PSTR("---")
             : FloatToStr(floatBuf[2], ((uint16_t)data[22] << 8 | data[23]) / 10.0, 1),
         (uint16_t)data[24] << 8 | data[25]
     );
@@ -823,6 +891,70 @@ VanPacketParseResult_t ParseCarStatus2Pkt(const char* idenStr, TVanPacketRxDesc&
     static const char msg_8_6[] PROGMEM = "Engine immobiliser fault";
     static const char msg_8_7[] PROGMEM = "Sport suspension mode active";
 
+    // Byte 9 is the index of the current message
+
+    // Byte 10
+    static const char msg_10_0[] PROGMEM = "Unknown";
+    static const char msg_10_1[] PROGMEM = "Unknown";
+    static const char msg_10_2[] PROGMEM = "Unknown";
+    static const char msg_10_3[] PROGMEM = "Change of fuel used in progress";
+    static const char msg_10_4[] PROGMEM = "LPG fuel refused";
+    static const char msg_10_5[] PROGMEM = "LPG system faulty";
+    static const char msg_10_6[] PROGMEM = "LPG in use";
+    static const char msg_10_7[] PROGMEM = "Min level LPG";
+
+    // Byte 11
+    static const char msg_11_0[] PROGMEM = "ADIN fault";
+    static const char msg_11_1[] PROGMEM = "User stop & start";
+    static const char msg_11_2[] PROGMEM = "Stop & start available";
+    static const char msg_11_3[] PROGMEM = "Stop & start activated";
+    static const char msg_11_4[] PROGMEM = "Stop & start deactivated";
+    static const char msg_11_5[] PROGMEM = "Stop & start deferred";
+    static const char msg_11_6[] PROGMEM = "XSARA DYNALTO";
+    static const char msg_11_7[] PROGMEM = "307 DYNALTO";
+
+    // Byte 12
+    static const char msg_12_0[] PROGMEM = "Unknown";
+    static const char msg_12_1[] PROGMEM = "Unknown";
+    static const char msg_12_2[] PROGMEM = "Unknown";
+    static const char msg_12_3[] PROGMEM = "Unknown";
+    static const char msg_12_4[] PROGMEM = "Unknown";
+    static const char msg_12_5[] PROGMEM = "Unknown";
+    static const char msg_12_6[] PROGMEM = "Unknown";
+    static const char msg_12_7[] PROGMEM = "Change to neutral";
+
+    // Byte 13
+    static const char msg_13_0[] PROGMEM = "Unknown";
+    static const char msg_13_1[] PROGMEM = "Unknown";
+    static const char msg_13_2[] PROGMEM = "Unknown";
+    static const char msg_13_3[] PROGMEM = "Unknown";
+    static const char msg_13_4[] PROGMEM = "Unknown";
+    static const char msg_13_5[] PROGMEM = "Unknown";
+    static const char msg_13_6[] PROGMEM = "Unknown";
+    static const char msg_13_7[] PROGMEM = "Unknown";
+
+    // On vehicles made after 2004
+
+    // Byte 14
+    static const char msg_14_0[] PROGMEM = "Roof operation complete";
+    static const char msg_14_1[] PROGMEM = "Operation impossible screen not in place";
+    static const char msg_14_2[] PROGMEM = "Roof mechanism not locked!";
+    static const char msg_14_3[] PROGMEM = "Operation impossible boot open";
+    static const char msg_14_4[] PROGMEM = "Operation impossible speed too high";
+    static const char msg_14_5[] PROGMEM = "Operation impossible ext temp too low";
+    static const char msg_14_6[] PROGMEM = "Roof mechanism faulty";
+    static const char msg_14_7[] PROGMEM = "Boot mechanism not locked!";
+
+    // Byte 15
+    static const char msg_15_0[] PROGMEM = "Unknown";
+    static const char msg_15_1[] PROGMEM = "Unknown";
+    static const char msg_15_2[] PROGMEM = "Unknown";
+    static const char msg_15_3[] PROGMEM = "Unknown";
+    static const char msg_15_4[] PROGMEM = "Bow fault";
+    static const char msg_15_5[] PROGMEM = "Operation impossible roof not unlocked";
+    static const char msg_15_6[] PROGMEM = "Unknown";
+    static const char msg_15_7[] PROGMEM = "Roof operation incomplete";
+
     static const char *const msgTable[] PROGMEM =
     {
         msg_0_0, msg_0_1, msg_0_2, msg_0_3, msg_0_4, msg_0_5, msg_0_6, msg_0_7,
@@ -833,23 +965,30 @@ VanPacketParseResult_t ParseCarStatus2Pkt(const char* idenStr, TVanPacketRxDesc&
         msg_5_0, msg_5_1, msg_5_2, msg_5_3, msg_5_4, msg_5_5, msg_5_6, msg_5_7,
         msg_6_0, msg_6_1, msg_6_2, msg_6_3, msg_6_4, msg_6_5, msg_6_6, msg_6_7,
         msg_7_0, msg_7_1, msg_7_2, msg_7_3, msg_7_4, msg_7_5, msg_7_6, msg_7_7,
-        msg_8_0, msg_8_1, msg_8_2, msg_8_3, msg_8_4, msg_8_5, msg_8_6, msg_8_7
+        msg_8_0, msg_8_1, msg_8_2, msg_8_3, msg_8_4, msg_8_5, msg_8_6, msg_8_7,
+        0, 0, 0, 0, 0, 0, 0, 0,
+        msg_10_0, msg_10_1, msg_10_2, msg_10_3, msg_10_4, msg_10_5, msg_10_6, msg_10_7,
+        msg_11_0, msg_11_1, msg_11_2, msg_11_3, msg_11_4, msg_11_5, msg_11_6, msg_11_7,
+        msg_12_0, msg_12_1, msg_12_2, msg_12_3, msg_12_4, msg_12_5, msg_12_6, msg_12_7,
+        msg_13_0, msg_13_1, msg_13_2, msg_13_3, msg_13_4, msg_13_5, msg_13_6, msg_13_7,
+        msg_14_0, msg_14_1, msg_14_2, msg_14_3, msg_14_4, msg_14_5, msg_14_6, msg_14_7,
+        msg_15_0, msg_15_1, msg_15_2, msg_15_3, msg_15_4, msg_15_5, msg_15_6, msg_15_7
     };
 
-    static char jsonFormatter[] PROGMEM = R"===(
-    {
-        "event": "notification",
-        "data": {
-            "alarm_list": [
-    )===";
+    const static char jsonFormatter[] PROGMEM =
+    "{\n"
+        "\"event\": \"notification\",\n"
+        "\"data\": {\n"
+            "\"alarm_list\": [";
 
     int at = snprintf_P(buf, n, jsonFormatter);
 
     const uint8_t* data = pkt.Data();
 
     bool first = true;
-    for (int byte = 0; byte < 9; byte++)
+    for (int byte = 0; byte < 16; byte++)
     {
+        if (byte == 9) byte++;
         for (int bit = 0; bit < 8; bit++)
         {
             if (data[byte] >> bit & 0x01)
@@ -858,13 +997,17 @@ VanPacketParseResult_t ParseCarStatus2Pkt(const char* idenStr, TVanPacketRxDesc&
                 strncpy_P(alarmText, (char *)pgm_read_dword(&(msgTable[byte * 8 + bit])), sizeof(alarmText) - 1);
                 alarmText[sizeof(alarmText) - 1] = 0;
                 at += at >= JSON_BUFFER_SIZE ? 0 :
-                    snprintf_P(buf + at, n - at, PSTR("%s\n\"%s\""), first ? "" : ",", alarmText);
+                    snprintf_P(buf + at, n - at, PSTR("%S\n\"%s\""), first ? emptyStr : PSTR(","), alarmText);
                 first = false;
             } // if
         } // for
     } // for
 
+    // TODO - this packet could become very large and overflow the JSON buffer, causing corrupt JSON data to be sent
+
     at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n]\n}\n}"));
+
+    if (at >= JSON_BUFFER_SIZE) Serial.print(F("--> WARNING: JSON BUFFER OVERFLOW!\n"));
 
     return VAN_PACKET_PARSE_OK;
 } // ParseCarStatus2Pkt
@@ -876,23 +1019,23 @@ VanPacketParseResult_t ParseDashboardPkt(const char* idenStr, TVanPacketRxDesc& 
 
     const uint8_t* data = pkt.Data();
 
-    static char jsonFormatter[] PROGMEM = R"===(
-    {
-        "event": "display",
-        "data":
-        {
-            "rpm": "%s",
-            "speed": "%s"
-        }
-    })===";
+    const static char jsonFormatter[] PROGMEM =
+    "{\n"
+        "\"event\": \"display\",\n"
+        "\"data\":\n"
+        "{\n"
+            "\"rpm\": \"%S\",\n"
+            "\"speed\": \"%S\"\n"
+        "}\n"
+    "}\n";
 
     char floatBuf[2][MAX_FLOAT_SIZE];
     snprintf_P(buf, n, jsonFormatter,
         data[0] == 0xFF && data[1] == 0xFF ?
-            "---.-" :
+            PSTR("---.-") :
             FloatToStr(floatBuf[0], ((uint16_t)data[0] << 8 | data[1]) / 8.0, 1),
         data[2] == 0xFF && data[3] == 0xFF ?
-            "---.--" :
+            PSTR("---.--") :
             FloatToStr(floatBuf[1], ((uint16_t)data[2] << 8 | data[3]) / 100.0, 2)
     );
 
@@ -909,28 +1052,28 @@ VanPacketParseResult_t ParseDashboardButtonsPkt(const char* idenStr, TVanPacketR
 
     const uint8_t* data = pkt.Data();
 
-    static char jsonFormatter[] PROGMEM = R"===(
-    {
-        "event": "display",
-        "data":
-        {
-            "hazard_lights": "%s",
-            "door_lock": "%s",
-            "dashboard_programmed_brightness": "%u",
-            "esp": "%s",
-            "fuel_level_filtered": "%s"
-            "fuel_level_raw": "%s"
-        }
-    })===";
+    const static char jsonFormatter[] PROGMEM =
+    "{\n"
+        "\"event\": \"display\",\n"
+        "\"data\":\n"
+        "{\n"
+            "\"hazard_lights\": \"%S\",\n"
+            "\"door_lock\": \"%S\",\n"
+            "\"dashboard_programmed_brightness\": \"%u\",\n"
+            "\"esp\": \"%S\",\n"
+            "\"fuel_level_filtered\": \"%s\",\n"
+            "\"fuel_level_raw\": \"%s\"\n"
+        "}\n"
+    "}\n";
 
     // data[6..10] - always 00-FF-00-FF-00
 
     char floatBuf[2][MAX_FLOAT_SIZE];
     snprintf_P(buf, n, jsonFormatter,
-        data[0] & 0x02 ? "ON" : "OFF",
-        data[2] & 0x40 ? "LOCKED" : "UNLOCKED",
+        data[0] & 0x02 ? onStr : offStr,
+        data[2] & 0x40 ? PSTR("LOCKED") : PSTR("UNLOCKED"),
         data[2] & 0x0F,
-        data[3] & 0x02 ? "ON" : "OFF",
+        data[3] & 0x02 ? onStr : offStr,
 
         // Surely fuel level. Test with tank full shows definitely level is in litres.
         FloatToStr(floatBuf[0], data[4] / 2.0, 1),
@@ -975,7 +1118,7 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
             uint8_t presetMemory = data[2] >> 3 & 0x0F;
 
             // data[3]: scanning bits
-            bool scanDx = data[3] & 0x02;  // Scan mode: distant (Dx) or local (Lo)
+            bool scanDx = data[3] & 0x02;  // Tuner sensitivity: distant (Dx) or local (Lo)
             bool ptyStandbyMode = data[3] & 0x04;
 
             uint8_t scanMode = data[3] >> 3 & 0x07;
@@ -1051,44 +1194,50 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
             rdsTxt[8] = 0;
 
             char piBuffer[40];
-            sprintf_P(piBuffer, PSTR("%04X(%s, %s)"),
+            sprintf_P(piBuffer, PSTR("%04X(%S, %S)"),
                 piCode,
                 RadioPiCountry(countryCode),
                 RadioPiAreaCoverage(coverageCode)
             );
 
             char currPtyBuffer[40];
-            sprintf_P(currPtyBuffer, PSTR("%s(%u)"), PtyStr(currPty), currPty);
+            sprintf_P(currPtyBuffer, PSTR("%S(%u)"), PtyStr(currPty), currPty);
 
             char selectedPtyBuffer[40];
-            sprintf_P(selectedPtyBuffer, PSTR("%s(%u)"), PtyStr(selectedPty), selectedPty);
+            sprintf_P(selectedPtyBuffer, PSTR("%S(%u)"), PtyStr(selectedPty), selectedPty);
 
             char presetMemoryBuffer[20];
             sprintf_P(presetMemoryBuffer, PSTR("%u"), presetMemory);
 
             bool anyScanBusy = (scanMode != TS_NOT_SEARCHING);
 
-            static char jsonFormatterCommon[] PROGMEM = R"===(
-            {
-                "event": "display",
-                "data":
-                {
-                    "band": "%s",
-                    "memory": "%s",
-                    "frequency": "%s %S",
-                    "signal_strength": "%s",
-                    "scan_mode": "%s",
-                    "scan_sensitivity": "%s",
-                    "scan_direction": "%s")===";
+            const static char jsonFormatterCommon[] PROGMEM =
+            "{\n"
+                "\"event\": \"display\",\n"
+                "\"data\":\n"
+                "{\n"
+                    "\"band\": \"%S\",\n"
+                    "\"memory\": \"%S\",\n"
+                    "\"frequency\": \"%S\",\n"
+                    "\"frequency_h\": \"%S\",\n"
+                    "\"frequency_unit\": \"%S\",\n"
+                    "\"signal_strength\": \"%S\",\n"
+                    "\"scan_mode\": \"%S\",\n"
+                    "\"scan_sensitivity\": \"%S\",\n"
+                    "\"scan_direction\": \"%S\"";
 
             char floatBuf[MAX_FLOAT_SIZE];
             int at = snprintf_P(buf, n, jsonFormatterCommon,
                 TunerBandStr(band),
-                presetMemory == 0 ? "-" : presetMemoryBuffer,
-                frequency == 0x07FF ? "---" :
+                presetMemory == 0 ? PSTR("-") : presetMemoryBuffer,
+                frequency == 0x07FF ? PSTR("---") :
                     band == TB_AM
                         ? FloatToStr(floatBuf, frequency, 0)  // AM and LW bands
-                        : FloatToStr(floatBuf, frequency / 20.0 + 50.0, 2),  // FM bands
+                        : FloatToStr(floatBuf, (frequency / 2 + 500) / 10.0, 1),  // FM bands
+                frequency == 0x07FF ? PSTR("-") :
+                    band == TB_AM
+                        ? emptyStr  // AM and LW bands
+                        : frequency % 2 == 0 ? PSTR("0") : PSTR("5"),  // FM bands
                 band == TB_AM ? PSTR("KHz") : PSTR("MHz"),
 
                 // TODO - check:
@@ -1097,7 +1246,7 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
                 //   In other words: maybe 14 is the highest possible signal strength, and 15 just means: no
                 //   signal.
                 signalStrength == 15 && (scanMode == TS_BY_FREQUENCY || scanMode == TS_BY_MATCHING_PTY)
-                    ? "--"
+                    ? PSTR("--")
                     : signalStrengthBuffer,
 
                 TunerScanModeStr(scanMode),
@@ -1105,51 +1254,53 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
                 // Scan sensitivity: distant (Dx) or local (Lo)
                 // TODO - not sure if this bit is applicable for the various values of 'scanMode'
                 ! anyScanBusy ? "" :
-                    scanDx ? ", sensitivity=Dx" : ", sensitivity=Lo",
+                    scanDx ? PSTR("Dx") : PSTR("Lo"),
 
                 ! anyScanBusy ? "" :
-                    scanDirectionUp ? ", scan_direction=UP" : ", scan_direction=DOWN"
+                    scanDirectionUp ? PSTR("UP") : PSTR("DOWN")
             );
 
             if (band != TB_AM)
             {
-                static char jsonFormatterFmBand[] PROGMEM = R"===(,
-                    "pty_selection_menu": "%s",
-                    "selected_pty": "%s",
-                    "pty_standby_mode": "%s",
-                    "pty_match": "%s",
-                    "pty": "%s",
-                    "pi": "%s",
-                    "regional": "%s",
-                    "ta_selected": "%s",
-                    "ta_available": "%s",
-                    "rds_selected": "%s",
-                    "rds_available": "%s",
-                    "rds_text": "%s",
-                    "info_trafic": "%s"
-                )===";
+                const static char jsonFormatterFmBand[] PROGMEM = ",\n"
+                    "\"pty_selection_menu\": \"%S\",\n"
+                    "\"selected_pty\": \"%s\",\n"
+                    "\"pty_standby_mode\": \"%S\",\n"
+                    "\"pty_match\": \"%S\",\n"
+                    "\"pty\": \"%S\",\n"
+                    "\"pi\": \"%S\",\n"
+                    "\"regional\": \"%S\",\n"
+                    "\"ta_selected\": \"%S\",\n"
+                    "\"ta_available\": \"%S\",\n"
+                    "\"rds_selected\": \"%S\",\n"
+                    "\"rds_available\": \"%S\",\n"
+                    "\"rds_text\": \"%s\",\n"
+                    "\"info_trafic\": \"%S\"";
 
                 at += at >= JSON_BUFFER_SIZE ? 0 :
                     snprintf_P(buf + at, n - at, jsonFormatterFmBand,
-                        ptySelectionMenu ? "ON" : "OFF",
+                        ptySelectionMenu ? onStr : offStr,
                         selectedPtyBuffer,
-                        ptyStandbyMode ? "YES" : "NO",
-                        ptyMatch ? "YES" : "NO",
-                        currPty == 0x00 ? "---" : currPtyBuffer,
+                        ptyStandbyMode ? yesStr : noStr,
+                        ptyMatch ? yesStr : noStr,
+                        currPty == 0x00 ? PSTR("---") : currPtyBuffer,
 
-                        piCode == 0xFFFF ? "---" : piBuffer,
-                        regional ? "ON" : "OFF",
-                        taSelected ? "YES" : "NO",
-                        taAvailable ? "YES" : "NO",
-                        rdsSelected ? "YES" : "NO",
-                        rdsAvailable ? "YES" : "NO",
+                        piCode == 0xFFFF ? PSTR("---") : piBuffer,
+                        regional ? onStr : offStr,
+                        taSelected ? yesStr : noStr,
+                        taAvailable ? yesStr : noStr,
+                        rdsSelected ? yesStr : noStr,
+                        rdsAvailable ? yesStr : noStr,
                         rdsTxt,
 
-                        taAnnounce ? "Info Trafic!" : ""
+                        taAnnounce ? PSTR("Info Trafic!") : emptyStr
                     );
             } // if
 
             at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}"));
+
+            // Warning on Serial output if JSON buffer overflows
+            if (at >= JSON_BUFFER_SIZE) Serial.print(F("--> WARNING: JSON BUFFER OVERFLOW!\n"));
         }
         break;
         
@@ -1163,26 +1314,27 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
             char buffer[5];
             sprintf_P(buffer, PSTR("0x%02X"), status);
 
-            static char jsonFormatter[] PROGMEM = R"===(
-            {
-                "event": "display",
-                "data":
-                {
-                    "tape_status": "%s",
-                    "tape_side": "%s"
-                }
-            })===";
+            const static char jsonFormatter[] PROGMEM =
+            "{\n"
+                "\"event\": \"display\",\n"
+                "\"data\":\n"
+                "{\n"
+                    "\"tape_status\": \"%S\",\n"
+                    "\"tape_side\": \"%S\"\n"
+                "}\n"
+            "}\n";
 
             snprintf_P(buf, n, jsonFormatter,
-                status == 0x00 ? "STOPPED" :
-                status == 0x04 ? "LOADING" :
-                status == 0x0C ? "PLAYING" :
-                status == 0x10 ? "FAST_FORWARD" :
-                status == 0x14 ? "NEXT_TRACK" :
-                status == 0x30 ? "REWIND" :
-                status == 0x34 ? "PREVIOUS_TRACK" :
+                status == 0x00 ? PSTR("STOPPED") :
+                status == 0x04 ? PSTR("LOADING") :
+                status == 0x0C ? PSTR("PLAYING") :
+                status == 0x10 ? PSTR("FAST_FORWARD") :
+                status == 0x14 ? PSTR("NEXT_TRACK") :
+                status == 0x30 ? PSTR("REWIND") :
+                status == 0x34 ? PSTR("PREVIOUS_TRACK") :
                 buffer,
-                data[2] & 0x01 ? "2" : "1"
+
+                data[2] & 0x01 ? PSTR("2") : PSTR("1")
             );
         }
         break;
@@ -1200,20 +1352,20 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
             strncpy(rdsOrFreqTxt, (const char*) data + 3, 8);
             rdsOrFreqTxt[8] = 0;
 
-            static char jsonFormatter[] PROGMEM = R"===(
-            {
-                "event": "display",
-                "data":
-                {
-                    "radio_preset_%s_%u": "%s (%s)"
-                }
-            })===";
+            const static char jsonFormatter[] PROGMEM =
+            "{\n"
+                "\"event\": \"display\",\n"
+                "\"data\":\n"
+                "{\n"
+                    "\"radio_preset_%S_%u\": \"%s (%S)\"\n"
+                "}\n"
+            "}\n";
 
             snprintf_P(buf, n, jsonFormatter,
                 tunerBand,
                 tunerMemory,
                 rdsOrFreqTxt,
-                data[2] & 0x80 ? "RDS_TEXT" : "FREQUENCY"
+                data[2] & 0x80 ? PSTR("RDS_TEXT") : PSTR("FREQUENCY")
             );
         }
         break;
@@ -1225,18 +1377,27 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
             // TODO - do we know the fixed numbers? Seems like this can only be 10 or 12.
             if (dataLen < 10) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
-            static char jsonFormatter[] PROGMEM = R"===(
-            {
-                "event": "display",
-                "data":
-                {
-                    "cd_status": "%s",
-                    "cd_track_min": "%u",
-                    "cd_track_sec": "%u",
-                    "cd_current_track": "%u"
-            )===";
+            const static char jsonFormatter[] PROGMEM =
+            "{\n"
+                "\"event\": \"display\",\n"
+                "\"data\":\n"
+                "{\n"
+                    "\"cd_status\": \"%S\",\n"
+                    "\"cd_track_min\": \"%u\",\n"
+                    "\"cd_track_sec\": \"%u\",\n"
+                    "\"cd_current_track\": \"%u\"";
 
             int at = snprintf_P(buf, n, jsonFormatter,
+
+                data[3] == 0x11 ? PSTR("INSERTED") :
+                data[3] == 0x12 ? PSTR("PAUSE-SEARCHING") :
+                data[3] == 0x13 ? PSTR("PLAY-SEARCHING") :
+                data[3] == 0x02 ? PSTR("PAUSE") :
+                data[3] == 0x03 ? PSTR("PLAY") :
+                data[3] == 0x04 ? PSTR("FAST_FORWARD") :
+                data[3] == 0x05 ? PSTR("REWIND") :
+                ToHexStr(data[3]),
+
                 GetBcd(data[5]),
                 GetBcd(data[6]),
                 GetBcd(data[7])
@@ -1258,6 +1419,9 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
             } // if
 
             at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}"));
+
+            // Warning on Serial output if JSON buffer overflows
+            if (at >= JSON_BUFFER_SIZE) Serial.print(F("--> WARNING: JSON BUFFER OVERFLOW!\n"));
         }
         break;
 
@@ -1288,15 +1452,15 @@ VanPacketParseResult_t ParseTimePkt(const char* idenStr, TVanPacketRxDesc& pkt, 
 
     const uint8_t* data = pkt.Data();
 
-    static char jsonFormatter[] PROGMEM = R"===(
-    {
-        "event": "display",
-        "data":
-        {
-            "uptime_battery": "%u",
-            "uptime": "%uh%um"
-        }
-    })===";
+    const static char jsonFormatter[] PROGMEM =
+    "{\n"
+        "\"event\": \"display\",\n"
+        "\"data\":\n"
+        "{\n"
+            "\"uptime_battery\": \"%u\",\n"
+            "\"uptime\": \"%uh%um\"\n"
+        "}\n"
+    "}\n";
 
     snprintf_P(buf, n, jsonFormatter,
         (uint16_t)data[0] << 8 | data[1],
@@ -1315,70 +1479,70 @@ VanPacketParseResult_t ParseAudioSettingsPkt(const char* idenStr, TVanPacketRxDe
 
     const uint8_t* data = pkt.Data();
 
-    static char jsonFormatter[] PROGMEM = R"===(
-    {
-        "event": "display",
-        "data":
-        {
-            "power": "%s",
-            "tape": "%s",
-            "cd": "%s",
-            "source": "%s",
-            "ext_mute": "%s",
-            "mute": "%s",
-            "volume": "%u%s",
-            "audio_menu": "%s",
-            "bass": "%d%s",
-            "treble": "%d%s",
-            "loudness": "%s",
-            "fader": "%d%s",
-            "balance": "%d%s",
-            "auto_volume": "%s"
-        }
-    })===";
+    const static char jsonFormatter[] PROGMEM =
+    "{\n"
+        "\"event\": \"display\",\n"
+        "\"data\":\n"
+        "{\n"
+            "\"power\": \"%S\",\n"
+            "\"tape\": \"%S\",\n"
+            "\"cd\": \"%S\",\n"
+            "\"source\": \"%S\",\n"
+            "\"ext_mute\": \"%S\",\n"
+            "\"mute\": \"%S\",\n"
+            "\"volume\": \"%u%S\",\n"
+            "\"audio_menu\": \"%S\",\n"
+            "\"bass\": \"%d%S\",\n"
+            "\"treble\": \"%d%S\",\n"
+            "\"loudness\": \"%S\",\n"
+            "\"fader\": \"%d%S\",\n"
+            "\"balance\": \"%d%S\",\n"
+            "\"auto_volume\": \"%S\"\n"
+        "}\n"
+    "}\n";
 
     snprintf_P(buf, n, jsonFormatter,
-        data[2] & 0x01 ? "ON" : "OFF",  // power
-        data[4] & 0x20 ? "PRESENT" : "NOT_PRESENT",  // tape
-        data[4] & 0x40 ? "PRESENT" : "NOT_PRESENT",  // cd
+        data[2] & 0x01 ? onStr : offStr,  // power
+        data[4] & 0x20 ? presentStr : notPresentStr,  // tape
+        data[4] & 0x40 ? presentStr : notPresentStr,  // cd
 
-        (data[4] & 0x0F) == 0x00 ? "NONE" :  // source
-        (data[4] & 0x0F) == 0x01 ? "TUNER" :
+        (data[4] & 0x0F) == 0x00 ? noneStr :  // source
+        (data[4] & 0x0F) == 0x01 ? PSTR("TUNER") :
         (data[4] & 0x0F) == 0x02 ?
-            data[4] & 0x20 ? "TAPE" : 
-            data[4] & 0x40 ? "INTERNAL_CD" : 
-            "INTERNAL_CD_OR_TAPE" :
-        (data[4] & 0x0F) == 0x03 ? "CD_CHANGER" :
+            data[4] & 0x20 ? PSTR("TAPE") : 
+            data[4] & 0x40 ? PSTR("INTERNAL_CD") : 
+            PSTR("INTERNAL_CD_OR_TAPE") :
+        (data[4] & 0x0F) == 0x03 ? PSTR("CD_CHANGER") :
 
-        // This is the "default" mode for the head unit, to sit there and listen to the navigation
+        // This is the PSTR("default") mode for the head unit, to sit there and listen to the navigation
         // audio. The navigation audio volume is also always set (usually a lot higher than the radio)
         // whenever this source is chosen.
-        (data[4] & 0x0F) == 0x05 ? "NAVIGATION_AUDIO" :
+        (data[4] & 0x0F) == 0x05 ? PSTR("NAVIGATION_AUDIO") :
 
-        "???",
+        ToHexStr((uint8_t)(data[4] & 0x0F)),
 
-        // ext_mute. Activated when head unit ISO connector A pin 1 ("Phone mute") is pulled LOW (to Ground).
-        data[1] & 0x02 ? "ON" : "OFF",
+        // ext_mute. Activated when head unit ISO connector A pin 1 (PSTR("Phone mute")) is pulled LOW (to Ground).
+        data[1] & 0x02 ? onStr : offStr,
 
         // mute. To activate: press both VOL_UP and VOL_DOWN buttons on stalk.
-        data[1] & 0x01 ? "ON" : "OFF",
+        data[1] & 0x01 ? onStr : offStr,
 
         data[5] & 0x7F,  // volume
-        data[5] & 0x80 ? "(UPD)" : "",
+        data[5] & 0x80 ? updatedStr : emptyStr,
 
-        // audio_menu. Bug: if CD changer is playing, this one is always "OPEN" (even if it isn't).
-        data[1] & 0x20 ? "OPEN" : "CLOSED",
+        // audio_menu. Bug: if CD changer is playing, this one is always PSTR("OPEN") (even if it isn't).
+        data[1] & 0x20 ? PSTR("OPEN") : PSTR("CLOSED"),
 
         (sint8_t)(data[8] & 0x7F) - 0x3F,  // bass
-        data[8] & 0x80 ? "(UPD)" : "",
+        data[8] & 0x80 ? updatedStr : emptyStr,
         (sint8_t)(data[9] & 0x7F) - 0x3F,  // treble
-        data[9] & 0x80 ? "(UPD)" : "",
-        data[1] & 0x10 ? "ON" : "OFF",  // loudness
+        data[9] & 0x80 ? updatedStr : emptyStr,
+        data[1] & 0x10 ? onStr : offStr,  // loudness
         (sint8_t)(0x3F) - (data[7] & 0x7F),  // fader
-        data[7] & 0x80 ? "(UPD)" : "",
+        data[7] & 0x80 ? updatedStr : emptyStr,
         (sint8_t)(0x3F) - (data[6] & 0x7F),  // balance
-        data[6] & 0x80 ? "(UPD)" : "",
-        data[1] & 0x04 ? "ON" : "OFF"  // auto_volume
+        data[6] & 0x80 ? updatedStr : emptyStr,
+        data[1] & 0x04 ? onStr : offStr  // auto_volume
     );
 
     return VAN_PACKET_PARSE_OK;
@@ -1391,27 +1555,25 @@ VanPacketParseResult_t ParseMfdStatusPkt(const char* idenStr, TVanPacketRxDesc& 
 
     const uint8_t* data = pkt.Data();
     uint16_t mfdStatus = (uint16_t)data[0] << 8 | data[1];
-    char buffer[7];
-    sprintf_P(buffer, PSTR("0x%04X"), mfdStatus);
 
-    static char jsonFormatter[] PROGMEM = R"===(
-    {
-        "event": "display",
-        "data":
-        {
-            "mfd_status": "%s"
-        }
-    })===";
+    const static char jsonFormatter[] PROGMEM =
+    "{\n"
+        "\"event\": \"display\",\n"
+        "\"data\":\n"
+        "{\n"
+            "\"mfd_status\": \"MFD_SCREEN_%S\"\n"
+        "}\n"
+    "}\n";
 
     snprintf_P(buf, n, jsonFormatter,
 
         // hmmm... MFD can also be ON if this is reported; this happens e.g. in the "minimal VAN network" test
         // setup with only the head unit (radio) and MFD. Maybe this is a status report: the MFD shows if has
         // received any packets that show connectivity to e.g. the BSI?
-        data[0] == 0x00 && data[1] == 0xFF ? "SCREEN_OFF" :
+        data[0] == 0x00 && data[1] == 0xFF ? offStr :
 
-        data[0] == 0x20 && data[1] == 0xFF ? "SCREEN_ON" :
-        buffer
+        data[0] == 0x20 && data[1] == 0xFF ? onStr :
+        ToHexStr(mfdStatus)
     );
 
     return VAN_PACKET_PARSE_OK;
@@ -1507,23 +1669,23 @@ VanPacketParseResult_t ParseAirCon1Pkt(const char* idenStr, TVanPacketRxDesc& pk
         setFanSpeed == 3 ? 1 : // All empty blades (1)
         0; // Fan icon not visible at all
 
-    static char jsonFormatter[] PROGMEM = R"===(
-    {
-        "event": "display",
-        "data":
-        {
-            "ac_icon": "%s",
-            "recirc": "%s",
-            "rear_heater_1": "%s",
-            "reported_fan_speed": "%u",
-            "set_fan_speed": "%u"
-        }
-    })===";
+    const static char jsonFormatter[] PROGMEM =
+    "{\n"
+        "\"event\": \"display\",\n"
+        "\"data\":\n"
+        "{\n"
+            "\"ac_icon\": \"%S\",\n"
+            "\"recirc\": \"%S\",\n"
+            "\"rear_heater_1\": \"%S\",\n"
+            "\"reported_fan_speed\": \"%u\",\n"
+            "\"set_fan_speed\": \"%u\"\n"
+        "}\n"
+    "}\n";
 
     snprintf_P(buf, n, jsonFormatter,
-        ac_icon ? "ON" : "OFF",
-        data[0] & 0x04 ? "ON" : "OFF",
-        rear_heater ? "YES" : "NO",
+        ac_icon ? onStr : offStr,
+        data[0] & 0x04 ? onStr : offStr,
+        rear_heater ? yesStr : noStr,
         data[4],
         setFanSpeed
     );
@@ -1550,33 +1712,33 @@ VanPacketParseResult_t ParseAirCon2Pkt(const char* idenStr, TVanPacketRxDesc& pk
     memcpy(packetData[0], packetData[1], dataLen);
     memcpy(packetData[1], data, dataLen);
 
-    static char jsonFormatter[] PROGMEM = R"===(
-    {
-        "event": "display",
-        "data":
-        {
-            "contact_key_on": "%s",
-            "ac_enabled": "%s",
-            "rear_heater_2": "%s",
-            "ac_compressor": "%s",
-            "contact_key_position": "%s",
-            "condenser_temperature": "%s",
-            "evaporator_temperature": "%s"
-        }
-    })===";
+    const static char jsonFormatter[] PROGMEM =
+    "{\n"
+        "\"event\": \"display\",\n"
+        "\"data\":\n"
+        "{\n"
+            "\"contact_key_on\": \"%S\",\n"
+            "\"ac_enabled\": \"%S\",\n"
+            "\"rear_heater_2\": \"%S\",\n"
+            "\"ac_compressor\": \"%S\",\n"
+            "\"contact_key_position\": \"%S\",\n"
+            "\"condenser_temperature\": \"%s\",\n"
+            "\"evaporator_temperature\": \"%s\"\n"
+        "}\n"
+    "}\n";
 
     char floatBuf[2][MAX_FLOAT_SIZE];
     snprintf_P(buf, n, jsonFormatter,
-        data[0] & 0x80 ? "YES" : "NO",
-        data[0] & 0x40 ? "YES" : "NO",
-        data[0] & 0x20 ? "ON" : "OFF",
-        data[0] & 0x01 ? "ON" : "OFF",
+        data[0] & 0x80 ? yesStr : noStr,
+        data[0] & 0x40 ? yesStr : noStr,
+        data[0] & 0x20 ? onStr : offStr,
+        data[0] & 0x01 ? onStr : offStr,
 
-        data[1] == 0x1C ? "ACC_OR_OFF" :
-        data[1] == 0x18 ? "ACC-->OFF" :
-        data[1] == 0x04 ? "ON-->ACC" :
-        data[1] == 0x00 ? "ON" :
-        "??",
+        data[1] == 0x1C ? PSTR("ACC_OR_OFF") :
+        data[1] == 0x18 ? PSTR("ACC-->OFF") :
+        data[1] == 0x04 ? PSTR("ON-->ACC") :
+        data[1] == 0x00 ? onStr :
+        ToHexStr(data[1]),
 
         // This is not interior temperature. This rises quite rapidly if the aircon compressor is
         // running, and drops again when the aircon compressor is off. So I think this is the condenser
@@ -1601,56 +1763,56 @@ VanPacketParseResult_t ParseCdChangerPkt(const char* idenStr, TVanPacketRxDesc& 
 
     const uint8_t* data = pkt.Data();
 
-    static char jsonFormatter[] PROGMEM = R"===(
-    {
-        "event": "display",
-        "data":
-        {
-            "cdc_random": "%s",
-            "cdc_state": "%s",
-            "cdc_cartridge": "%s",
-            "cdc_track_time_min": "%s",
-            "cdc_track_time_sec": "%s",
-            "cdc_current_track": "%u",
-            "cdc_total_tracks": "%u",
-            "cdc_current_cd": "%u",
-            "cdc_disc_1_present": "%s",
-            "cdc_disc_2_present": "%s",
-            "cdc_disc_3_present": "%s",
-            "cdc_disc_4_present": "%s",
-            "cdc_disc_5_present": "%s",
-            "cdc_disc_6_present": "%s"
-        }
-    })===";
+    const static char jsonFormatter[] PROGMEM =
+    "{\n"
+        "\"event\": \"display\",\n"
+        "\"data\":\n"
+        "{\n"
+            "\"cdc_random\": \"%S\",\n"
+            "\"cdc_state\": \"%S\",\n"
+            "\"cdc_cartridge\": \"%S\",\n"
+            "\"cdc_track_time_min\": \"%S\",\n"
+            "\"cdc_track_time_sec\": \"%S\",\n"
+            "\"cdc_current_track\": \"%u\",\n"
+            "\"cdc_total_tracks\": \"%S\",\n"
+            "\"cdc_current_cd\": \"%u\",\n"
+            "\"cdc_disc_1_present\": \"%S\",\n"
+            "\"cdc_disc_2_present\": \"%S\",\n"
+            "\"cdc_disc_3_present\": \"%S\",\n"
+            "\"cdc_disc_4_present\": \"%S\",\n"
+            "\"cdc_disc_5_present\": \"%S\",\n"
+            "\"cdc_disc_6_present\": \"%S\"\n"
+        "}\n"
+    "}\n";
 
     char floatBuf[3][MAX_FLOAT_SIZE];
     snprintf_P(buf, n, jsonFormatter,
-        data[1] == 0x01 ? "ON" : "OFF",
+        data[1] == 0x01 ? onStr : offStr,
 
-        data[2] == 0x41 ? "OFF" :
-            data[2] == 0xC1 ? "PAUSE" :
-            data[2] == 0xD3 ? "SEARCHING" :
-            data[2] == 0xC3 ? "PLAYING" :
-            data[2] == 0xC4 ? "FAST_FORWARD" :
-            data[2] == 0xC5 ? "REWIND" :
-            "UNKNOWN",
+        data[2] == 0x41 ? offStr :
+        data[2] == 0xC1 ? PSTR("PAUSE") :
+        data[2] == 0xD3 ? PSTR("SEARCHING") :
+        data[2] == 0xC3 ? PSTR("PLAYING") :
+        data[2] == 0xC4 ? PSTR("FAST_FORWARD") :
+        data[2] == 0xC5 ? PSTR("REWIND") :
+        ToHexStr(data[2]),
 
-        data[3] == 0x16 ? "IN" :
-            data[3] == 0x06 ? "OUT" :
-            "UNKNOWN",
+        data[3] == 0x16 ? PSTR("IN") :
+        data[3] == 0x06 ? PSTR("OUT") :
+        ToHexStr(data[3]),
 
-        data[4] == 0xFF ? "--" : FloatToStr(floatBuf[0], GetBcd(data[4]), 0),
-        data[5] == 0xFF ? "--" : FloatToStr(floatBuf[1], GetBcd(data[5]), 0),
+        data[4] == 0xFF ? PSTR("--") : FloatToStr(floatBuf[0], GetBcd(data[4]), 0),
+        data[5] == 0xFF ? PSTR("--") : FloatToStr(floatBuf[1], GetBcd(data[5]), 0),
         GetBcd(data[6]),
-        data[8] == 0xFF ? "--" : FloatToStr(floatBuf[2], GetBcd(data[8]), 0),
+        data[8] == 0xFF ? PSTR("--") : FloatToStr(floatBuf[2], GetBcd(data[8]), 0),
         GetBcd(data[7]),
 
-        data[10] & 0x01 ? "1" : " ",
-        data[10] & 0x02 ? "2" : " ",
-        data[10] & 0x04 ? "3" : " ",
-        data[10] & 0x08 ? "4" : " ",
-        data[10] & 0x10 ? "5" : " ",
-        data[10] & 0x20 ? "6" : " "
+        data[10] & 0x01 ? PSTR("1") : PSTR(" "),
+        data[10] & 0x02 ? PSTR("2") : PSTR(" "),
+        data[10] & 0x04 ? PSTR("3") : PSTR(" "),
+        data[10] & 0x08 ? PSTR("4") : PSTR(" "),
+        data[10] & 0x10 ? PSTR("5") : PSTR(" "),
+        data[10] & 0x20 ? PSTR("6") : PSTR(" ")
     );
 
     return VAN_PACKET_PARSE_OK;
@@ -1664,48 +1826,45 @@ VanPacketParseResult_t ParseSatnavStatus1Pkt(const char* idenStr, TVanPacketRxDe
     const uint8_t* data = pkt.Data();
     uint16_t status = (uint16_t)data[1] << 8 | data[2];
 
-    char buffer[10];
-    sprintf_P(buffer, PSTR("0x%02X-0x%02X"), data[1], data[2]);
-
-    static char jsonFormatter[] PROGMEM = R"===(
-    {
-        "event": "display",
-        "data":
-        {
-            "satnav_status_1": "%s%s"
-        }
-    })===";
+    const static char jsonFormatter[] PROGMEM =
+    "{\n"
+        "\"event\": \"display\",\n"
+        "\"data\":\n"
+        "{\n"
+            "\"satnav_status_1\": \"%S%S\"\n"
+        "}\n"
+    "}\n";
 
     snprintf_P(buf, n, jsonFormatter,
 
         // TODO - check; total guess
-        status == 0x0000 ? "NOT_OPERATING" :
-        status == 0x0001 ? "0x0001" :
-        status == 0x0020 ? "0x0020" : // Nearly at destination ??
-        status == 0x0080 ? "READY" :
-        status == 0x0101 ? "0x0101" :
-        status == 0x0200 ? "READING_DISC_1" :
-        status == 0x0220 ? "0x0220" :
-        status == 0x0300 ? "IN_GUIDANCE_MODE_1" :
-        status == 0x0301 ? "IN_GUIDANCE_MODE_2" :
-        status == 0x0320 ? "STOPPING_GUIDANCE" :
-        status == 0x0400 ? "START_OF_AUDIO_MESSAGE" :
-        status == 0x0410 ? "ARRIVED_AT_DESTINATION_1" :
-        status == 0x0600 ? "0x0600" :
-        status == 0x0700 ? "INSTRUCTION_AUDIO_MESSAGE_START_1" :
-        status == 0x0701 ? "INSTRUCTION_AUDIO_MESSAGE_START_2" :
-        status == 0x0800 ? "END_OF_AUDIO_MESSAGE" :  // Follows 0x0400, 0x0700, 0x0701
-        status == 0x4000 ? "GUIDANCE_STOPPED" :
-        status == 0x4001 ? "0x4001" :
-        status == 0x4200 ? "ARRIVED_AT_DESTINATION_2" :
-        status == 0x9000 ? "READING_DISC_2" :
-        status == 0x9080 ? "0x9080" :
-        buffer,
+        status == 0x0000 ? PSTR("NOT_OPERATING") :
+        status == 0x0001 ? PSTR("0x0001") :
+        status == 0x0020 ? PSTR("0x0020") : // Nearly at destination ??
+        status == 0x0080 ? PSTR("READY") :
+        status == 0x0101 ? PSTR("0x0101") :
+        status == 0x0200 ? PSTR("READING_DISC_1") :
+        status == 0x0220 ? PSTR("0x0220") :
+        status == 0x0300 ? PSTR("IN_GUIDANCE_MODE_1") :
+        status == 0x0301 ? PSTR("IN_GUIDANCE_MODE_2") :
+        status == 0x0320 ? PSTR("STOPPING_GUIDANCE") :
+        status == 0x0400 ? PSTR("START_OF_AUDIO_MESSAGE") :
+        status == 0x0410 ? PSTR("ARRIVED_AT_DESTINATION_1") :
+        status == 0x0600 ? PSTR("0x0600") :
+        status == 0x0700 ? PSTR("INSTRUCTION_AUDIO_MESSAGE_START_1") :
+        status == 0x0701 ? PSTR("INSTRUCTION_AUDIO_MESSAGE_START_2") :
+        status == 0x0800 ? PSTR("END_OF_AUDIO_MESSAGE") :  // Follows 0x0400, 0x0700, 0x0701
+        status == 0x4000 ? PSTR("GUIDANCE_STOPPED") :
+        status == 0x4001 ? PSTR("0x4001") :
+        status == 0x4200 ? PSTR("ARRIVED_AT_DESTINATION_2") :
+        status == 0x9000 ? PSTR("READING_DISC_2") :
+        status == 0x9080 ? PSTR("0x9080") :
+        ToHexStr(data[1], data[2]),
 
-        data[4] == 0x0B ? " reason=0x0B" :  // Seen with status == 0x4001
-        data[4] == 0x0C ? " reason=NO_DISC" :
-        data[4] == 0x0E ? " reason=NO_DISC" :
-        ""
+        data[4] == 0x0B ? PSTR(" reason=0x0B") :  // Seen with status == 0x4001
+        data[4] == 0x0C ? PSTR(" reason=NO_DISC") :
+        data[4] == 0x0E ? PSTR(" reason=NO_DISC") :
+        emptyStr
     );
 
     return VAN_PACKET_PARSE_OK;
@@ -1718,42 +1877,41 @@ VanPacketParseResult_t ParseSatnavStatus2Pkt(const char* idenStr, TVanPacketRxDe
 
     const uint8_t* data = pkt.Data();
 
-    static char jsonFormatter[] PROGMEM = R"===(
-    {
-        "event": "display",
-        "data":
-        {
-            "satnav_status_2": "%s",
-            "satnav_disc": "%s",
-            "satnav_gps_fix": "%s",
-            "satnav_gps_fix_lost": "%s",
-            "satnav_gps_scanning": "%s",
-            "satnav_gps_speed": "%u km/h%s"
-    )===";
+    const static char jsonFormatter[] PROGMEM =
+    "{\n"
+        "\"event\": \"display\",\n"
+        "\"data\":\n"
+        "{\n"
+            "\"satnav_status_2\": \"%S\",\n"
+            "\"satnav_disc\": \"%S\",\n"
+            "\"satnav_gps_fix\": \"%S\",\n"
+            "\"satnav_gps_fix_lost\": \"%S\",\n"
+            "\"satnav_gps_scanning\": \"%S\",\n"
+            "\"satnav_gps_speed\": \"%u km/h%S\"\n";
 
     int at = snprintf_P(buf, n, jsonFormatter,
 
-        data[1] == 0x11 ? "STOPPING_GUIDANCE" :
-        data[1] == 0x15 ? "IN_GUIDANCE_MODE" :
-        data[1] == 0x20 ? "IDLE_NOT_READY" :
-        data[1] == 0x21 ? "IDLE_READY" :
-        data[1] == 0x25 ? "CALCULATING_ROUTE" :
-        data[1] == 0x41 ? "???" :
-        data[1] == 0xC1 ? "FINISHED_DOWNLOADING" :
-        "??",
+        data[1] == 0x11 ? PSTR("STOPPING_GUIDANCE") :
+        data[1] == 0x15 ? PSTR("IN_GUIDANCE_MODE") :
+        data[1] == 0x20 ? PSTR("IDLE_NOT_READY") :
+        data[1] == 0x21 ? PSTR("IDLE_READY") :
+        data[1] == 0x25 ? PSTR("CALCULATING_ROUTE") :
+        data[1] == 0x41 ? ToHexStr(data[1]) :  // Seen this but what is it??
+        data[1] == 0xC1 ? PSTR("FINISHED_DOWNLOADING") :
+        ToHexStr(data[1]),
 
-        (data[2] & 0x70) == 0x70 ? "NONE_PRESENT" :
-        (data[2] & 0x70) == 0x30 ? "RECOGNIZED" :
-        "??",
+        (data[2] & 0x70) == 0x70 ? PSTR("NONE_PRESENT") :
+        (data[2] & 0x70) == 0x30 ? PSTR("RECOGNIZED") :
+        ToHexStr((uint8_t)(data[2] & 0x70)),
 
-        data[2] & 0x01 ? "YES" : "NO",
-        data[2] & 0x02 ? "YES" : "NO",
-        data[2] & 0x04 ? "YES" : "NO",
+        data[2] & 0x01 ? yesStr : noStr,
+        data[2] & 0x02 ? yesStr : noStr,
+        data[2] & 0x04 ? yesStr : noStr,
 
         // 0xE0 as boundary for "reverse": just guessing. Do we ever drive faster than 224 km/h?
         data[16] < 0xE0 ? data[16] : 0xFF - data[16] + 1,
 
-        data[16] >= 0xE0 ? " (reverse)" : ""
+        data[16] >= 0xE0 ? PSTR(" (reverse)") : emptyStr
     );
 
     // TODO - what is this?
@@ -1766,19 +1924,22 @@ VanPacketParseResult_t ParseSatnavStatus2Pkt(const char* idenStr, TVanPacketRxDe
     if (data[17] != 0x00)
     {
         at += at >= JSON_BUFFER_SIZE ? 0 :
-            snprintf_P(buf + at, n - at, PSTR(",\n\"satnav_disc_status\": \"%s%s%s%s%s%s%s\""),
+            snprintf_P(buf + at, n - at, PSTR(",\n\"satnav_disc_status\": \"%S%S%S%S%S%S%S\""),
 
-                data[17] & 0x01 ? "LOADING_AUDIO_FRAGMENT " : "",
-                data[17] & 0x02 ? "AUDIO_OUTPUT " : "",
-                data[17] & 0x04 ? "NEW_GUIDANCE_INSTRUCTION " : "",
-                data[17] & 0x08 ? "READING_DISC " : "",
-                data[17] & 0x10 ? "CALCULATING_ROUTE " : "",
-                data[17] & 0x20 ? "DISC_PRESENT " : "",
-                data[17] & 0x80 ? "REACHED_DESTINATION " : ""
+                data[17] & 0x01 ? PSTR("LOADING_AUDIO_FRAGMENT ") : emptyStr,
+                data[17] & 0x02 ? PSTR("AUDIO_OUTPUT ") : emptyStr,
+                data[17] & 0x04 ? PSTR("NEW_GUIDANCE_INSTRUCTION ") : emptyStr,
+                data[17] & 0x08 ? PSTR("READING_DISC ") : emptyStr,
+                data[17] & 0x10 ? PSTR("CALCULATING_ROUTE ") : emptyStr,
+                data[17] & 0x20 ? PSTR("DISC_PRESENT ") : emptyStr,
+                data[17] & 0x80 ? PSTR("REACHED_DESTINATION ") : emptyStr
             );
     } // if
 
     at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}"));
+
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(F("--> WARNING: JSON BUFFER OVERFLOW!\n"));
 
     return VAN_PACKET_PARSE_OK;
 } // ParseSatnavStatus2Pkt
@@ -1797,41 +1958,38 @@ VanPacketParseResult_t ParseSatnavStatus3Pkt(const char* idenStr, TVanPacketRxDe
     {
         uint16_t status = (uint16_t)data[0] << 8 | data[1];
 
-        char buffer[7];
-        sprintf_P(buffer, PSTR("0x%04X"), status);
-
-        static char jsonFormatter[] PROGMEM = R"===(
-        {
-            "event": "display",
-            "data":
-            {
-                "satnav_status_3": "%s"
-            }
-        })===";
+        const static char jsonFormatter[] PROGMEM =
+        "{\n"
+            "\"event\": \"display\",\n"
+            "\"data\":\n"
+            "{\n"
+                "\"satnav_status_3\": \"%S\"\n"
+            "}\n"
+        "}\n";
 
         snprintf_P(buf, n, jsonFormatter,
 
             // TODO - check; total guess
-            status == 0x0000 ? "CALCULATING_ROUTE" :
-            status == 0x0001 ? "STOPPING_NAVIGATION" :
-            status == 0x0C01 ? "CD_ROM_FOUND" :
-            status == 0x0C02 ? "POWERING_OFF" :
-            status == 0x0140 ? "GPS_POS_FOUND" :
-            status == 0x0120 ? "ACCEPTED_TERMS_AND_CONDITIONS" :
-            status == 0x0108 ? "NAVIGATION_MENU_ENTERED" :
-            buffer
+            status == 0x0000 ? PSTR("CALCULATING_ROUTE") :
+            status == 0x0001 ? PSTR("STOPPING_NAVIGATION") :
+            status == 0x0C01 ? PSTR("CD_ROM_FOUND") :
+            status == 0x0C02 ? PSTR("POWERING_OFF") :
+            status == 0x0140 ? PSTR("GPS_POS_FOUND") :
+            status == 0x0120 ? PSTR("ACCEPTED_TERMS_AND_CONDITIONS") :
+            status == 0x0108 ? PSTR("NAVIGATION_MENU_ENTERED") :
+            ToHexStr(status)
         );
     }
     else if (dataLen == 17 && data[0] == 0x20)
     {
         // Some set of ID strings. Stays the same even when the navigation CD is changed.
 
-        static char jsonFormatter[] PROGMEM = R"===(
-        {
-            "event": "display",
-            "data": {
-                "satnav_system_id": [
-        )===";
+        const static char jsonFormatter[] PROGMEM =
+        "{\n"
+            "\"event\": \"display\",\n"
+            "\"data\":\n"
+            "{\n"
+                "\"satnav_system_id\": [\n";
 
         int at = snprintf_P(buf, n, jsonFormatter);
 
@@ -1849,6 +2007,9 @@ VanPacketParseResult_t ParseSatnavStatus3Pkt(const char* idenStr, TVanPacketRxDe
         } // while
 
         at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n]\n}\n}"));
+
+        // Warning on Serial output if JSON buffer overflows
+        if (at >= JSON_BUFFER_SIZE) Serial.print(F("--> WARNING: JSON BUFFER OVERFLOW!\n"));
     } // if
 
     return VAN_PACKET_PARSE_OK;
@@ -1869,32 +2030,32 @@ VanPacketParseResult_t ParseSatnavGuidanceDataPkt(const char* idenStr, TVanPacke
     uint16_t headingOnRoundabout = (uint16_t)data[11] << 8 | data[12];
     uint16_t minutesToTravel = (uint16_t)data[13] << 8 | data[14];
 
-    static char jsonFormatter[] PROGMEM = R"===(
-    {
-        "event": "display",
-        "data":
-        {
-            "satnav_curr_heading": "%u deg",
-            "satnav_heading_to_dest": "%u deg",
-            "satnav_distance_to_dest": "%u %s",
-            "satnav_distance_to_dest_straight_line": "%u %s",
-            "satnav_turn_at": "%u %s",
-            "satnav_heading_on_roundabout": "%s deg",
-            "satnav_minutes_to_travel": "%u"
-        }
-    })===";
+    const static char jsonFormatter[] PROGMEM =
+    "{\n"
+        "\"event\": \"display\",\n"
+        "\"data\":\n"
+        "{\n"
+            "\"satnav_curr_heading\": \"%u deg\",\n"
+            "\"satnav_heading_to_dest\": \"%u deg\",\n"
+            "\"satnav_distance_to_dest\": \"%u %S\",\n"
+            "\"satnav_distance_to_dest_straight_line\": \"%u %S\",\n"
+            "\"satnav_turn_at\": \"%u %S\",\n"
+            "\"satnav_heading_on_roundabout\": \"%S deg\",\n"
+            "\"satnav_minutes_to_travel\": \"%u\"\n"
+        "}\n"
+    "}\n";
 
     char floatBuf[MAX_FLOAT_SIZE];
     snprintf_P(buf, n, jsonFormatter,
         currHeading,
         headingToDestination,
         distanceToDestination,
-        data[5] & 0x80 ? "Km" : "m" ,
+        data[5] & 0x80 ? PSTR("Km") : PSTR("m") ,
         gpsDistanceToDestination,
-        data[7] & 0x80 ? "Km" : "m" ,
+        data[7] & 0x80 ? PSTR("Km") : PSTR("m") ,
         distanceToNextTurn,
-        data[9] & 0x80 ? "Km" : "m",
-        headingOnRoundabout == 0x7FFF ? "---" : FloatToStr(floatBuf, headingOnRoundabout, 0),
+        data[9] & 0x80 ? PSTR("Km") : PSTR("m"),
+        headingOnRoundabout == 0x7FFF ? PSTR("---") : FloatToStr(floatBuf, headingOnRoundabout, 0),
         minutesToTravel
     );
 
@@ -1914,16 +2075,12 @@ VanPacketParseResult_t ParseSatnavGuidancePkt(const char* idenStr, TVanPacketRxD
 
     const uint8_t* data = pkt.Data();
 
-    char buffer[20];
-    sprintf_P(buffer, PSTR("unknown(0x%02X-0x%02X)"), data[1], data[2]);
-
-    static char jsonFormatter[] PROGMEM = R"===(
-    {
-        "event": "display",
-        "data":
-        {
-            "satnav_guidance_instruction": "%s"
-    )===";
+    const static char jsonFormatter[] PROGMEM =
+    "{\n"
+        "\"event\": \"display\",\n"
+        "\"data\":\n"
+        "{\n"
+            "\"satnav_guidance_instruction\": \"%s\"";
 
     int at = snprintf_P(buf, n, jsonFormatter,
         data[1] == 0x01 ? "SINGLE_TURN" :
@@ -1931,7 +2088,7 @@ VanPacketParseResult_t ParseSatnavGuidancePkt(const char* idenStr, TVanPacketRxD
         data[1] == 0x04 ? "TURN_AROUND_IF_POSSIBLE" :
         data[1] == 0x05 ? "FOLLOW_ROAD" :
         data[1] == 0x06 ? "NOT_ON_MAP" :
-        buffer
+        ToHexStr(data[1], data[2])
     );
 
     if (data[1] == 0x01)  // Single turn
@@ -1950,17 +2107,17 @@ VanPacketParseResult_t ParseSatnavGuidancePkt(const char* idenStr, TVanPacketRxD
 
             // Fork or exit instruction
             at += at >= JSON_BUFFER_SIZE ? 0 :
-                snprintf_P(buf + at, n - at, PSTR(",\n\"current_instruction\": \"%s\""),
-                    data[4] == 0x41 ? "KEEP_LEFT_ON_FORK" :
-                    data[4] == 0x14 ? "KEEP_RIGHT_ON_FORK" :
-                    data[4] == 0x12 ? "TAKE_RIGHT_EXIT" :
-                    "??"
+                snprintf_P(buf + at, n - at, PSTR(",\n\"current_instruction\": \"%S\""),
+                    data[4] == 0x41 ? PSTR("KEEP_LEFT_ON_FORK") :
+                    data[4] == 0x14 ? PSTR("KEEP_RIGHT_ON_FORK") :
+                    data[4] == 0x12 ? PSTR("TAKE_RIGHT_EXIT") :
+                    ToHexStr(data[4])
                 );
         }
         else
         {
             at += at >= JSON_BUFFER_SIZE ? 0 :
-                snprintf_P(buf + at, n - at, PSTR(",\n\"current_instruction\": \"%s\""), buffer);
+                snprintf_P(buf + at, n - at, PSTR(",\n\"current_instruction\": \"unknown(%s)\""), ToHexStr(data[2]));
         } // if
     }
     else if (data[1] == 0x03)  // Double turn
@@ -1987,14 +2144,14 @@ VanPacketParseResult_t ParseSatnavGuidancePkt(const char* idenStr, TVanPacketRxD
         if (dataLen != 4) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
         at += at >= JSON_BUFFER_SIZE ? 0 :
-            snprintf_P(buf + at, n - at, PSTR(",\n\"follow_road_next_instruction\": \"%s\""),
-                data[2] == 0x00 ? "NONE" :
-                data[2] == 0x01 ? "TURN_RIGHT" :
-                data[2] == 0x02 ? "TURN_LEFT" :
-                data[2] == 0x04 ? "ROUNDABOUT" :
-                data[2] == 0x08 ? "GO_STRAIGHT_AHEAD" :
-                data[2] == 0x10 ? "RETRIEVING_NEXT_INSTRUCTION" :
-                "??"
+            snprintf_P(buf + at, n - at, PSTR(",\n\"follow_road_next_instruction\": \"%S\""),
+                data[2] == 0x00 ? noneStr :
+                data[2] == 0x01 ? PSTR("TURN_RIGHT") :
+                data[2] == 0x02 ? PSTR("TURN_LEFT") :
+                data[2] == 0x04 ? PSTR("ROUNDABOUT") :
+                data[2] == 0x08 ? PSTR("GO_STRAIGHT_AHEAD") :
+                data[2] == 0x10 ? PSTR("RETRIEVING_NEXT_INSTRUCTION") :
+                ToHexStr(data[2])
             );
     }
     else if (data[1] == 0x06)  // Not on map
@@ -2005,7 +2162,10 @@ VanPacketParseResult_t ParseSatnavGuidancePkt(const char* idenStr, TVanPacketRxD
             snprintf_P(buf + at, n - at, PSTR(",\n\"not_on_map_follow_heading\": \"%u\""), data[2]);
     } // if
 
-    n -= n <= 0 ? 0 : snprintf_P(buf, n, PSTR("\n}\n}"));
+    at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}"));
+
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(F("--> WARNING: JSON BUFFER OVERFLOW!\n"));
 
     return VAN_PACKET_PARSE_OK;
 } // ParseSatnavGuidancePkt
@@ -2031,13 +2191,12 @@ VanPacketParseResult_t ParseSatnavReportPkt(const char* idenStr, TVanPacketRxDes
         offsetInPacket = 2;
         offsetInBuffer = 0;
 
-        static char jsonFormatter[] PROGMEM = R"===(
-        {
-            "event": "display",
-            "data":
-            {
-                "satnav_report": "%s"
-        )===";
+        const static char jsonFormatter[] PROGMEM =
+        "{\n"
+            "\"event\": \"display\",\n"
+            "\"data\":\n"
+            "{\n"
+                "\"satnav_report\": \"%S\"";
 
         n -= snprintf_P(buf, n, jsonFormatter, SatNavRequestStr(data[1]));
     }
@@ -2086,9 +2245,8 @@ VanPacketParseResult_t ParseSatnavReportPkt(const char* idenStr, TVanPacketRxDes
     } // while
 
     // Last packet in report sequence?
-    if (data[0] & 0x80) Serial.print("--LAST--");
+    if (data[0] & 0x80) Serial.print("--LAST--"); // TODO
     Serial.println();
-
 
     return VAN_PACKET_PARSE_OK;
 } // ParseSatnavReportPkt
@@ -2125,17 +2283,17 @@ VanPacketParseResult_t ParseWheelSpeedPkt(const char* idenStr, TVanPacketRxDesc&
 
     const uint8_t* data = pkt.Data();
 
-    static char jsonFormatter[] PROGMEM = R"===(
-    {
-        "event": "display",
-        "data":
-        {
-            "wheel_speed_rear_right": "%s",
-            "wheel_speed_rear_left": "%s",
-            "wheel_pulses_rear_right": "%u",
-            "wheel_pulses_rear_left": "%u"
-        }
-    })===";
+    const static char jsonFormatter[] PROGMEM =
+    "{\n"
+        "\"event\": \"display\",\n"
+        "\"data\":\n"
+        "{\n"
+            "\"wheel_speed_rear_right\": \"%s\",\n"
+            "\"wheel_speed_rear_left\": \"%s\",\n"
+            "\"wheel_pulses_rear_right\": \"%u\",\n"
+            "\"wheel_pulses_rear_left\": \"%u\"\n"
+        "}\n"
+    "}\n";
 
     char floatBuf[2][MAX_FLOAT_SIZE];
 
@@ -2156,14 +2314,14 @@ VanPacketParseResult_t ParseOdometerPkt(const char* idenStr, TVanPacketRxDesc& p
 
     const uint8_t* data = pkt.Data();
 
-    static char jsonFormatter[] PROGMEM = R"===(
-    {
-        "event": "display",
-        "data":
-        {
-            "odometer_2": "%lu"
-        }
-    })===";
+    const static char jsonFormatter[] PROGMEM =
+    "{\n"
+        "\"event\": \"display\",\n"
+        "\"data\":\n"
+        "{\n"
+            "\"odometer_2\": \"%lu\"\n"
+        "}\n"
+    "}\n";
 
     char floatBuf[MAX_FLOAT_SIZE];
 
@@ -2180,47 +2338,48 @@ VanPacketParseResult_t ParseCom2000Pkt(const char* idenStr, TVanPacketRxDesc& pk
 
     const uint8_t* data = pkt.Data();
 
-    static char jsonFormatter[] PROGMEM = R"===(
-    {
-        "event": "display",
-        "data":
-        {
-            "com2000_light_switch": "%s%s%s%s%s%s%s%s",
-            "com2000_right_stalk": "%s%s%s%s%s%s%s%s",
-            "com2000_turn_signal": "%s%s",
-            "com2000_head_unit_stalk": "%s%s%s%s%s",
-            "com2000_head_unit_stalk_wheel_pos": "%d"
-        }
-    })===";
+    // TODO - event is not "display" but "button_press"
+    const static char jsonFormatter[] PROGMEM =
+    "{\n"
+        "\"event\": \"display\",\n"
+        "\"data\":\n"
+        "{\n"
+            "\"com2000_light_switch\": \"%S%S%S%S%S%S%S%S\",\n"
+            "\"com2000_right_stalk\": \"%S%S%S%S%S%S%S%S\",\n"
+            "\"com2000_turn_signal\": \"%S%S\",\n"
+            "\"com2000_head_unit_stalk\": \"%S%S%S%S%S\",\n"
+            "\"com2000_head_unit_stalk_wheel_pos\": \"%d\"\n"
+        "}\n"
+    "}\n";
 
     snprintf_P(buf, n, jsonFormatter,
 
-        data[1] & 0x01 ? "Auto light button pressed, " : "",
-        data[1] & 0x02 ? "Fog light switch turned FORWARD, " : "",
-        data[1] & 0x04 ? "Fog light switch turned BACKWARD, " : "",
-        data[1] & 0x08 ? "Main beam handle gently ON, " : "",
-        data[1] & 0x10 ? "Main beam handle fully ON, " : "",
-        data[1] & 0x20 ? "All OFF, " : "",
-        data[1] & 0x40 ? "Sidelights ON, " : "",
-        data[1] & 0x80 ? "Low beam ON, " : "",
+        data[1] & 0x01 ? PSTR("Auto light button pressed, ") : emptyStr,
+        data[1] & 0x02 ? PSTR("Fog light switch turned FORWARD, ") : emptyStr,
+        data[1] & 0x04 ? PSTR("Fog light switch turned BACKWARD, ") : emptyStr,
+        data[1] & 0x08 ? PSTR("Main beam handle gently ON, ") : emptyStr,
+        data[1] & 0x10 ? PSTR("Main beam handle fully ON, ") : emptyStr,
+        data[1] & 0x20 ? PSTR("All OFF, ") : emptyStr,
+        data[1] & 0x40 ? PSTR("Sidelights ON, ") : emptyStr,
+        data[1] & 0x80 ? PSTR("Low beam ON, ") : emptyStr,
 
-        data[2] & 0x01 ? "Trip computer button pressed, " : "",
-        data[2] & 0x02 ? "Rear wiper switched turned to screen wash position, " : "",
-        data[2] & 0x04 ? "Rear wiper switched turned to position 1, " : "",
-        data[2] & 0x08 ? "Screen wash, " : "",
-        data[2] & 0x10 ? "Single screen wipe, " : "",
-        data[2] & 0x20 ? "Screen wipe speed 1, " : "",
-        data[2] & 0x40 ? "Screen wipe speed 2, " : "",
-        data[2] & 0x80 ? "Screen wipe speed 3, " : "",
+        data[2] & 0x01 ? PSTR("Trip computer button pressed, ") : emptyStr,
+        data[2] & 0x02 ? PSTR("Rear wiper switched turned to screen wash position, ") : emptyStr,
+        data[2] & 0x04 ? PSTR("Rear wiper switched turned to position 1, ") : emptyStr,
+        data[2] & 0x08 ? PSTR("Screen wash, ") : emptyStr,
+        data[2] & 0x10 ? PSTR("Single screen wipe, ") : emptyStr,
+        data[2] & 0x20 ? PSTR("Screen wipe speed 1, ") : emptyStr,
+        data[2] & 0x40 ? PSTR("Screen wipe speed 2, ") : emptyStr,
+        data[2] & 0x80 ? PSTR("Screen wipe speed 3, ") : emptyStr,
 
-        data[3] & 0x40 ? "Left signal ON, " : "",
-        data[3] & 0x80 ? "Right signal ON, " : "",
+        data[3] & 0x40 ? PSTR("Left signal ON, ") : emptyStr,
+        data[3] & 0x80 ? PSTR("Right signal ON, ") : emptyStr,
 
-        data[5] & 0x02 ? "SRC button pressed, " : "",
-        data[5] & 0x03 ? "Volume down button pressed, " : "",
-        data[5] & 0x08 ? "Volume up button pressed, " : "",
-        data[5] & 0x40 ? "Seek backward button pressed, " : "",
-        data[5] & 0x80 ? "Seek forward button pressed, " : "",
+        data[5] & 0x02 ? PSTR("SRC button pressed, ") : emptyStr,
+        data[5] & 0x03 ? PSTR("Volume down button pressed, ") : emptyStr,
+        data[5] & 0x08 ? PSTR("Volume up button pressed, ") : emptyStr,
+        data[5] & 0x40 ? PSTR("Seek backward button pressed, ") : emptyStr,
+        data[5] & 0x80 ? PSTR("Seek forward button pressed, ") : emptyStr,
 
         (sint8_t)data[6]
     );
@@ -2235,35 +2394,32 @@ VanPacketParseResult_t ParseCdChangerCmdPkt(const char* idenStr, TVanPacketRxDes
     const uint8_t* data = pkt.Data();
     uint16_t cdcCommand = (uint16_t)data[0] << 8 | data[1];
 
-    char buffer[7];
-    sprintf_P(buffer, PSTR("0x%04X"), cdcCommand);
-
-    static char jsonFormatter[] PROGMEM = R"===(
-    {
-        "event": "display",
-        "data":
-        {
-            "cd_changer_command": "%s"
-        }
-    })===";
+    const static char jsonFormatter[] PROGMEM =
+    "{\n"
+        "\"event\": \"display\",\n"
+        "\"data\":\n"
+        "{\n"
+            "\"cd_changer_command\": \"%S\"\n"
+        "}\n"
+    "}\n";
 
     snprintf_P(buf, n, jsonFormatter,
 
-        cdcCommand == 0x1101 ? "POWER_OFF" :
-        cdcCommand == 0x2101 ? "POWER_OFF" :
-        cdcCommand == 0x1181 ? "PAUSE" :
-        cdcCommand == 0x1183 ? "PLAY" :
-        cdcCommand == 0x31FE ? "PREVIOUS_TRACK" :
-        cdcCommand == 0x31FF ? "NEXT_TRACK" :
-        cdcCommand == 0x4101 ? "CD_1" :
-        cdcCommand == 0x4102 ? "CD_2" :
-        cdcCommand == 0x4103 ? "CD_3" :
-        cdcCommand == 0x4104 ? "CD_4" :
-        cdcCommand == 0x4105 ? "CD_5" :
-        cdcCommand == 0x4106 ? "CD_6" :
-        cdcCommand == 0x41FE ? "PREVIOUS_CD" :
-        cdcCommand == 0x41FF ? "NEXT_CD" :
-        buffer
+        cdcCommand == 0x1101 ? PSTR("POWER_OFF") :
+        cdcCommand == 0x2101 ? PSTR("POWER_OFF") :
+        cdcCommand == 0x1181 ? PSTR("PAUSE") :
+        cdcCommand == 0x1183 ? PSTR("PLAY") :
+        cdcCommand == 0x31FE ? PSTR("PREVIOUS_TRACK") :
+        cdcCommand == 0x31FF ? PSTR("NEXT_TRACK") :
+        cdcCommand == 0x4101 ? PSTR("CD_1") :
+        cdcCommand == 0x4102 ? PSTR("CD_2") :
+        cdcCommand == 0x4103 ? PSTR("CD_3") :
+        cdcCommand == 0x4104 ? PSTR("CD_4") :
+        cdcCommand == 0x4105 ? PSTR("CD_5") :
+        cdcCommand == 0x4106 ? PSTR("CD_6") :
+        cdcCommand == 0x41FE ? PSTR("PREVIOUS_CD") :
+        cdcCommand == 0x41FF ? PSTR("NEXT_CD") :
+        ToHexStr(cdcCommand)
     );
 
     return VAN_PACKET_PARSE_OK;
@@ -2277,124 +2433,126 @@ VanPacketParseResult_t ParseMfdToHeadUnitPkt(const char* idenStr, TVanPacketRxDe
     int dataLen = pkt.DataLen();
     const uint8_t* data = pkt.Data();
 
-    char buffer[5];
-    sprintf_P(buffer, PSTR("0x%02X"), data[1]);
+    // Maybe this is in fact "Head unit to MFD"??
 
     if (data[0] == 0x11)
     {
         if (dataLen != 2) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
-        static char jsonFormatter[] PROGMEM = R"===(
-        {
-            "event": "display",
-            "data":
-            {
-                "head_unit_update_audio_bits_mute": "%s",
-                "head_unit_update_audio_bits_auto_volume": "%s",
-                "head_unit_update_audio_bits_loudness": "%s",
-                "head_unit_update_audio_bits_audio_menu": "%s",
-                "head_unit_update_audio_bits_power": "%s",
-                "head_unit_update_audio_bits_contact_key": "%s"
-            }
-        })===";
+        const static char jsonFormatter[] PROGMEM =
+        "{\n"
+            "\"event\": \"display\",\n"
+            "\"data\":\n"
+            "{\n"
+                "\"head_unit_update_audio_bits_mute\": \"%S\",\n"
+                "\"head_unit_update_audio_bits_auto_volume\": \"%S\",\n"
+                "\"head_unit_update_audio_bits_loudness\": \"%S\",\n"
+                "\"head_unit_update_audio_bits_audio_menu\": \"%S\",\n"
+                "\"head_unit_update_audio_bits_power\": \"%S\",\n"
+                "\"head_unit_update_audio_bits_contact_key\": \"%S\"\n"
+            "}\n"
+        "}\n";
 
         snprintf_P(buf, n, jsonFormatter,
-            data[1] & 0x01 ? "ON" : "OFF",
-            data[1] & 0x02 ? "ON" : "OFF",
-            data[1] & 0x10 ? "ON" : "OFF",
-            data[1] & 0x20 ? "OPEN" : "CLOSED",  // Bug: if CD changer is playing, this one is always "OPEN"...
-            data[1] & 0x40 ? "ON" : "OFF",
-            data[1] & 0x80 ? "ON" : "OFF"
+            data[1] & 0x01 ? onStr : offStr,
+            data[1] & 0x02 ? onStr : offStr,
+            data[1] & 0x10 ? onStr : offStr,
+
+            // Bug: if CD changer is playing, this one is always "OPEN"...
+            data[1] & 0x20 ? PSTR("OPEN") : PSTR("CLOSED"),
+
+            data[1] & 0x40 ? onStr : offStr,
+            data[1] & 0x80 ? onStr : offStr
         );
     }
     else if (data[0] == 0x12)
     {
         if (dataLen != 2 && dataLen != 11) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
-        static char jsonFormatter[] PROGMEM = R"===(
-        {
-            "event": "display",
-            "data":
-            {
-                "head_unit_update_switch_to": "%s"
-        )===";
+        const static char jsonFormatter[] PROGMEM =
+        "{\n"
+            "\"event\": \"display\",\n"
+            "\"data\":\n"
+            "{\n"
+                "\"head_unit_update_switch_to\": \"%S\"";
 
         int at = snprintf_P(buf, n, jsonFormatter,
-            data[1] == 0x01 ? "TUNER" :
-            data[1] == 0x02 ? "INTERNAL_CD_OR_TAPE" :
-            data[1] == 0x03 ? "CD_CHANGER" :
+            data[1] == 0x01 ? PSTR("TUNER") :
+            data[1] == 0x02 ? PSTR("INTERNAL_CD_OR_TAPE") :
+            data[1] == 0x03 ? PSTR("CD_CHANGER") :
 
-            // This is the "default" mode for the head unit, to sit there and listen to the navigation
+            // This is the PSTR("default") mode for the head unit, to sit there and listen to the navigation
             // audio. The navigation audio volume is also always set (usually a lot higher than the radio)
             // whenever this source is chosen.
-            data[1] == 0x05 ? "NAVIGATION_AUDIO" :
+            data[1] == 0x05 ? PSTR("NAVIGATION_AUDIO") :
 
-            buffer
+            ToHexStr(data[1])
         );
 
         if (dataLen == 11)
         {
-            static char jsonFormatter2[] PROGMEM = R"===(,
-                "head_unit_update_power": "%s",
-                "head_unit_update_source": "%s",
-                "head_unit_update_volume_1": "%u%s",
-                "head_unit_update_balance": "%d%s",
-                "head_unit_update_fader": "%d%s",
-                "head_unit_update_bass": "%d%s",
-                "head_unit_update_treble": "%d%s"
-            )===";
+            const static char jsonFormatter2[] PROGMEM = ",\n"
+                "\"head_unit_update_power\": \"%S\",\n"
+                "\"head_unit_update_source\": \"%S\",\n"
+                "\"head_unit_update_volume_1\": \"%u%S\",\n"
+                "\"head_unit_update_balance\": \"%d%S\",\n"
+                "\"head_unit_update_fader\": \"%d%S\",\n"
+                "\"head_unit_update_bass\": \"%d%S\",\n"
+                "\"head_unit_update_treble\": \"%d%S\"";
 
             at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, jsonFormatter2,
 
-                data[2] & 0x01 ? "ON" : "OFF",
+                data[2] & 0x01 ? onStr : offStr,
 
-                (data[4] & 0x0F) == 0x00 ? "NONE" :  // source
-                (data[4] & 0x0F) == 0x01 ? "TUNER" :
-                (data[4] & 0x0F) == 0x02 ? "INTERNAL_CD_OR_TAPE" :
-                (data[4] & 0x0F) == 0x03 ? "CD_CHANGER" :
+                (data[4] & 0x0F) == 0x00 ? noneStr :  // source
+                (data[4] & 0x0F) == 0x01 ? PSTR("TUNER") :
+                (data[4] & 0x0F) == 0x02 ? PSTR("INTERNAL_CD_OR_TAPE") :
+                (data[4] & 0x0F) == 0x03 ? PSTR("CD_CHANGER") :
 
                 // This is the "default" mode for the head unit, to sit there and listen to the navigation
                 // audio. The navigation audio volume is also always set (usually a lot higher than the radio)
                 // whenever this source is chosen.
-                (data[4] & 0x0F) == 0x05 ? "NAVIGATION_AUDIO" :
+                (data[4] & 0x0F) == 0x05 ? PSTR("NAVIGATION_AUDIO") :
 
-                "???",
+                ToHexStr((uint8_t)(data[4] & 0x0F)),
 
                 data[5] & 0x7F,
-                data[5] & 0x80 ? "(UPD)" : "",
+                data[5] & 0x80 ? updatedStr : emptyStr,
                 (sint8_t)(0x3F) - (data[6] & 0x7F),
-                data[6] & 0x80 ? "(UPD)" : "",
+                data[6] & 0x80 ? updatedStr : emptyStr,
                 (sint8_t)(0x3F) - (data[7] & 0x7F),
-                data[7] & 0x80 ? "(UPD)" : "",
+                data[7] & 0x80 ? updatedStr : emptyStr,
                 (sint8_t)(data[8] & 0x7F) - 0x3F,
-                data[8] & 0x80 ? "(UPD)" : "",
+                data[8] & 0x80 ? updatedStr : emptyStr,
                 (sint8_t)(data[9] & 0x7F) - 0x3F,
-                data[9] & 0x80 ? "(UPD)" : ""
+                data[9] & 0x80 ? updatedStr : emptyStr
             );
-
         } // if
 
         at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}"));
+
+        // Warning on Serial output if JSON buffer overflows
+        if (at >= JSON_BUFFER_SIZE) Serial.print(F("--> WARNING: JSON BUFFER OVERFLOW!\n"));
     }
     else if (data[0] == 0x13)
     {
         if (dataLen != 2) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
-        static char jsonFormatter[] PROGMEM = R"===(
-        {
-            "event": "display",
-            "data":
-            {
-                "head_unit_update_volume_2": "%u(%s%s)"
-            }
-        })===";
+        const static char jsonFormatter[] PROGMEM =
+        "{\n"
+            "\"event\": \"display\",\n"
+            "\"data\":\n"
+            "{\n"
+                "\"head_unit_update_volume_2\": \"%u(%S%S)\"\n"
+            "}\n"
+        "}\n";
 
         snprintf_P(buf, n, jsonFormatter,
             data[1] & 0x1F,
-            data[1] & 0x40 ? "relative: " : "absolute",
+            data[1] & 0x40 ? PSTR("relative: ") : PSTR("absolute"),
             data[1] & 0x40 ?
-                data[1] & 0x20 ? "decrease" : "increase" :
-                ""
+                data[1] & 0x20 ? PSTR("decrease") : PSTR("increase") :
+                emptyStr
         );
     }
     else if (data[0] == 0x14)
@@ -2411,17 +2569,17 @@ VanPacketParseResult_t ParseMfdToHeadUnitPkt(const char* idenStr, TVanPacketRxDe
 
         // TODO - bit 7 of data[1] is always 1 ?
 
-        static char jsonFormatter[] PROGMEM = R"===(
-        {
-            "event": "display",
-            "data":
-            {
-                "head_unit_update_audio_levels_balance": "%d",
-                "head_unit_update_audio_levels_fader": "%d",
-                "head_unit_update_audio_levels_bass": "%d",
-                "head_unit_update_audio_levels_treble": "%d"
-            }
-        })===";
+        const static char jsonFormatter[] PROGMEM =
+        "{\n"
+            "\"event\": \"display\",\n"
+            "\"data\":\n"
+            "{\n"
+                "\"head_unit_update_audio_levels_balance\": \"%d\",\n"
+                "\"head_unit_update_audio_levels_fader\": \"%d\",\n"
+                "\"head_unit_update_audio_levels_bass\": \"%d\",\n"
+                "\"head_unit_update_audio_levels_treble\": \"%d\"\n"
+            "}\n"
+        "}\n";
 
         snprintf_P(buf, n, jsonFormatter,
             (sint8_t)(0x3F) - (data[1] & 0x7F),
@@ -2434,15 +2592,15 @@ VanPacketParseResult_t ParseMfdToHeadUnitPkt(const char* idenStr, TVanPacketRxDe
     {
         if (dataLen != 2) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
-        static char jsonFormatter[] PROGMEM = R"===(
-        {
-            "event": "display",
-            "data":
-            {
-                "head_unit_preset_request_band": "%s",
-                "head_unit_preset_request_memory": "%u"
-            }
-        })===";
+        const static char jsonFormatter[] PROGMEM =
+        "{\n"
+            "\"event\": \"display\",\n"
+            "\"data\":\n"
+            "{\n"
+                "\"head_unit_preset_request_band\": \"%S\",\n"
+                "\"head_unit_preset_request_memory\": \"%u\"\n"
+            "}\n"
+        "}\n";
 
         snprintf_P(buf, n, jsonFormatter,
             TunerBandStr(data[1] >> 4 & 0x07),
@@ -2453,35 +2611,35 @@ VanPacketParseResult_t ParseMfdToHeadUnitPkt(const char* idenStr, TVanPacketRxDe
     {
         if (dataLen != 4) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
-        static char jsonFormatter[] PROGMEM = R"===(
-        {
-            "event": "display",
-            "data":
-            {
-                "head_unit_cd_request": "%s"
-            }
-        })===";
+        const static char jsonFormatter[] PROGMEM =
+        "{\n"
+            "\"event\": \"display\",\n"
+            "\"data\":\n"
+            "{\n"
+                "\"head_unit_cd_request\": \"%S\"\n"
+            "}\n"
+        "}\n";
 
         snprintf_P(buf, n, jsonFormatter,
-            data[1] == 0x02 ? "PAUSE" :
-            data[1] == 0x03 ? "PLAY" :
-            data[3] == 0xFF ? "NEXT" :
-            data[3] == 0xFE ? "PREVIOUS" :
-            "??"
+            data[1] == 0x02 ? PSTR("PAUSE") :
+            data[1] == 0x03 ? PSTR("PLAY") :
+            data[3] == 0xFF ? PSTR("NEXT") :
+            data[3] == 0xFE ? PSTR("PREVIOUS") :
+            ToHexStr(data[3])
         );
     }
     else if (data[0] == 0xD1)
     {
         if (dataLen != 1) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
-        static char jsonFormatter[] PROGMEM = R"===(
-        {
-            "event": "display",
-            "data":
-            {
-                "head_unit_tuner_info_request": "REQUEST"
-            }
-        })===";
+        const static char jsonFormatter[] PROGMEM =
+        "{\n"
+            "\"event\": \"display\",\n"
+            "\"data\":\n"
+            "{\n"
+                "\"head_unit_tuner_info_request\": \"REQUEST\"\n"
+            "}\n"
+        "}\n";
 
         snprintf_P(buf, n, jsonFormatter);
     }
@@ -2489,14 +2647,14 @@ VanPacketParseResult_t ParseMfdToHeadUnitPkt(const char* idenStr, TVanPacketRxDe
     {
         if (dataLen != 1) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
-        static char jsonFormatter[] PROGMEM = R"===(
-        {
-            "event": "display",
-            "data":
-            {
-                "head_unit_tape_info_request": "REQUEST"
-            }
-        })===";
+        const static char jsonFormatter[] PROGMEM =
+        "{\n"
+            "\"event\": \"display\",\n"
+            "\"data\":\n"
+            "{\n"
+                "\"head_unit_tape_info_request\": \"REQUEST\"\n"
+            "}\n"
+        "}\n";
 
         snprintf_P(buf, n, jsonFormatter);
     }
@@ -2504,14 +2662,14 @@ VanPacketParseResult_t ParseMfdToHeadUnitPkt(const char* idenStr, TVanPacketRxDe
     {
         if (dataLen != 1) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
-        static char jsonFormatter[] PROGMEM = R"===(
-        {
-            "event": "display",
-            "data":
-            {
-                "head_unit_cd_track_info_request": "REQUEST"
-            }
-        })===";
+        const static char jsonFormatter[] PROGMEM =
+        "{\n"
+            "\"event\": \"display\",\n"
+            "\"data\":\n"
+            "{\n"
+                "\"head_unit_cd_track_info_request\": \"REQUEST\"\n"
+            "}\n"
+        "}\n";
 
         snprintf_P(buf, n, jsonFormatter);
     }
@@ -2530,25 +2688,35 @@ void PrintPacketDataDiff(TVanPacketRxDesc& pkt, IdenHandler_t* handler)
     int dataLen = pkt.DataLen();
     const uint8_t* data = pkt.Data();
 
-    // First print only the differing bytes from the previous packet
-    Serial.printf("DIFF: %03X (%s) ", iden, handler->idenStr);
-    for (int i = 0; i < dataLen; i++)
+    // The first time, handler->prevData will be NULL, so only the "FULL: " line will be printed
+    if (handler->prevData != NULL)
     {
-        char diffByte[3] = "  ";
-        if (data[i] != handler->prevData[i])
+        // First line: print the new packet's data where it differs from the previous packet
+        Serial.printf_P(PSTR("DIFF: %03X (%s) "), iden, handler->idenStr);
+        for (int i = 0; i < dataLen; i++)
         {
-            snprintf_P(diffByte, sizeof(diffByte), PSTR("%02X"), handler->prevData[i]);
-        } // if
-        Serial.printf("%s%c", diffByte, i < dataLen - 1 ? '-' : '\n');
-    } // for
+            char diffByte[3] = "  ";
+            if (data[i] != handler->prevData[i])
+            {
+                snprintf_P(diffByte, sizeof(diffByte), PSTR("%02X"), handler->prevData[i]);
+            } // if
+            Serial.printf_P(PSTR("%s%c"), diffByte, i < dataLen - 1 ? '-' : '\n');
+        } // for
+    } // if
 
-    // Save packet data to compare against at next packet reception
-    memset(handler->prevData, '\0', VAN_MAX_DATA_BYTES);
-    memcpy(handler->prevData, data, dataLen);
+    if (handler->prevData == NULL) handler->prevData = (uint8_t*) malloc(VAN_MAX_DATA_BYTES);
 
-    // Now print the new packet's data
-    Serial.printf("FULL: %03X (%s) ", iden, handler->idenStr);
-    for (int i = 0; i < dataLen; i++) Serial.printf("%02X%c", data[i], i < dataLen - 1 ? '-' : '\n');
+    if (handler->prevData != NULL)
+    {
+        // Save packet data to compare against at next packet reception
+        memset(handler->prevData, 0, VAN_MAX_DATA_BYTES);
+        memcpy(handler->prevData, data, dataLen);
+    } // if
+
+    // Now print the new packet's data in full
+    Serial.printf_P(PSTR("FULL: %03X (%s) "), iden, handler->idenStr);
+    for (int i = 0; i < dataLen; i++) Serial.printf_P(PSTR("%02X%c"), data[i], i < dataLen - 1 ? '-' : ' ');
+    Serial.println();
 } // PrintPacketDataDiff
 
 static IdenHandler_t handlers[] = 
@@ -2616,14 +2784,8 @@ const char* ParseVanPacketToJson(TVanPacketRxDesc& pkt)
 
         const uint8_t* data = pkt.Data();
 
-        // Assumption is that 'handler->prevData' is initialized to all-zeroes; see also:
-        // https://stackoverflow.com/questions/2589749/how-to-initialize-array-to-0-in-c which says: 
-        //
-        // "Global variables and static variables are automatically initialized to zero. If you have simply
-        // char ZEROARRAY[1024];
-        // at global scope it will be all zeros at runtime."
-        //
-        if (memcmp(data, handler->prevData, dataLen) == 0) return "";  // Duplicate packet
+        // Relying on short-circuit boolean evaluation
+        if (handler->prevData != NULL && memcmp(data, handler->prevData, dataLen) == 0) return "";  // Duplicate packet
 
         // Print the new packet on Serial, highlighting the bytes that differ
         PrintPacketDataDiff(pkt, handler);
