@@ -25,11 +25,32 @@
  *
  * Note that the presentation of the data is not very slick: it is a simple list. This sketch is just to demonstrate
  * the mechanism; experts in graphic design need to step in from here :-)
+ *
+ * -----
+ * Dependencies
+ *
+ * In order to compile this sketch, you need to additionally install the following libraries:
+ * (Arduino IDE --> Menu 'Sketch' --> 'Include Library' --> 'Manage Libraries...')
+ *
+ * - "WebSockets" by Markus Sattler (tested with version 2.2.0)
+ *
+ * The web site itself, as served by this sketch, uses jQuery, which it downloads from:
+ * https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js
+ * If you don't like Google tracking your surfing, you could use Firefox and install the 'LocalCDN' extension (see
+ * https://addons.mozilla.org/nl/firefox/addon/localcdn-fork-of-decentraleyes ).
  */
 
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <WebSocketsServer.h>
+#include <VanBusRx.h>
+
+#if defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
+// For ESP-01 board we use GPIO 2 (internal pull-up, keep disconnected or high at boot time)
+#define D2 (2)
+#endif
+
+int RX_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
 
 ESP8266WebServer webServer;
 WebSocketsServer webSocket = WebSocketsServer(81);
@@ -41,8 +62,8 @@ char* password = "MyCar"; // Fill in yours
 char webpage[] PROGMEM = R"=====(
 <html>
 <head>
-    <meta charset='UTF-8' />
-    <script>
+  <meta charset='UTF-8' />
+  <script>
 
     // Inspired by https://gist.github.com/ismasan/299789
     var FancyWebSocket = function(url)
@@ -212,7 +233,7 @@ char webpage[] PROGMEM = R"=====(
     <p>Radio</p>
     <p>Band: <b id="band">---</b></p>
     <p>Preset: <b id="preset">---</b></p>
-    <p>Frequency: <b id="frequency">---</b></p>
+    <p>Frequency: <b id="frequency">---</b><b id="frequency_h">-</b> <b id="frequency_unit"></b></p>
     <p>Signal strength: <b id="signal_strength">---</b></p>
     <p>Scanning: <b id="scan_mode">---</b></p>
     <p>Scan sensitivity: <b id="scan_sensitivity">---</b></p>
@@ -423,9 +444,10 @@ char webpage[] PROGMEM = R"=====(
 </html>
 )=====";
 
-#include <VanBusRx.h>
-
-int RX_PIN = 2; // Set to GPIO pin connected to VAN bus transceiver output
+const char* getHostname()
+{
+    return "Car";
+} // getHostname
 
 void setup()
 {
@@ -434,6 +456,9 @@ void setup()
     Serial.println(F("Starting VAN bus live web page server"));
 
     Serial.printf_P(PSTR("Connecting to Wifi SSID '%s' "), ssid);
+
+    // TODO - move to after WiFi.status() == WL_CONNECTED ?
+    WiFi.hostname(getHostname());
 
     WiFi.begin(ssid,password);
     while (WiFi.status() != WL_CONNECTED)
