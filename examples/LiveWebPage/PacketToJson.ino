@@ -8,14 +8,16 @@
  * MIT license, all text above must be included in any redistribution.   
  */
 
-// Uncomment to see the JSON buffers printed on the Serial port
-//#define PRINT_JSON_BUFFERS_ON_SERIAL
+// Uncomment to see the JSON buffers printed on the Serial port.
+// Note: printing the JSON buffers takes pretty long, so it leads to more Rx queue overruns.
+#define PRINT_JSON_BUFFERS_ON_SERIAL
 
 #define JSON_BUFFER_SIZE 2048
 char jsonBuffer[JSON_BUFFER_SIZE];
 
 enum VanPacketParseResult_t
 {
+    VAN_PACKET_NO_CONTENT  = 2, // Packet is OK but contains no useful content
     VAN_PACKET_DUPLICATE  = 1, // Packet was the same as the last with this IDEN field
     VAN_PACKET_PARSE_OK = 0,  // Packet was parsed OK
     VAN_PACKET_PARSE_CRC_ERROR = -1,  // Packet had a CRC error
@@ -37,6 +39,7 @@ struct IdenHandler_t
 
 // Often used string constants
 static const char PROGMEM emptyStr[] = "";
+static const char PROGMEM commaStr[] = ",";
 static const char PROGMEM onStr[] = "ON";
 static const char PROGMEM offStr[] = "OFF";
 static const char PROGMEM yesStr[] = "YES";
@@ -45,6 +48,9 @@ static const char PROGMEM presentStr[] = "PRESENT";
 static const char PROGMEM notPresentStr[] = "NOT_PRESENT";
 static const char PROGMEM noneStr[] = "NONE";
 static const char PROGMEM updatedStr[] = "(UPD)";
+static const char PROGMEM notApplicable2Str[] = "--";
+static const char PROGMEM notApplicable3Str[] = "---";
+static const char PROGMEM warningPrintBufferOverflow[] = "--> WARNING: JSON BUFFER OVERFLOW!\n";
 
 inline uint8_t GetBcd(uint8_t bcd)
 {
@@ -103,59 +109,60 @@ const char* TunerBandStr(uint8_t data)
         data == TB_FM3 ? PSTR("FM3") :  // Never seen, just guessing
         data == TB_FMAST ? PSTR("FMAST") :
         data == TB_AM ? PSTR("AM") :
-        data == TB_PTY_SELECT ? PSTR("PTY_SELECT") :  // When selecting PTY to scan for
+        data == TB_PTY_SELECT ? PSTR("PTY_SELECT") :  // When selecting PTY to search for
         ToHexStr(data);
 } // TunerBandStr
 
-// Tuner scan mode
+// Tuner search mode
 // Bits:
 //  2  1  0
 // ---+--+---
 //  0  0  0 : Not searching
 //  0  0  1 : Manual tuning
-//  0  1  0 : Scanning by frequency
+//  0  1  0 : Searching by frequency
 //  0  1  1 : 
-//  1  0  0 : Scanning for station with matching PTY
+//  1  0  0 : Searching for station with matching PTY
 //  1  0  1 : 
 //  1  1  0 : 
 //  1  1  1 : Auto-station search in the FMAST band (long-press "Radio Band" button)
-enum TunerScanMode_t
+enum TunerSearchMode_t
 {
     TS_NOT_SEARCHING = 0,
     TS_MANUAL = 1,
     TS_BY_FREQUENCY = 2,
     TS_BY_MATCHING_PTY = 4,
     TS_FM_AST = 7
-}; // enum TunerScanMode_t
+}; // enum TunerSearchMode_t
 
 // Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
-const char* TunerScanModeStr(uint8_t data)
+const char* TunerSearchModeStr(uint8_t data)
 {
     return
         data == TS_NOT_SEARCHING ? PSTR("NOT_SEARCHING") :
         data == TS_MANUAL ? PSTR("MANUAL_TUNING") :
-        data == TS_BY_FREQUENCY ? PSTR("SCANNING_BY_FREQUENCY") :
-        data == TS_BY_MATCHING_PTY ? PSTR("SCANNING_MATCHING_PTY") : // Scanning for station with matching PTY
-        data == TS_FM_AST ? PSTR("FM_AST_SEARCH") : // Auto-station search in the FMAST band (long-press Radio Band button)
+        data == TS_BY_FREQUENCY ? PSTR("SEARCHING_BY_FREQUENCY") :
+        data == TS_BY_MATCHING_PTY ? PSTR("SEARCHING_MATCHING_PTY") : // Searching for station with matching PTY
+        data == TS_FM_AST ? PSTR("FM_AST_SCAN") : // Auto-station scan in the FMAST band (long-press "Radio Band" button)
         ToHexStr(data);
-} // TunerScanModeStr
+} // TunerSearchModeStr
 
+// "Full" PTY string
 // Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
-const char* PtyStr(uint8_t ptyCode)
+const char* PtyStrFull(uint8_t ptyCode)
 {
     // See also:
     // https://www.electronics-notes.com/articles/audio-video/broadcast-audio/rds-radio-data-system-pty-codes.php
     return
-        ptyCode == 0 ? PSTR("Not defined") :
-        ptyCode == 1 ? PSTR("News") :
-        ptyCode == 2 ? PSTR("Current affairs") :
-        ptyCode == 3 ? PSTR("Information") :
-        ptyCode == 4 ? PSTR("Sport") :
-        ptyCode == 5 ? PSTR("Education") :
-        ptyCode == 6 ? PSTR("Drama") :
-        ptyCode == 7 ? PSTR("Culture") :
-        ptyCode == 8 ? PSTR("Science") :
-        ptyCode == 9 ? PSTR("Varied") :
+        ptyCode ==  0 ? PSTR("Not defined") :
+        ptyCode ==  1 ? PSTR("News") :
+        ptyCode ==  2 ? PSTR("Current affairs") :
+        ptyCode ==  3 ? PSTR("Information") :
+        ptyCode ==  4 ? PSTR("Sport") :
+        ptyCode ==  5 ? PSTR("Education") :
+        ptyCode ==  6 ? PSTR("Drama") :
+        ptyCode ==  7 ? PSTR("Culture") :
+        ptyCode ==  8 ? PSTR("Science") :
+        ptyCode ==  9 ? PSTR("Varied") :
         ptyCode == 10 ? PSTR("Pop Music") :
         ptyCode == 11 ? PSTR("Rock Music") :
         ptyCode == 12 ? PSTR("Easy Listening") :  // also: "Middle of the road music"
@@ -179,28 +186,116 @@ const char* PtyStr(uint8_t ptyCode)
         ptyCode == 30 ? PSTR("Alarm Test") :
         ptyCode == 31 ? PSTR("Alarm") :
         ToHexStr(ptyCode);
-} // PtyStr
+} // PtyStrFull
+
+// 16-character PTY string
+// See: poupa.cz/rds/r98_009_2.pdf, page 2
+// Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
+const char* PtyStr16(uint8_t ptyCode)
+{
+    // See also:
+    // https://www.electronics-notes.com/articles/audio-video/broadcast-audio/rds-radio-data-system-pty-codes.php
+    return
+        ptyCode ==  0 ? PSTR("None") :
+        ptyCode ==  1 ? PSTR("News") :
+        ptyCode ==  2 ? PSTR("Current Affairs") :
+        ptyCode ==  3 ? PSTR("Information") :
+        ptyCode ==  4 ? PSTR("Sport") :
+        ptyCode ==  5 ? PSTR("Education") :
+        ptyCode ==  6 ? PSTR("Drama") :
+        ptyCode ==  7 ? PSTR("Cultures") :
+        ptyCode ==  8 ? PSTR("Science") :
+        ptyCode ==  9 ? PSTR("Varied Speech") :
+        ptyCode == 10 ? PSTR("Pop Music") :
+        ptyCode == 11 ? PSTR("Rock Music") :
+        ptyCode == 12 ? PSTR("Easy Listening") :
+        ptyCode == 13 ? PSTR("Light Classics M") :
+        ptyCode == 14 ? PSTR("Serious Classics") :
+        ptyCode == 15 ? PSTR("Other Music") :
+        ptyCode == 16 ? PSTR("Weather & Metr") :
+        ptyCode == 17 ? PSTR("Finance") :
+        ptyCode == 18 ? PSTR("Children’s Progs") :
+        ptyCode == 19 ? PSTR("Social Affairs") :
+        ptyCode == 20 ? PSTR("Religion") :
+        ptyCode == 21 ? PSTR("Phone In") :
+        ptyCode == 22 ? PSTR("Travel & Touring") :
+        ptyCode == 23 ? PSTR("Leisure & Hobby") :
+        ptyCode == 24 ? PSTR("Jazz Music") :
+        ptyCode == 25 ? PSTR("Country Music") :
+        ptyCode == 26 ? PSTR("National Music") :
+        ptyCode == 27 ? PSTR("Oldies Music") :
+        ptyCode == 28 ? PSTR("Folk Music") :
+        ptyCode == 29 ? PSTR("Documentary") :
+        ptyCode == 30 ? PSTR("Alarm Test") :
+        ptyCode == 31 ? PSTR("Alarm-Alarm!") :
+        ToHexStr(ptyCode);
+} // PtyStr16
+
+// 8-character PTY string
+// See: poupa.cz/rds/r98_009_2.pdf, page 2
+// Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
+const char* PtyStr8(uint8_t ptyCode)
+{
+    // See also:
+    // https://www.electronics-notes.com/articles/audio-video/broadcast-audio/rds-radio-data-system-pty-codes.php
+    return
+        ptyCode ==  0 ? PSTR("None") :
+        ptyCode ==  1 ? PSTR("News") :
+        ptyCode ==  2 ? PSTR("Affairs") :
+        ptyCode ==  3 ? PSTR("Info") :
+        ptyCode ==  4 ? PSTR("Sport") :
+        ptyCode ==  5 ? PSTR("Educate") :
+        ptyCode ==  6 ? PSTR("Drama") :
+        ptyCode ==  7 ? PSTR("Culture") :
+        ptyCode ==  8 ? PSTR("Science") :
+        ptyCode ==  9 ? PSTR("Varied") :
+        ptyCode == 10 ? PSTR("Pop M") :
+        ptyCode == 11 ? PSTR("Rock M") :
+        ptyCode == 12 ? PSTR("Easy M") :
+        ptyCode == 13 ? PSTR("Light M") :
+        ptyCode == 14 ? PSTR("Classics") :
+        ptyCode == 15 ? PSTR("Other M") :
+        ptyCode == 16 ? PSTR("Weather") :
+        ptyCode == 17 ? PSTR("Finance") :
+        ptyCode == 18 ? PSTR("Children") :
+        ptyCode == 19 ? PSTR("Social") :
+        ptyCode == 20 ? PSTR("Religion") :
+        ptyCode == 21 ? PSTR("Phone In") :
+        ptyCode == 22 ? PSTR("Travel") :
+        ptyCode == 23 ? PSTR("Leisure") :
+        ptyCode == 24 ? PSTR("Jazz") :
+        ptyCode == 25 ? PSTR("Country") :
+        ptyCode == 26 ? PSTR("Nation M") :
+        ptyCode == 27 ? PSTR("Oldies") :
+        ptyCode == 28 ? PSTR("Folk M") :
+        ptyCode == 29 ? PSTR("Document") :
+        ptyCode == 30 ? PSTR("TEST") :
+        ptyCode == 31 ? PSTR("Alarm") :
+        ToHexStr(ptyCode);
+} // PtyStr8
 
 // Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
 const char* RadioPiCountry(uint8_t countryCode)
 {
-    // https://radio-tv-nederland.nl/rds/PI%20codes%20Europe.jpg
+    // See also:
+    // - http://poupa.cz/rds/countrycodes.htm
+    // - https://radio-tv-nederland.nl/rds/PI%20codes%20Europe.jpg
     // More than one country is assigned to the same code, just listing the most likely.
     return
-        countryCode == 0x01 || countryCode == 0x0D ? PSTR("Germany") :
-        countryCode == 0x02 ? PSTR("Ireland") :
-        countryCode == 0x03 ? PSTR("Poland") :
-        countryCode == 0x04 ? PSTR("Switzerland") :
-        countryCode == 0x05 ? PSTR("Italy") :
-        countryCode == 0x06 ? PSTR("Belgium") :
-        countryCode == 0x07 ? PSTR("Luxemburg") :
-        countryCode == 0x08 ? PSTR("Netherlands") :
-        countryCode == 0x09 ? PSTR("Denmark") :
-        countryCode == 0x0A ? PSTR("Austria") :
-        countryCode == 0x0B ? PSTR("Hungary") :
-        countryCode == 0x0C ? PSTR("UK") :
-        countryCode == 0x0E ? PSTR("Spain") :
-        countryCode == 0x0F ? PSTR("France") :
+        countryCode == 0x01 || countryCode == 0x0D ? PSTR("DE") :  // Germany
+        countryCode == 0x02 ? PSTR("IE") :  // Ireland
+        countryCode == 0x03 ? PSTR("PL") :  // Poland
+        countryCode == 0x04 ? PSTR("CH") :  // Switzerland
+        countryCode == 0x05 ? PSTR("IT") :  // Italy
+        countryCode == 0x06 ? PSTR("BEL") :  // Belgium
+        countryCode == 0x07 ? PSTR("LU") :  // Luxemburg
+        countryCode == 0x08 ? PSTR("NL") :  // Netherlands
+        countryCode == 0x09 ? PSTR("DNK") :  // Denmark
+        countryCode == 0x0A ? PSTR("AUT") :  // Austria
+        countryCode == 0x0B ? PSTR("HU") :  // Hungary
+        countryCode == 0x0C ? PSTR("GB") :  // United Kingdom
+        countryCode == 0x0E ? PSTR("ES") :  // Spain
+        countryCode == 0x0F ? PSTR("FR") :  // France
         ToHexStr(countryCode);
 } // RadioPiCountry
 
@@ -225,111 +320,127 @@ const char* RadioPiAreaCoverage(uint8_t coverageCode)
 // - MFD_TO_SATNAV_IDEN (0x94E): data[0]. Following values of data[1] seen:
 //   0x02, 0x05, 0x06, 0x08, 0x09, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x1B, 0x1C, 0x1D
 //
+enum SatNavRequest_t
+{
+    SR_ENTER_COUNTRY = 0x00,  // Never seen, just guessing
+    SR_ENTER_PROVINCE = 0x01,  // Never seen, just guessing
+    SR_ENTER_CITY = 0x02,  // Or: list of cities?
+    SR_ENTER_DISTRICT = 0x03,  // Never seen, just guessing
+    SR_ENTER_NEIGHBORHOOD = 0x04,  // Never seen, just guessing
+    SR_ENTER_STREET = 0x05,  // Or: list of streets?
+    SR_ENTER_HOUSE_NUMBER = 0x06,  // Or: range of house numbers?
+    SR_ENTER_HOUSE_NUMBER_LETTER = 0x07,  // Never seen, just guessing
+    SR_PLACE_OF_INTEREST_CATEGORY_LIST = 0x08,
+    SR_PLACE_OF_INTEREST_CATEGORY = 0x09,  // Or: place of interest address?
+    SR_GPS_FOR_PLACE_OF_INTEREST = 0x0E,  // Or: current address?
+    SR_NEXT_STREET = 0x0F,  // Shown during navigation in the (solid line) top box
+    SR_CURRENT_STREET = 0x10,  // Shown during navigation in the (dashed line) bottom box
+    SR_PRIVATE_ADDRESS = 0x11,
+    SR_BUSINESS_ADDRESS = 0x12,
+    SR_SOFTWARE_MODULE_VERSIONS = 0x13,
+    SR_PRIVATE_ADDRESS_LIST = 0x1B,
+    SR_BUSINESS_ADDRESS_LIST = 0x1C,
+    SR_GPS_CHOOSE_DESTINATION = 0x1D  // Or: current or last destination?
+}; // enum SatNavRequest_t
+
 // Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
 const char* SatNavRequestStr(uint8_t data)
 {
     return
-        data == 0x00 ? PSTR("ENTER_COUNTRY") :  // Never seen, just guessing
-        data == 0x01 ? PSTR("ENTER_PROVINCE") :  // Never seen, just guessing
-        data == 0x02 ? PSTR("ENTER_CITY") :
-        data == 0x03 ? PSTR("ENTER_DISTRICT") :  // Never seen, just guessing
-        data == 0x04 ? PSTR("ENTER_NEIGHBORHOOD") :  // Never seen, just guessing
-        data == 0x05 ? PSTR("ENTER_STREET") :
-        data == 0x06 ? PSTR("ENTER_HOUSE_NUMBER") :
-        data == 0x07 ? PSTR("ENTER_HOUSE_NUMBER_LETTER") :  // Never seen, just guessing
-        data == 0x08 ? PSTR("PLACE_OF_INTEREST_CATEGORY_LIST") :
-        data == 0x09 ? PSTR("PLACE_OF_INTEREST_CATEGORY") :
-        data == 0x0E ? PSTR("GPS_FOR_PLACE_OF_INTEREST") :
-        data == 0x0F ? PSTR("NEXT_STREET") : // Shown during navigation in the (solid line) top box
-        data == 0x10 ? PSTR("CURRENT_STREET") : // Shown during navigation in the (dashed line) bottom box
-        data == 0x11 ? PSTR("PRIVATE_ADDRESS") :
-        data == 0x12 ? PSTR("BUSINESS_ADDRESS") :
-        data == 0x13 ? PSTR("SOFTWARE_MODULE_VERSIONS") :
-        data == 0x1B ? PSTR("PRIVATE_ADDRESS_LIST") :
-        data == 0x1C ? PSTR("BUSINESS_ADDRESS_LIST") :
-        data == 0x1D ? PSTR("GPS_CHOOSE_DESTINATION") :
+        data == SR_ENTER_COUNTRY ? PSTR("ENTER_COUNTRY") :
+        data == SR_ENTER_PROVINCE ? PSTR("ENTER_PROVINCE") :
+        data == SR_ENTER_CITY ? PSTR("ENTER_CITY") :
+        data == SR_ENTER_DISTRICT ? PSTR("ENTER_DISTRICT") :
+        data == SR_ENTER_NEIGHBORHOOD ? PSTR("ENTER_NEIGHBORHOOD") :
+        data == SR_ENTER_STREET ? PSTR("ENTER_STREET") :
+        data == SR_ENTER_HOUSE_NUMBER ? PSTR("ENTER_HOUSE_NUMBER") :
+        data == SR_ENTER_HOUSE_NUMBER_LETTER ? PSTR("ENTER_HOUSE_NUMBER_LETTER") :
+        data == SR_PLACE_OF_INTEREST_CATEGORY_LIST ? PSTR("PLACE_OF_INTEREST_CATEGORY_LIST") :
+        data == SR_PLACE_OF_INTEREST_CATEGORY ? PSTR("PLACE_OF_INTEREST_CATEGORY") :
+        data == SR_GPS_FOR_PLACE_OF_INTEREST ? PSTR("GPS_FOR_PLACE_OF_INTEREST") :
+        data == SR_NEXT_STREET ? PSTR("NEXT_STREET") :
+        data == SR_CURRENT_STREET ? PSTR("CURRENT_STREET") :
+        data == SR_PRIVATE_ADDRESS ? PSTR("PRIVATE_ADDRESS") :
+        data == SR_BUSINESS_ADDRESS ? PSTR("BUSINESS_ADDRESS") :
+        data == SR_SOFTWARE_MODULE_VERSIONS ? PSTR("SOFTWARE_MODULE_VERSIONS") :
+        data == SR_PRIVATE_ADDRESS_LIST ? PSTR("PRIVATE_ADDRESS_LIST") :
+        data == SR_BUSINESS_ADDRESS_LIST ? PSTR("BUSINESS_ADDRESS_LIST") :
+        data == SR_GPS_CHOOSE_DESTINATION ? PSTR("GPS_CHOOSE_DESTINATION") :
         ToHexStr(data);
 } // SatNavRequestStr
 
-// Attempt to show a detailed SatNnav guidance instruction in "Ascii art"
+// Convert SatNav guidance instruction icon details to JSON
 //
-// A detailed SatNnav guidance instruction consists of 8 bytes:
+// A detailed SatNav guidance instruction consists of 8 bytes:
 // * 0   : turn angle in increments of 22.5 degrees, measured clockwise, starting with 0 at 6 o-clock.
 //         E.g.: 0x4 == 90 deg left, 0x8 = 180 deg = straight ahead, 0xC = 270 deg = 90 deg right.
-//         Turn angle is shown here as (vertical) (d|sl)ash ('\', '|', '/', or '-').
 // * 1   : always 0x00 ??
 // * 2, 3: bit pattern indicating which legs are present in the junction or roundabout. Each bit set is for one leg.
 //         Lowest bit of byte 3 corresponds to the leg of 0 degrees (straight down, which is
 //         always there, because that is where we are currently driving), running clockwise up to the
 //         highest bit of byte 2, which corresponds to a leg of 337.5 degrees (very sharp right).
-//         A leg is shown here as a '.'.
 // * 4, 5: bit pattern indicating which legs in the junction are "no entry". The coding of the bits is the same
 //         as for bytes 2 and 3.
-//         A "no-entry" is shown here as "(-)".
 // * 6   : always 0x00 ??
 // * 7   : always 0x00 ??
 //
-void PrintGuidanceInstruction(const uint8_t data[8])
+void GuidanceInstructionIconJson(const char* iconName, const uint8_t data[8], char* buf, int& at, int n)
 {
-    // String constants
-    static const char PROGMEM entryStr[] = "   ";
-    static const char PROGMEM noEntryStr[] = "(-)";
-    static const char PROGMEM legStr[] = ".";
-    static const char PROGMEM noLegStr[] = " ";
-    static const char PROGMEM goStraightAheadStr[] = "|";
-    static const char PROGMEM turnLeftStr[] = "-";
-    static const char PROGMEM turnRightStr[] = "-";
-    static const char PROGMEM turnHalfLeftStr[] = "\\";
-    static const char PROGMEM turnSharpRightStr[] = "\\";
-    static const char PROGMEM turnHalfRightStr[] = "/";
-    static const char PROGMEM turnSharpLeftStr[] = "/";
+    // Show all the legs in the junction
 
-    Serial.printf_P(PSTR("      %S%S%S%S%S\n"),
-        data[5] & 0x40 ? noEntryStr : entryStr,
-        data[5] & 0x80 ? noEntryStr : entryStr,
-        data[4] & 0x01 ? noEntryStr : entryStr,
-        data[4] & 0x02 ? noEntryStr : entryStr,
-        data[4] & 0x04 ? noEntryStr : entryStr
-    );
-    Serial.printf_P(PSTR("       %S  %S  %S  %S  %S\n"),
-        data[0] == 6 ? turnHalfLeftStr : data[3] & 0x40 ? legStr : noLegStr,
-        data[0] == 7 ? turnHalfLeftStr : data[3] & 0x80 ? legStr : noLegStr,
-        data[0] == 8 ? goStraightAheadStr : data[2] & 0x01 ? legStr : noLegStr,
-        data[0] == 9 ? turnHalfRightStr : data[2] & 0x02 ? legStr : noLegStr,
-        data[0] == 10 ? turnHalfRightStr : data[2] & 0x04 ? legStr : noLegStr
-    );
-    Serial.printf_P(PSTR("    %S%S           %S%S\n"),
-        data[5] & 0x20 ? noEntryStr : entryStr,
-        data[0] == 5 ? turnLeftStr : data[3] & 0x20 ? legStr : noLegStr,
-        data[0] == 11 ? turnRightStr : data[2] & 0x08 ? legStr : noLegStr,
-        data[4] & 0x08 ? noEntryStr : entryStr
-    );
-    Serial.printf_P(PSTR("    %S%S     +     %S%S\n"),
-        data[5] & 0x10 ? noEntryStr : entryStr,
-        data[0] == 4 ? turnLeftStr : data[3] & 0x10 ? legStr : noLegStr,
-        data[0] == 12 ? turnRightStr : data[2] & 0x10 ? legStr : noLegStr,
-        data[4] & 0x10 ? noEntryStr : entryStr
-    );
-    Serial.printf_P(PSTR("    %S%S     |     %S%S\n"),
-        data[5] & 0x08 ? noEntryStr : entryStr,
-        data[0] == 3 ? turnLeftStr : data[3] & 0x08 ? legStr : noLegStr,
-        data[0] == 13 ? turnRightStr : data[2] & 0x20 ? legStr : noLegStr,
-        data[4] & 0x20 ? noEntryStr : entryStr
-    );
-    Serial.printf_P(PSTR("       %S  %S  |  %S  %S\n"),
-        data[0] == 2 ? turnSharpLeftStr : data[3] & 0x04 ? legStr : noLegStr,
-        data[0] == 1 ? turnSharpLeftStr : data[3] & 0x02 ? legStr : noLegStr,
-        data[0] == 14 ? turnSharpRightStr : data[3] & 0x40 ? legStr : noLegStr,
-        data[0] == 15 ? turnSharpRightStr : data[3] & 0x80 ? legStr : noLegStr
-    );
-    Serial.printf_P(PSTR("      %S%S%S%S%S\n"),
-        data[5] & 0x04 ? noEntryStr : entryStr,
-        data[5] & 0x02 ? noEntryStr : entryStr,
-        data[5] & 0x01 ? noEntryStr : entryStr,
-        data[4] & 0x40 ? noEntryStr : entryStr,
-        data[4] & 0x80 ? noEntryStr : entryStr
-    );
-} // PrintGuidanceInstruction
+    uint16_t legBits = (uint16_t)data[2] << 8 | data[3];
+    for (int legBit = 1; legBit < 16; legBit++)
+    {
+        uint16_t degrees10 = legBit * 225;
+        at += at >= JSON_BUFFER_SIZE ? 0 :
+            snprintf_P(buf + at, n - at, PSTR(",\n\"%S_leg_%u_%u\": \"%S\""),
+                iconName,
+                degrees10 / 10,
+                degrees10 % 10,
+                legBits & 1 >> legBit ? onStr : offStr 
+            );
+    } // for
+
+    // Show all the "no-entry" legs in the junction
+
+    uint16_t noEntryBits = (uint16_t)data[4] << 8 | data[5];
+    for (int noEntryBit = 1; noEntryBit < 16; noEntryBit++)
+    {
+        uint16_t degrees10 = noEntryBit * 225;
+        at += at >= JSON_BUFFER_SIZE ? 0 :
+            snprintf_P(buf + at, n - at, PSTR(",\n\"%S_no_entry_%u_%u\": \"%S\""),
+                iconName,
+                degrees10 / 10,
+                degrees10 % 10,
+                noEntryBits & 1 >> noEntryBit ? onStr : offStr
+            );
+    } // for
+
+    // Show the direction to go
+
+    uint16_t direction = data[0] * 225;
+
+    const static char jsonFormatter[] PROGMEM =
+        ",\n"
+        "\"%S_direction_as_text\": \"%u.%u deg\",\n"
+        "\"%S_direction\":\n"
+        "{\n"
+            "\"style\":\n"
+            "{\n"
+                "\"transform\": \"rotate(%u.%udeg)\"\n"
+            "}\n"
+        "}\n";
+
+    at += at >= JSON_BUFFER_SIZE ? 0 :
+        snprintf_P(buf + at, n - at, jsonFormatter,
+            iconName,
+            direction / 10,
+            direction % 10,
+            iconName,
+            direction / 10,
+            direction % 10
+        );
+} // GuidanceInstructionIconJson
 
 #if 0
 #include <PrintEx.h>
@@ -357,7 +468,10 @@ VanPacketParseResult_t DefaultPacketParser(const char* idenStr, TVanPacketRxDesc
         "}\n"
     "}\n";
 
-    snprintf_P(buf, n, jsonFormatter, idenStr, PacketRawToStr(pkt));
+    int at = snprintf_P(buf, n, jsonFormatter, idenStr, PacketRawToStr(pkt));
+
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
     return VAN_PACKET_PARSE_OK;
 } // DefaultPacketParser
@@ -377,7 +491,10 @@ VanPacketParseResult_t ParseVinPkt(const char* idenStr, TVanPacketRxDesc& pkt, c
         "}\n"
     "}\n";
 
-    snprintf_P(buf, n, jsonFormatter, pkt.Data());
+    int at = snprintf_P(buf, n, jsonFormatter, pkt.Data());
+
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
     return VAN_PACKET_PARSE_OK;
 } // ParseVinPkt
@@ -401,14 +518,14 @@ VanPacketParseResult_t ParseEnginePkt(const char* idenStr, TVanPacketRxDesc& pkt
             "\"economy_mode\": \"%S\",\n"
             "\"in_reverse\": \"%S\",\n"
             "\"trailer\": \"%S\",\n"
-            "\"water_temp\": \"%s\",\n"
+            "\"water_temp\": \"%S\",\n"
             "\"odometer_1\": \"%s\",\n"
             "\"exterior_temperature\": \"%s\"\n"
         "}\n"
     "}\n";
 
     char floatBuf[3][MAX_FLOAT_SIZE];
-    snprintf_P(buf, n, jsonFormatter,
+    int at = snprintf_P(buf, n, jsonFormatter,
 
         data[0] & 0x80 ? PSTR("FULL") : PSTR("DIMMED (LIGHTS ON)"),
         data[0] & 0x0F,
@@ -423,10 +540,13 @@ VanPacketParseResult_t ParseEnginePkt(const char* idenStr, TVanPacketRxDesc& pkt
         data[1] & 0x10 ? onStr : offStr,
         data[1] & 0x20 ? yesStr : noStr,
         data[1] & 0x40 ? presentStr : notPresentStr,
-        data[2] == 0xFF ? "---" : FloatToStr(floatBuf[0], data[2] - 39, 0),  // TODO - or: data[2] / 2
+        data[2] == 0xFF ? notApplicable3Str : FloatToStr(floatBuf[0], data[2] - 39, 0),  // TODO - or: data[2] / 2
         FloatToStr(floatBuf[1], ((uint32_t)data[3] << 16 | (uint32_t)data[4] << 8 | data[5]) / 10.0, 1),
         FloatToStr(floatBuf[2], (data[6] - 0x50) / 2.0, 1)
     );
+
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
     return VAN_PACKET_PARSE_OK;
 } // ParseEnginePkt
@@ -449,7 +569,7 @@ VanPacketParseResult_t ParseHeadUnitStalkPkt(const char* idenStr, TVanPacketRxDe
         "}\n"
     "}\n";
 
-    snprintf_P(buf, n, jsonFormatter,
+    int at = snprintf_P(buf, n, jsonFormatter,
 
         data[0] & 0x80 ? PSTR("NEXT") : emptyStr,
         data[0] & 0x40 ? PSTR("PREV") : emptyStr,
@@ -460,6 +580,9 @@ VanPacketParseResult_t ParseHeadUnitStalkPkt(const char* idenStr, TVanPacketRxDe
         data[1] - 0x80,
         data[0] >> 4 & 0x03
     );
+
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
     return VAN_PACKET_PARSE_OK;
 } // ParseHeadUnitStalkPkt
@@ -590,9 +713,10 @@ VanPacketParseResult_t ParseLightsStatusPkt(const char* idenStr, TVanPacketRxDes
             snprintf_P(buf + at, n - at, PSTR(",\n\"cruise_control_speed\": \"%u\""), data[12]);
     } // if
 
-    at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}"));
+    at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}\n"));
 
-    if (at >= JSON_BUFFER_SIZE) Serial.print(F("--> WARNING: JSON BUFFER OVERFLOW!\n"));
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
     return VAN_PACKET_PARSE_OK;
 } // ParseLightsStatusPkt
@@ -606,6 +730,7 @@ VanPacketParseResult_t ParseDeviceReportPkt(const char* idenStr, TVanPacketRxDes
     if (dataLen < 1 || dataLen > 3) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
     const uint8_t* data = pkt.Data();
+    int at = 0;
 
     if (data[0] == 0x8A)
     {
@@ -618,7 +743,7 @@ VanPacketParseResult_t ParseDeviceReportPkt(const char* idenStr, TVanPacketRxDes
             "{\n"
                 "\"head_unit_report\": \"%S\"";
 
-        int at = snprintf_P(buf, n, jsonFormatter,
+        at = snprintf_P(buf, n, jsonFormatter,
 
             data[1] == 0x20 ? PSTR("TUNER_REPLY") :
             data[1] == 0x21 ? PSTR("AUDIO_SETTINGS_ANNOUNCE") :
@@ -668,16 +793,30 @@ VanPacketParseResult_t ParseDeviceReportPkt(const char* idenStr, TVanPacketRxDes
                     (data[2] & 0x1F) == 0x1E ? PSTR("CD_CHANGER") :
                     buffer,
 
-                    data[2] & 0xC0 ? PSTR(" (held)") :
+                    (data[2] & 0xC0) == 0xC0 ? PSTR(" (held)") :
                     data[2] & 0x40 ? PSTR(" (released)") :
                     data[2] & 0x80 ? PSTR(" (repeat)") :
                     emptyStr
                 );
+
+            // TODO - remove; just for experimenting
+
+            const static char jsonFormatter[] PROGMEM =
+                ",\n"
+                "\"satnav_curr_heading\":\n"
+                "{\n"
+                    "\"style\":\n"
+                    "{\n"
+                        "\"transform\": \"rotate(%udeg)\"\n"
+                    "}\n"
+                "}";
+
+            at += at >= JSON_BUFFER_SIZE ? 0 :
+                snprintf_P(buf + at, n - at, jsonFormatter, (data[2] & 0x1F) * 22);
+
         } // if
 
-        at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}"));
-
-        if (at >= JSON_BUFFER_SIZE) Serial.print(F("--> WARNING: JSON BUFFER OVERFLOW!\n"));
+        at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}\n"));
     }
     else if (data[0] == 0x96)
     {
@@ -692,7 +831,7 @@ VanPacketParseResult_t ParseDeviceReportPkt(const char* idenStr, TVanPacketRxDes
             "}\n"
         "}\n";
 
-        snprintf_P(buf, n, jsonFormatter);
+        at = snprintf_P(buf, n, jsonFormatter);
     }
     else if (data[0] == 0x07)
     {
@@ -712,6 +851,9 @@ VanPacketParseResult_t ParseDeviceReportPkt(const char* idenStr, TVanPacketRxDes
     {
         return VAN_PACKET_PARSE_TO_BE_DECODED;
     } // if
+
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
     return VAN_PACKET_PARSE_OK;
 } // ParseDeviceReportPkt
@@ -739,17 +881,21 @@ VanPacketParseResult_t ParseCarStatus1Pkt(const char* idenStr, TVanPacketRxDesc&
             "\"avg_speed_1\": \"%u\",\n"
             "\"avg_speed_2\": \"%u\",\n"
             "\"exp_moving_avg_speed\": \"%u\",\n"
-            "\"range_1\": \"%u\",\n"
-            "\"avg_consumption_1\": \"%s\",\n"
-            "\"range_2\": \"%u\",\n"
-            "\"avg_consumption_2\": \"%s\",\n"
-            "\"inst_consumption\": \"%S\",\n"
-            "\"mileage\": \"%u\"\n"
+            "\"distance_1\": \"%u\",\n"
+            "\"avg_consumption_lt_100_1\": \"%s\",\n"
+            "\"distance_2\": \"%u\",\n"
+            "\"avg_consumption_lt_100_2\": \"%s\",\n"
+            "\"inst_consumption_lt_100\": \"%S\",\n"
+            "\"distance_to_empty\": \"%u\"\n"
         "}\n"
     "}\n";
 
+    float avgConsumptionLt100_1 = ((uint16_t)data[16] << 8 | data[17]) / 10.0;
+    float avgConsumptionLt100_2 = ((uint16_t)data[20] << 8 | data[21]) / 10.0;
+    float instConsumptionLt_100 = ((uint16_t)data[22] << 8 | data[23]) / 10.0;
+
     char floatBuf[3][MAX_FLOAT_SIZE];
-    snprintf_P(buf, n, jsonFormatter,
+    int at = snprintf_P(buf, n, jsonFormatter,
         data[7] & 0x80 ? PSTR("FRONT_RIGHT ") : emptyStr,
         data[7] & 0x40 ? PSTR("FRONT_LEFT ") : emptyStr,
         data[7] & 0x20 ? PSTR("REAR_RIGHT ") : emptyStr,
@@ -774,14 +920,15 @@ VanPacketParseResult_t ParseCarStatus1Pkt(const char* idenStr, TVanPacketRxDesc&
         data[13],
 
         (uint16_t)data[14] << 8 | data[15],
-        FloatToStr(floatBuf[0], ((uint16_t)data[16] << 8 | data[17]) / 10.0, 1),
+        FloatToStr(floatBuf[0], avgConsumptionLt100_1, 1),
         (uint16_t)data[18] << 8 | data[19],
-        FloatToStr(floatBuf[1], ((uint16_t)data[20] << 8 | data[21]) / 10.0, 1),
-        (uint16_t)data[22] << 8 | data[23] == 0xFFFF
-            ? PSTR("---")
-            : FloatToStr(floatBuf[2], ((uint16_t)data[22] << 8 | data[23]) / 10.0, 1),
+        FloatToStr(floatBuf[1], avgConsumptionLt100_2, 1),
+        (uint16_t)data[22] << 8 | data[23] == 0xFFFF ? notApplicable3Str : FloatToStr(floatBuf[2], instConsumptionLt_100, 1),
         (uint16_t)data[24] << 8 | data[25]
     );
+
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
     return VAN_PACKET_PARSE_OK;
 } // ParseCarStatus1Pkt
@@ -979,7 +1126,8 @@ VanPacketParseResult_t ParseCarStatus2Pkt(const char* idenStr, TVanPacketRxDesc&
     "{\n"
         "\"event\": \"notification\",\n"
         "\"data\": {\n"
-            "\"alarm_list\": [";
+            "\"alarm_list\":\n"
+            "[";
 
     int at = snprintf_P(buf, n, jsonFormatter);
 
@@ -993,21 +1141,28 @@ VanPacketParseResult_t ParseCarStatus2Pkt(const char* idenStr, TVanPacketRxDesc&
         {
             if (data[byte] >> bit & 0x01)
             {
-                char alarmText[80];  // Make sure this is large enough for the largest string it must hold
+                char alarmText[80];  // Make sure this is large enough for the largest string it must hold; see above
                 strncpy_P(alarmText, (char *)pgm_read_dword(&(msgTable[byte * 8 + bit])), sizeof(alarmText) - 1);
                 alarmText[sizeof(alarmText) - 1] = 0;
                 at += at >= JSON_BUFFER_SIZE ? 0 :
-                    snprintf_P(buf + at, n - at, PSTR("%S\n\"%s\""), first ? emptyStr : PSTR(","), alarmText);
+                    snprintf_P(buf + at, n - at, PSTR("%S\n\"%s\""), first ? emptyStr : commaStr, alarmText);
                 first = false;
             } // if
         } // for
     } // for
 
+    at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n]"));
+
+    uint8_t currentMsg = data[9];
+    at += at >= JSON_BUFFER_SIZE ? 0 :
+        snprintf_P(buf, n, PSTR(",\n\"message_displayed_on_mfd\": \"%S\""), msgTable[currentMsg]);
+
+    at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}\n"));
+
     // TODO - this packet could become very large and overflow the JSON buffer, causing corrupt JSON data to be sent
 
-    at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n]\n}\n}"));
-
-    if (at >= JSON_BUFFER_SIZE) Serial.print(F("--> WARNING: JSON BUFFER OVERFLOW!\n"));
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
     return VAN_PACKET_PARSE_OK;
 } // ParseCarStatus2Pkt
@@ -1030,7 +1185,7 @@ VanPacketParseResult_t ParseDashboardPkt(const char* idenStr, TVanPacketRxDesc& 
     "}\n";
 
     char floatBuf[2][MAX_FLOAT_SIZE];
-    snprintf_P(buf, n, jsonFormatter,
+    int at = snprintf_P(buf, n, jsonFormatter,
         data[0] == 0xFF && data[1] == 0xFF ?
             PSTR("---.-") :
             FloatToStr(floatBuf[0], ((uint16_t)data[0] << 8 | data[1]) / 8.0, 1),
@@ -1038,6 +1193,9 @@ VanPacketParseResult_t ParseDashboardPkt(const char* idenStr, TVanPacketRxDesc& 
             PSTR("---.--") :
             FloatToStr(floatBuf[1], ((uint16_t)data[2] << 8 | data[3]) / 100.0, 2)
     );
+
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
     return VAN_PACKET_PARSE_OK;
 } // ParseDashboardPkt
@@ -1069,7 +1227,7 @@ VanPacketParseResult_t ParseDashboardButtonsPkt(const char* idenStr, TVanPacketR
     // data[6..10] - always 00-FF-00-FF-00
 
     char floatBuf[2][MAX_FLOAT_SIZE];
-    snprintf_P(buf, n, jsonFormatter,
+    int at = snprintf_P(buf, n, jsonFormatter,
         data[0] & 0x02 ? onStr : offStr,
         data[2] & 0x40 ? PSTR("LOCKED") : PSTR("UNLOCKED"),
         data[2] & 0x0F,
@@ -1079,6 +1237,9 @@ VanPacketParseResult_t ParseDashboardButtonsPkt(const char* idenStr, TVanPacketR
         FloatToStr(floatBuf[0], data[4] / 2.0, 1),
         FloatToStr(floatBuf[1], data[5] / 2.0, 1)
     );
+
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
     return VAN_PACKET_PARSE_OK;
 } // ParseDashboardButtonsPkt
@@ -1102,6 +1263,7 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
     const uint8_t* data = pkt.Data();
     uint8_t infoType = data[1];
     int dataLen = pkt.DataLen();
+    int at = 0;
 
     switch (infoType)
     {
@@ -1116,20 +1278,18 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
             // data[2]: radio band and preset position
             uint8_t band = data[2] & 0x07;
             uint8_t presetMemory = data[2] >> 3 & 0x0F;
+            char presetMemoryBuffer[3];
+            sprintf_P(presetMemoryBuffer, PSTR("%1u"), presetMemory);
 
-            // data[3]: scanning bits
-            bool scanDx = data[3] & 0x02;  // Tuner sensitivity: distant (Dx) or local (Lo)
+            // data[3]: search bits
+            bool dxSensitivity = data[3] & 0x02;  // Tuner sensitivity: distant (Dx) or local (Lo)
             bool ptyStandbyMode = data[3] & 0x04;
 
-            uint8_t scanMode = data[3] >> 3 & 0x07;
+            uint8_t searchMode = data[3] >> 3 & 0x07;
+            bool searchDirectionUp = data[3] & 0x80;
+            bool anySearchBusy = (searchMode != TS_NOT_SEARCHING);
 
-            bool manualScan = data[3] & 0x08;
-            bool scanningByFreq = data[3] & 0x10;
-            bool fmastSearch = data[3] & 0x20;  // Auto-station search (long-press "Radio Band" button)
-
-            bool scanDirectionUp = data[3] & 0x80;
-
-            // data[4] and data[5]: frequency tuned in to
+            // data[4] and data[5]: frequency being scanned or tuned in to
             uint16_t frequency = (uint16_t)data[5] << 8 | data[4];
 
             // data[6] - Reception status? Like: receiving station? Stereo? RDS bits like MS, TP, TA, AF?
@@ -1141,11 +1301,7 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
             //   Just guessing for the possible meaning of the bits:
             //   - Mono (not stereo) bit
             //   - Music/Speech (MS) bit
-            //   - No RDS available / Searching for RDS
-            //   - No TA available / Searching for TA
             //   - No AF (Alternative Frequencies) available
-            //   - No PTY (Program TYpe) available
-            //   - No PI (Program Identification) available
             //   - Number (0..15) indicating the quality of the RDS stream
             //   & 0x10:
             //   & 0x20:
@@ -1158,79 +1314,42 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
             char signalStrengthBuffer[3];
             sprintf_P(signalStrengthBuffer, PSTR("%u"), signalStrength);
 
-            // data[7]: TA, RDS and REG (regional) bits
-            bool rdsSelected = data[7] & 0x01;
-            bool taSelected = data[7] & 0x02;
-            bool regional = data[7] & 0x04;  // Long-press "RDS" button
-            bool rdsAvailable = data[7] & 0x20;
-            bool taAvailable = data[7] & 0x40;
-            bool taAnnounce = data[7] & 0x80;
-
-            // data[8] and data[9]: PI code
-            // See also:
-            // - https://en.wikipedia.org/wiki/Radio_Data_System#Program_Identification_Code_(PI_Code),
-            // - https://radio-tv-nederland.nl/rds/rds.html
-            // - https://people.uta.fi/~jk54415/dx/pi-codes.html
-            // - http://poupa.cz/rds/countrycodes.htm
-            // - https://www.pira.cz/rds/p232man.pdf
-            uint16_t piCode = (uint16_t)data[8] << 8 | data[9];
-            uint8_t countryCode = data[8] >> 4 & 0x0F;
-            uint8_t coverageCode = data[8] & 0x0F;
-
-            // data[10]: for PTY-based scan mode
-            // & 0x1F: PTY code to scan
-            // & 0x20: 0 = PTY of station matches selected; 1 = no match
-            // & 0x40: 1 = "Select PTY" dialog visible (long-press "TA" button; press "<<" or ">>" to change)
-            uint8_t selectedPty = data[10] & 0x1F;
-            bool ptyMatch = (data[10] & 0x20) == 0;  // PTY of station matches selected PTY
-            bool ptySelectionMenu = data[10] & 0x40; 
-
-            // data[11]: PTY code of current station
-            uint8_t currPty = data[11] & 0x1F;
-
-            // data[12]...data[20]: RDS text
-            char rdsTxt[9];
-            strncpy(rdsTxt, (const char*) data + 12, 8);
-            rdsTxt[8] = 0;
-
-            char piBuffer[40];
-            sprintf_P(piBuffer, PSTR("%04X(%S, %S)"),
-                piCode,
-                RadioPiCountry(countryCode),
-                RadioPiAreaCoverage(coverageCode)
-            );
-
-            char currPtyBuffer[40];
-            sprintf_P(currPtyBuffer, PSTR("%S(%u)"), PtyStr(currPty), currPty);
-
-            char selectedPtyBuffer[40];
-            sprintf_P(selectedPtyBuffer, PSTR("%S(%u)"), PtyStr(selectedPty), selectedPty);
-
-            char presetMemoryBuffer[20];
-            sprintf_P(presetMemoryBuffer, PSTR("%u"), presetMemory);
-
-            bool anyScanBusy = (scanMode != TS_NOT_SEARCHING);
-
             const static char jsonFormatterCommon[] PROGMEM =
             "{\n"
                 "\"event\": \"display\",\n"
                 "\"data\":\n"
                 "{\n"
                     "\"band\": \"%S\",\n"
+                    "\"fm_band\": \"%S\",\n"
+                    "\"fm_band_1\": \"%S\",\n"
+                    "\"fm_band_2\": \"%S\",\n"
+                    "\"fm_band_ast\": \"%S\",\n"
+                    "\"am_lw_band\": \"%S\",\n"
                     "\"memory\": \"%S\",\n"
                     "\"frequency\": \"%S\",\n"
                     "\"frequency_h\": \"%S\",\n"
                     "\"frequency_unit\": \"%S\",\n"
+                    "\"frequency_khz\": \"%S\",\n"
+                    "\"frequency_mhz\": \"%S\",\n"
                     "\"signal_strength\": \"%S\",\n"
-                    "\"scan_mode\": \"%S\",\n"
-                    "\"scan_sensitivity\": \"%S\",\n"
-                    "\"scan_direction\": \"%S\"";
+                    "\"search_mode\": \"%S\",\n"
+                    "\"search_sensitivity\": \"%S\",\n"
+                    "\"search_sensitivity_lo\": \"%S\",\n"
+                    "\"search_sensitivity_dx\": \"%S\",\n"
+                    "\"search_direction\": \"%S\",\n"
+                    "\"search_direction_up\": \"%S\",\n"
+                    "\"search_direction_down\": \"%S\"";
 
             char floatBuf[MAX_FLOAT_SIZE];
-            int at = snprintf_P(buf, n, jsonFormatterCommon,
+            at = snprintf_P(buf, n, jsonFormatterCommon,
                 TunerBandStr(band),
+                band == TB_FM1 || band == TB_FM2 || band == TB_FM3 || band == TB_FMAST ? onStr : offStr,
+                band == TB_FM1 ? onStr : offStr,
+                band == TB_FM2 ? onStr : offStr,
+                band == TB_FMAST ? onStr : offStr,
+                band == TB_AM ? onStr : offStr,
                 presetMemory == 0 ? PSTR("-") : presetMemoryBuffer,
-                frequency == 0x07FF ? PSTR("---") :
+                frequency == 0x07FF ? notApplicable3Str :
                     band == TB_AM
                         ? FloatToStr(floatBuf, frequency, 0)  // AM and LW bands
                         : FloatToStr(floatBuf, (frequency / 2 + 500) / 10.0, 1),  // FM bands
@@ -1239,36 +1358,91 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
                         ? emptyStr  // AM and LW bands
                         : frequency % 2 == 0 ? PSTR("0") : PSTR("5"),  // FM bands
                 band == TB_AM ? PSTR("KHz") : PSTR("MHz"),
+                band == TB_AM ? onStr : offStr,  // For retro-type "LED" display
+                band == TB_AM ? offStr : onStr,  // For retro-type "LED" display
 
                 // TODO - check:
                 // - not sure if applicable in AM mode
-                // - signalStrength == 15 always means "not applicable" or "no signal"? Not just while scanning?
-                //   In other words: maybe 14 is the highest possible signal strength, and 15 just means: no
-                //   signal.
-                signalStrength == 15 && (scanMode == TS_BY_FREQUENCY || scanMode == TS_BY_MATCHING_PTY)
-                    ? PSTR("--")
-                    : signalStrengthBuffer,
+                // - signalStrength == 15 always means "not applicable" or "no signal"? Not just while searching?
+                //   In other words: maybe 14 is the highest possible signal strength, and 15 just means: not
+                //   applicable.
+                // signalStrength == 15 && (searchMode == TS_BY_FREQUENCY || searchMode == TS_BY_MATCHING_PTY)
+                    // ? notApplicable2Str
+                    // : signalStrengthBuffer,
+                signalStrength == 15 ? notApplicable2Str : signalStrengthBuffer,
 
-                TunerScanModeStr(scanMode),
+                TunerSearchModeStr(searchMode),
 
-                // Scan sensitivity: distant (Dx) or local (Lo)
-                // TODO - not sure if this bit is applicable for the various values of 'scanMode'
-                ! anyScanBusy ? "" :
-                    scanDx ? PSTR("Dx") : PSTR("Lo"),
+                // Search sensitivity: distant (Dx) or local (Lo)
+                // TODO - not sure if this bit is applicable for the various values of 'searchMode'
+                // ! anySearchBusy ? emptyStr : dxSensitivity ? PSTR("Dx") : PSTR("Lo"),
+                // ! anySearchBusy ? offStr : dxSensitivity ? offStr : onStr,  // For retro-type "LED" display
+                // ! anySearchBusy ? offStr : dxSensitivity ? onStr : offStr,  // For retro-type "LED" display
+                dxSensitivity ? PSTR("Dx") : PSTR("Lo"),
+                dxSensitivity ? offStr : onStr,  // For retro-type "LED" display
+                dxSensitivity ? onStr : offStr,  // For retro-type "LED" display
 
-                ! anyScanBusy ? "" :
-                    scanDirectionUp ? PSTR("UP") : PSTR("DOWN")
+                ! anySearchBusy ? emptyStr : searchDirectionUp ? PSTR("UP") : PSTR("DOWN"),
+                anySearchBusy && searchDirectionUp ? onStr : offStr,  // For retro-type "LED" display
+                anySearchBusy && ! searchDirectionUp ? onStr : offStr  // For retro-type "LED" display
             );
 
             if (band != TB_AM)
             {
+                // FM bands only
+
+                // data[7]: TA, RDS and REG (regional) bits
+                bool rdsSelected = data[7] & 0x01;
+                bool taSelected = data[7] & 0x02;
+                bool regional = data[7] & 0x04;  // Long-press "RDS" button
+                bool rdsAvailable = data[7] & 0x20;
+                bool taAvailable = data[7] & 0x40;
+                bool taAnnounce = data[7] & 0x80;
+
+                // data[8] and data[9]: PI code
+                // See also:
+                // - https://en.wikipedia.org/wiki/Radio_Data_System#Program_Identification_Code_(PI_Code),
+                // - https://radio-tv-nederland.nl/rds/rds.html
+                // - https://people.uta.fi/~jk54415/dx/pi-codes.html
+                // - http://poupa.cz/rds/countrycodes.htm
+                // - https://www.pira.cz/rds/p232man.pdf
+                uint16_t piCode = (uint16_t)data[8] << 8 | data[9];
+                uint8_t countryCode = piCode >> 12 & 0x0F;
+                uint8_t coverageCode = piCode >> 8 & 0x0F;
+                char piBuffer[40];
+                sprintf_P(piBuffer, PSTR("%04X"), piCode);
+
+                // data[10]: for PTY-based search mode
+                // & 0x1F: PTY code to search
+                // & 0x20: 0 = PTY of station matches selected; 1 = no match
+                // & 0x40: 1 = "Select PTY" dialog visible (long-press "TA" button; press "<<" or ">>" to change)
+                uint8_t selectedPty = data[10] & 0x1F;
+                bool ptyMatch = (data[10] & 0x20) == 0;  // PTY of station matches selected PTY
+                bool ptySelectionMenu = data[10] & 0x40; 
+                char selectedPtyBuffer[40];
+                sprintf_P(selectedPtyBuffer, PSTR("%S"), PtyStrFull(selectedPty));
+
+                // data[11]: PTY code of current station
+                uint8_t currPty = data[11] & 0x1F;
+                char currPtyBuffer[40];
+                sprintf_P(currPtyBuffer, PSTR("%S"), PtyStrFull(currPty));
+
+                // data[12]...data[20]: RDS text
+                char rdsTxt[9];
+                strncpy(rdsTxt, (const char*) data + 12, 8);
+                rdsTxt[8] = 0;
+
                 const static char jsonFormatterFmBand[] PROGMEM = ",\n"
                     "\"pty_selection_menu\": \"%S\",\n"
                     "\"selected_pty\": \"%s\",\n"
                     "\"pty_standby_mode\": \"%S\",\n"
                     "\"pty_match\": \"%S\",\n"
-                    "\"pty\": \"%S\",\n"
-                    "\"pi\": \"%S\",\n"
+                    "\"pty_8\": \"%S\",\n"
+                    "\"pty_16\": \"%S\",\n"
+                    "\"pty_full\": \"%S\",\n"
+                    "\"pi_code\": \"%S\",\n"
+                    "\"pi_country\": \"%S\",\n"
+                    "\"pi_area_coverage\": \"%S\",\n"
                     "\"regional\": \"%S\",\n"
                     "\"ta_selected\": \"%S\",\n"
                     "\"ta_available\": \"%S\",\n"
@@ -1283,9 +1457,14 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
                         selectedPtyBuffer,
                         ptyStandbyMode ? yesStr : noStr,
                         ptyMatch ? yesStr : noStr,
-                        currPty == 0x00 ? PSTR("---") : currPtyBuffer,
+                        currPty == 0x00 ? notApplicable3Str : PtyStr8(currPty),
+                        currPty == 0x00 ? notApplicable3Str : PtyStr16(currPty),
+                        currPty == 0x00 ? notApplicable3Str : PtyStrFull(currPty),
 
-                        piCode == 0xFFFF ? PSTR("---") : piBuffer,
+                        piCode == 0xFFFF ? notApplicable3Str : piBuffer,
+                        piCode == 0xFFFF ? notApplicable2Str : RadioPiCountry(countryCode),
+                        piCode == 0xFFFF ? notApplicable3Str : RadioPiAreaCoverage(coverageCode),
+
                         regional ? onStr : offStr,
                         taSelected ? yesStr : noStr,
                         taAvailable ? yesStr : noStr,
@@ -1293,14 +1472,11 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
                         rdsAvailable ? yesStr : noStr,
                         rdsTxt,
 
-                        taAnnounce ? PSTR("Info Trafic!") : emptyStr
+                        taAnnounce ? yesStr : noStr
                     );
             } // if
 
-            at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}"));
-
-            // Warning on Serial output if JSON buffer overflows
-            if (at >= JSON_BUFFER_SIZE) Serial.print(F("--> WARNING: JSON BUFFER OVERFLOW!\n"));
+            at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}\n"));
         }
         break;
         
@@ -1324,7 +1500,7 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
                 "}\n"
             "}\n";
 
-            snprintf_P(buf, n, jsonFormatter,
+            at = snprintf_P(buf, n, jsonFormatter,
                 status == 0x00 ? PSTR("STOPPED") :
                 status == 0x04 ? PSTR("LOADING") :
                 status == 0x0C ? PSTR("PLAYING") :
@@ -1345,7 +1521,7 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
 
             if (dataLen != 12) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
-            const char* tunerBand = TunerBandStr(data[2] >> 4 & 0x07);
+            uint8_t tunerBand = data[2] >> 4 & 0x07;
             uint8_t tunerMemory = data[2] & 0x0F;
 
             char rdsOrFreqTxt[9];
@@ -1357,15 +1533,15 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
                 "\"event\": \"display\",\n"
                 "\"data\":\n"
                 "{\n"
-                    "\"radio_preset_%S_%u\": \"%s (%S)\"\n"
+                    "\"radio_preset_%S_%u\": \"%s%S\"\n"
                 "}\n"
             "}\n";
 
-            snprintf_P(buf, n, jsonFormatter,
-                tunerBand,
+            at = snprintf_P(buf, n, jsonFormatter,
+                TunerBandStr(tunerBand),
                 tunerMemory,
                 rdsOrFreqTxt,
-                data[2] & 0x80 ? PSTR("RDS_TEXT") : PSTR("FREQUENCY")
+                tunerBand == TB_AM ? PSTR(" KHz") : data[2] & 0x80 ? emptyStr : PSTR(" MHz")
             );
         }
         break;
@@ -1383,11 +1559,10 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
                 "\"data\":\n"
                 "{\n"
                     "\"cd_status\": \"%S\",\n"
-                    "\"cd_track_min\": \"%u\",\n"
-                    "\"cd_track_sec\": \"%u\",\n"
+                    "\"cd_track_time\": \"%u:%u\",\n"
                     "\"cd_current_track\": \"%u\"";
 
-            int at = snprintf_P(buf, n, jsonFormatter,
+            at = snprintf_P(buf, n, jsonFormatter,
 
                 data[3] == 0x11 ? PSTR("INSERTED") :
                 data[3] == 0x12 ? PSTR("PAUSE-SEARCHING") :
@@ -1400,6 +1575,7 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
 
                 GetBcd(data[5]),
                 GetBcd(data[6]),
+
                 GetBcd(data[7])
             );
 
@@ -1411,17 +1587,20 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
                 if (dataLen >= 12 && data[9] != 0xFF)
                 {
                     at += at >= JSON_BUFFER_SIZE ? 0 :
-                        snprintf_P(buf + at, n - at, PSTR(",\n\"cd_total_mins\": \"%u\",\n\"cd_total_secs\": \"%u\""),
+                        snprintf_P(buf + at, n - at,
+                            PSTR(",\n"
+                                "\"cd_total_time\": \"%u:%u\""
+                            ),
                             GetBcd(data[9]),
                             GetBcd(data[10])
                         );
                 } // if
             } // if
 
-            at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}"));
+            at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}\n"));
 
             // Warning on Serial output if JSON buffer overflows
-            if (at >= JSON_BUFFER_SIZE) Serial.print(F("--> WARNING: JSON BUFFER OVERFLOW!\n"));
+            if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
         }
         break;
 
@@ -1437,6 +1616,10 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
         }
         break;
     } // switch
+
+
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
     return VAN_PACKET_PARSE_OK;
 } // ParseHeadUnitPkt
@@ -1462,11 +1645,14 @@ VanPacketParseResult_t ParseTimePkt(const char* idenStr, TVanPacketRxDesc& pkt, 
         "}\n"
     "}\n";
 
-    snprintf_P(buf, n, jsonFormatter,
+    int at = snprintf_P(buf, n, jsonFormatter,
         (uint16_t)data[0] << 8 | data[1],
         data[3],
         data[4]
     );
+
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
     return VAN_PACKET_PARSE_OK;
 } // ParseTimePkt
@@ -1485,26 +1671,31 @@ VanPacketParseResult_t ParseAudioSettingsPkt(const char* idenStr, TVanPacketRxDe
         "\"data\":\n"
         "{\n"
             "\"power\": \"%S\",\n"
-            "\"tape\": \"%S\",\n"
-            "\"cd\": \"%S\",\n"
+            "\"tape_present\": \"%S\",\n"
+            "\"cd_present\": \"%S\",\n"
             "\"source\": \"%S\",\n"
             "\"ext_mute\": \"%S\",\n"
             "\"mute\": \"%S\",\n"
-            "\"volume\": \"%u%S\",\n"
+            "\"volume\": \"%u\",\n"
+            "\"volume_update\": \"%S\",\n"
             "\"audio_menu\": \"%S\",\n"
-            "\"bass\": \"%d%S\",\n"
-            "\"treble\": \"%d%S\",\n"
+            "\"bass\": \"%+d\",\n"
+            "\"bass_update\": \"%S\",\n"
+            "\"treble\": \"%+d\",\n"
+            "\"treble_update\": \"%S\",\n"
             "\"loudness\": \"%S\",\n"
-            "\"fader\": \"%d%S\",\n"
-            "\"balance\": \"%d%S\",\n"
+            "\"fader\": \"%+d\",\n"
+            "\"fader_update\": \"%S\",\n"
+            "\"balance\": \"%+d\",\n"
+            "\"balance_update\": \"%S\",\n"
             "\"auto_volume\": \"%S\"\n"
         "}\n"
     "}\n";
 
-    snprintf_P(buf, n, jsonFormatter,
+    int at = snprintf_P(buf, n, jsonFormatter,
         data[2] & 0x01 ? onStr : offStr,  // power
-        data[4] & 0x20 ? presentStr : notPresentStr,  // tape
-        data[4] & 0x40 ? presentStr : notPresentStr,  // cd
+        data[4] & 0x20 ? yesStr : noStr,  // tape
+        data[4] & 0x40 ? yesStr : noStr,  // cd
 
         (data[4] & 0x0F) == 0x00 ? noneStr :  // source
         (data[4] & 0x0F) == 0x01 ? PSTR("TUNER") :
@@ -1514,36 +1705,39 @@ VanPacketParseResult_t ParseAudioSettingsPkt(const char* idenStr, TVanPacketRxDe
             PSTR("INTERNAL_CD_OR_TAPE") :
         (data[4] & 0x0F) == 0x03 ? PSTR("CD_CHANGER") :
 
-        // This is the PSTR("default") mode for the head unit, to sit there and listen to the navigation
+        // This is the "default" mode for the head unit, to sit there and listen to the navigation
         // audio. The navigation audio volume is also always set (usually a lot higher than the radio)
         // whenever this source is chosen.
-        (data[4] & 0x0F) == 0x05 ? PSTR("NAVIGATION_AUDIO") :
+        (data[4] & 0x0F) == 0x05 ? PSTR("NAVIGATION") :
 
         ToHexStr((uint8_t)(data[4] & 0x0F)),
 
-        // ext_mute. Activated when head unit ISO connector A pin 1 (PSTR("Phone mute")) is pulled LOW (to Ground).
+        // ext_mute. Activated when head unit ISO connector A pin 1 ("Phone mute") is pulled LOW (to Ground).
         data[1] & 0x02 ? onStr : offStr,
 
         // mute. To activate: press both VOL_UP and VOL_DOWN buttons on stalk.
         data[1] & 0x01 ? onStr : offStr,
 
         data[5] & 0x7F,  // volume
-        data[5] & 0x80 ? updatedStr : emptyStr,
+        data[5] & 0x80 ? yesStr : noStr,
 
-        // audio_menu. Bug: if CD changer is playing, this one is always PSTR("OPEN") (even if it isn't).
+        // audio_menu. Bug: if CD changer is playing, this one is always "OPEN" (even if it isn't).
         data[1] & 0x20 ? PSTR("OPEN") : PSTR("CLOSED"),
 
         (sint8_t)(data[8] & 0x7F) - 0x3F,  // bass
-        data[8] & 0x80 ? updatedStr : emptyStr,
+        data[8] & 0x80 ? yesStr : noStr,
         (sint8_t)(data[9] & 0x7F) - 0x3F,  // treble
-        data[9] & 0x80 ? updatedStr : emptyStr,
+        data[9] & 0x80 ? yesStr : noStr,
         data[1] & 0x10 ? onStr : offStr,  // loudness
         (sint8_t)(0x3F) - (data[7] & 0x7F),  // fader
-        data[7] & 0x80 ? updatedStr : emptyStr,
+        data[7] & 0x80 ? yesStr : noStr,
         (sint8_t)(0x3F) - (data[6] & 0x7F),  // balance
-        data[6] & 0x80 ? updatedStr : emptyStr,
+        data[6] & 0x80 ? yesStr : noStr,
         data[1] & 0x04 ? onStr : offStr  // auto_volume
     );
+
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
     return VAN_PACKET_PARSE_OK;
 } // ParseAudioSettingsPkt
@@ -1565,7 +1759,7 @@ VanPacketParseResult_t ParseMfdStatusPkt(const char* idenStr, TVanPacketRxDesc& 
         "}\n"
     "}\n";
 
-    snprintf_P(buf, n, jsonFormatter,
+    int at = snprintf_P(buf, n, jsonFormatter,
 
         // hmmm... MFD can also be ON if this is reported; this happens e.g. in the "minimal VAN network" test
         // setup with only the head unit (radio) and MFD. Maybe this is a status report: the MFD shows if has
@@ -1575,6 +1769,9 @@ VanPacketParseResult_t ParseMfdStatusPkt(const char* idenStr, TVanPacketRxDesc& 
         data[0] == 0x20 && data[1] == 0xFF ? onStr :
         ToHexStr(mfdStatus)
     );
+
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
     return VAN_PACKET_PARSE_OK;
 } // ParseMfdStatusPkt
@@ -1682,13 +1879,16 @@ VanPacketParseResult_t ParseAirCon1Pkt(const char* idenStr, TVanPacketRxDesc& pk
         "}\n"
     "}\n";
 
-    snprintf_P(buf, n, jsonFormatter,
+    int at = snprintf_P(buf, n, jsonFormatter,
         ac_icon ? onStr : offStr,
         data[0] & 0x04 ? onStr : offStr,
         rear_heater ? yesStr : noStr,
         data[4],
         setFanSpeed
     );
+
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
     return VAN_PACKET_PARSE_OK;
 } // ParseAirCon1Pkt
@@ -1722,13 +1922,13 @@ VanPacketParseResult_t ParseAirCon2Pkt(const char* idenStr, TVanPacketRxDesc& pk
             "\"rear_heater_2\": \"%S\",\n"
             "\"ac_compressor\": \"%S\",\n"
             "\"contact_key_position\": \"%S\",\n"
-            "\"condenser_temperature\": \"%s\",\n"
+            "\"condenser_temperature\": \"%S\",\n"
             "\"evaporator_temperature\": \"%s\"\n"
         "}\n"
     "}\n";
 
     char floatBuf[2][MAX_FLOAT_SIZE];
-    snprintf_P(buf, n, jsonFormatter,
+    int at = snprintf_P(buf, n, jsonFormatter,
         data[0] & 0x80 ? yesStr : noStr,
         data[0] & 0x40 ? yesStr : noStr,
         data[0] & 0x20 ? onStr : offStr,
@@ -1743,10 +1943,13 @@ VanPacketParseResult_t ParseAirCon2Pkt(const char* idenStr, TVanPacketRxDesc& pk
         // This is not interior temperature. This rises quite rapidly if the aircon compressor is
         // running, and drops again when the aircon compressor is off. So I think this is the condenser
         // temperature.
-        data[2] == 0xFF ? "--" : FloatToStr(floatBuf[0], data[2], 0),
+        data[2] == 0xFF ? notApplicable2Str : FloatToStr(floatBuf[0], data[2], 0),
 
         FloatToStr(floatBuf[1], ((uint16_t)data[3] << 8 | data[4]) / 10.0 - 40.0, 1)
     );
+
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
     return VAN_PACKET_PARSE_OK;
 } // ParseAirCon2Pkt
@@ -1758,7 +1961,7 @@ VanPacketParseResult_t ParseCdChangerPkt(const char* idenStr, TVanPacketRxDesc& 
     // https://github.com/morcibacsi/PSAVanCanBridge/blob/master/src/Van/Structs/VanCdChangerStructs.h
 
     int dataLen = pkt.DataLen();
-    if (dataLen == 0) return VAN_PACKET_PARSE_OK; // "Request" packet; nothing to show
+    if (dataLen == 0) return VAN_PACKET_NO_CONTENT; // "Request" packet; nothing to show
     if (dataLen != 12) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
     const uint8_t* data = pkt.Data();
@@ -1768,25 +1971,32 @@ VanPacketParseResult_t ParseCdChangerPkt(const char* idenStr, TVanPacketRxDesc& 
         "\"event\": \"display\",\n"
         "\"data\":\n"
         "{\n"
-            "\"cdc_random\": \"%S\",\n"
-            "\"cdc_state\": \"%S\",\n"
-            "\"cdc_cartridge\": \"%S\",\n"
-            "\"cdc_track_time_min\": \"%S\",\n"
-            "\"cdc_track_time_sec\": \"%S\",\n"
-            "\"cdc_current_track\": \"%u\",\n"
-            "\"cdc_total_tracks\": \"%S\",\n"
-            "\"cdc_current_cd\": \"%u\",\n"
-            "\"cdc_disc_1_present\": \"%S\",\n"
-            "\"cdc_disc_2_present\": \"%S\",\n"
-            "\"cdc_disc_3_present\": \"%S\",\n"
-            "\"cdc_disc_4_present\": \"%S\",\n"
-            "\"cdc_disc_5_present\": \"%S\",\n"
-            "\"cdc_disc_6_present\": \"%S\"\n"
+            "\"cd_changer_random\": \"%S\",\n"
+            "\"cd_changer_status\": \"%S\",\n"
+            "\"cd_changer_cartridge_present\": \"%S\",\n"
+            "\"cd_changer_track_time\": \"%S:%S\",\n"
+            "\"cd_changer_track_info\": \"%u/%S\",\n"
+            "\"cd_changer_current_track\": \"%u\",\n"
+            "\"cd_changer_total_tracks\": \"%S\",\n"
+            "\"cd_changer_current_cd\": \"%u\",\n"
+            "\"cd_changer_disc_1_present\": \"%S\",\n"
+            "\"cd_changer_disc_2_present\": \"%S\",\n"
+            "\"cd_changer_disc_3_present\": \"%S\",\n"
+            "\"cd_changer_disc_4_present\": \"%S\",\n"
+            "\"cd_changer_disc_5_present\": \"%S\",\n"
+            "\"cd_changer_disc_6_present\": \"%S\"\n"
         "}\n"
     "}\n";
 
     char floatBuf[3][MAX_FLOAT_SIZE];
-    snprintf_P(buf, n, jsonFormatter,
+
+    const char* trackTimeSec = data[4] == 0xFF ? notApplicable2Str : FloatToStr(floatBuf[0], GetBcd(data[4]), 0);
+    const char* trackTimeMin = data[5] == 0xFF ? notApplicable2Str : FloatToStr(floatBuf[1], GetBcd(data[5]), 0);
+
+    uint8_t currentTrack = GetBcd(data[6]);
+    const char* totalTracks = data[8] == 0xFF ? notApplicable2Str : FloatToStr(floatBuf[2], GetBcd(data[8]), 0);
+
+    int at = snprintf_P(buf, n, jsonFormatter,
         data[1] == 0x01 ? onStr : offStr,
 
         data[2] == 0x41 ? offStr :
@@ -1797,28 +2007,35 @@ VanPacketParseResult_t ParseCdChangerPkt(const char* idenStr, TVanPacketRxDesc& 
         data[2] == 0xC5 ? PSTR("REWIND") :
         ToHexStr(data[2]),
 
-        data[3] == 0x16 ? PSTR("IN") :
-        data[3] == 0x06 ? PSTR("OUT") :
+        data[3] == 0x16 ? yesStr :
+        data[3] == 0x06 ? noStr :
         ToHexStr(data[3]),
 
-        data[4] == 0xFF ? PSTR("--") : FloatToStr(floatBuf[0], GetBcd(data[4]), 0),
-        data[5] == 0xFF ? PSTR("--") : FloatToStr(floatBuf[1], GetBcd(data[5]), 0),
-        GetBcd(data[6]),
-        data[8] == 0xFF ? PSTR("--") : FloatToStr(floatBuf[2], GetBcd(data[8]), 0),
+        trackTimeMin,
+        trackTimeSec,
+
+        currentTrack,
+        totalTracks,
+        currentTrack,
+        totalTracks,
+
         GetBcd(data[7]),
 
-        data[10] & 0x01 ? PSTR("1") : PSTR(" "),
-        data[10] & 0x02 ? PSTR("2") : PSTR(" "),
-        data[10] & 0x04 ? PSTR("3") : PSTR(" "),
-        data[10] & 0x08 ? PSTR("4") : PSTR(" "),
-        data[10] & 0x10 ? PSTR("5") : PSTR(" "),
-        data[10] & 0x20 ? PSTR("6") : PSTR(" ")
+        data[10] & 0x01 ? yesStr : noStr,
+        data[10] & 0x02 ? yesStr : noStr,
+        data[10] & 0x04 ? yesStr : noStr,
+        data[10] & 0x08 ? yesStr : noStr,
+        data[10] & 0x10 ? yesStr : noStr,
+        data[10] & 0x20 ? yesStr : noStr
     );
+
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
     return VAN_PACKET_PARSE_OK;
 } // ParseCdChangerPkt
 
-VanPacketParseResult_t ParseSatnavStatus1Pkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, int n)
+VanPacketParseResult_t ParseSatNavStatus1Pkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#54E
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#54E
@@ -1835,30 +2052,30 @@ VanPacketParseResult_t ParseSatnavStatus1Pkt(const char* idenStr, TVanPacketRxDe
         "}\n"
     "}\n";
 
-    snprintf_P(buf, n, jsonFormatter,
+    int at = snprintf_P(buf, n, jsonFormatter,
 
         // TODO - check; total guess
         status == 0x0000 ? PSTR("NOT_OPERATING") :
-        status == 0x0001 ? PSTR("0x0001") :
-        status == 0x0020 ? PSTR("0x0020") : // Nearly at destination ??
+        status == 0x0001 ? ToHexStr(status) :  // Seen this but what is it??
+        status == 0x0020 ? ToHexStr(status) :  // Seen this but what is it?? Nearly at destination ??
         status == 0x0080 ? PSTR("READY") :
-        status == 0x0101 ? PSTR("0x0101") :
+        status == 0x0101 ? ToHexStr(status) :  // Seen this but what is it??
         status == 0x0200 ? PSTR("READING_DISC_1") :
-        status == 0x0220 ? PSTR("0x0220") :
+        status == 0x0220 ? ToHexStr(status) :  // Seen this but what is it??
         status == 0x0300 ? PSTR("IN_GUIDANCE_MODE_1") :
         status == 0x0301 ? PSTR("IN_GUIDANCE_MODE_2") :
         status == 0x0320 ? PSTR("STOPPING_GUIDANCE") :
         status == 0x0400 ? PSTR("START_OF_AUDIO_MESSAGE") :
         status == 0x0410 ? PSTR("ARRIVED_AT_DESTINATION_1") :
-        status == 0x0600 ? PSTR("0x0600") :
+        status == 0x0600 ? ToHexStr(status) :  // Seen this but what is it??
         status == 0x0700 ? PSTR("INSTRUCTION_AUDIO_MESSAGE_START_1") :
         status == 0x0701 ? PSTR("INSTRUCTION_AUDIO_MESSAGE_START_2") :
         status == 0x0800 ? PSTR("END_OF_AUDIO_MESSAGE") :  // Follows 0x0400, 0x0700, 0x0701
         status == 0x4000 ? PSTR("GUIDANCE_STOPPED") :
-        status == 0x4001 ? PSTR("0x4001") :
+        status == 0x4001 ? ToHexStr(status) :  // Seen this but what is it??
         status == 0x4200 ? PSTR("ARRIVED_AT_DESTINATION_2") :
         status == 0x9000 ? PSTR("READING_DISC_2") :
-        status == 0x9080 ? PSTR("0x9080") :
+        status == 0x9080 ? ToHexStr(status) :  // Seen this but what is it??
         ToHexStr(data[1], data[2]),
 
         data[4] == 0x0B ? PSTR(" reason=0x0B") :  // Seen with status == 0x4001
@@ -1867,10 +2084,13 @@ VanPacketParseResult_t ParseSatnavStatus1Pkt(const char* idenStr, TVanPacketRxDe
         emptyStr
     );
 
-    return VAN_PACKET_PARSE_OK;
-} // ParseSatnavStatus1Pkt
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
-VanPacketParseResult_t ParseSatnavStatus2Pkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, int n)
+    return VAN_PACKET_PARSE_OK;
+} // ParseSatNavStatus1Pkt
+
+VanPacketParseResult_t ParseSatNavStatus2Pkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#7CE
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#7CE
@@ -1883,7 +2103,7 @@ VanPacketParseResult_t ParseSatnavStatus2Pkt(const char* idenStr, TVanPacketRxDe
         "\"data\":\n"
         "{\n"
             "\"satnav_status_2\": \"%S\",\n"
-            "\"satnav_disc\": \"%S\",\n"
+            "\"satnav_disc_present\": \"%S\",\n"
             "\"satnav_gps_fix\": \"%S\",\n"
             "\"satnav_gps_fix_lost\": \"%S\",\n"
             "\"satnav_gps_scanning\": \"%S\",\n"
@@ -1900,8 +2120,8 @@ VanPacketParseResult_t ParseSatnavStatus2Pkt(const char* idenStr, TVanPacketRxDe
         data[1] == 0xC1 ? PSTR("FINISHED_DOWNLOADING") :
         ToHexStr(data[1]),
 
-        (data[2] & 0x70) == 0x70 ? PSTR("NONE_PRESENT") :
-        (data[2] & 0x70) == 0x30 ? PSTR("RECOGNIZED") :
+        (data[2] & 0x70) == 0x70 ? noStr :
+        (data[2] & 0x70) == 0x30 ? yesStr :
         ToHexStr((uint8_t)(data[2] & 0x70)),
 
         data[2] & 0x01 ? yesStr : noStr,
@@ -1936,15 +2156,15 @@ VanPacketParseResult_t ParseSatnavStatus2Pkt(const char* idenStr, TVanPacketRxDe
             );
     } // if
 
-    at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}"));
+    at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}\n"));
 
     // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(F("--> WARNING: JSON BUFFER OVERFLOW!\n"));
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
     return VAN_PACKET_PARSE_OK;
-} // ParseSatnavStatus2Pkt
+} // ParseSatNavStatus2Pkt
 
-VanPacketParseResult_t ParseSatnavStatus3Pkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, int n)
+VanPacketParseResult_t ParseSatNavStatus3Pkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#8CE
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#8CE
@@ -1953,6 +2173,7 @@ VanPacketParseResult_t ParseSatnavStatus3Pkt(const char* idenStr, TVanPacketRxDe
     if (dataLen != 2 && dataLen != 3 && dataLen != 17) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
     const uint8_t* data = pkt.Data();
+    int at = 0;
 
     if (dataLen == 2)
     {
@@ -1967,7 +2188,7 @@ VanPacketParseResult_t ParseSatnavStatus3Pkt(const char* idenStr, TVanPacketRxDe
             "}\n"
         "}\n";
 
-        snprintf_P(buf, n, jsonFormatter,
+        at = snprintf_P(buf, n, jsonFormatter,
 
             // TODO - check; total guess
             status == 0x0000 ? PSTR("CALCULATING_ROUTE") :
@@ -1989,9 +2210,10 @@ VanPacketParseResult_t ParseSatnavStatus3Pkt(const char* idenStr, TVanPacketRxDe
             "\"event\": \"display\",\n"
             "\"data\":\n"
             "{\n"
-                "\"satnav_system_id\": [\n";
+                "\"satnav_system_id\":\n"
+                "[";
 
-        int at = snprintf_P(buf, n, jsonFormatter);
+        at = snprintf_P(buf, n, jsonFormatter);
 
         char txt[VAN_MAX_DATA_BYTES - 1 + 1];  // Max 28 data bytes, minus header (1), plus terminating '\0'
 
@@ -2001,68 +2223,89 @@ VanPacketParseResult_t ParseSatnavStatus3Pkt(const char* idenStr, TVanPacketRxDe
         {
             strncpy(txt, (const char*) data + at2, dataLen - at2);
             txt[dataLen - at2] = 0;
-            at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("%s\n\"%s\""), first ? "" : ",", txt);
+            at += at >= JSON_BUFFER_SIZE ? 0 :
+                snprintf_P(buf + at, n - at, PSTR("%S\n\"%s\""), first ? emptyStr : commaStr, txt);
             at2 += strlen(txt) + 1;
             first = false;
         } // while
 
-        at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n]\n}\n}"));
-
-        // Warning on Serial output if JSON buffer overflows
-        if (at >= JSON_BUFFER_SIZE) Serial.print(F("--> WARNING: JSON BUFFER OVERFLOW!\n"));
+        at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n]\n}\n}\n"));
     } // if
 
-    return VAN_PACKET_PARSE_OK;
-} // ParseSatnavStatus3Pkt
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
-VanPacketParseResult_t ParseSatnavGuidanceDataPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, int n)
+    return VAN_PACKET_PARSE_OK;
+} // ParseSatNavStatus3Pkt
+
+VanPacketParseResult_t ParseSatNavGuidanceDataPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#9CE
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#9CE
 
     const uint8_t* data = pkt.Data();
 
-    uint16_t currHeading = (uint16_t)data[1] << 8 | data[2];
-    uint16_t headingToDestination = (uint16_t)data[3] << 8 | data[4];
-    uint16_t distanceToDestination = (uint16_t)(data[5] & 0x7F) << 8 | data[6];
+    uint16_t currHeading = (uint16_t)data[1] << 8 | data[2];  // in compass degrees (0...359)
+    uint16_t headingToDestination = (uint16_t)data[3] << 8 | data[4];  // in compass degrees (0...359)
+    uint16_t roadDistanceToDestination = (uint16_t)(data[5] & 0x7F) << 8 | data[6];
     uint16_t gpsDistanceToDestination = (uint16_t)(data[7] & 0x7F) << 8 | data[8];
     uint16_t distanceToNextTurn = (uint16_t)(data[9] & 0x7F) << 8 | data[10];
     uint16_t headingOnRoundabout = (uint16_t)data[11] << 8 | data[12];
-    uint16_t minutesToTravel = (uint16_t)data[13] << 8 | data[14];
+    uint16_t minutesToTravel = (uint16_t)data[13] << 8 | data[14];  // Not sure, just guessing
 
     const static char jsonFormatter[] PROGMEM =
     "{\n"
         "\"event\": \"display\",\n"
         "\"data\":\n"
         "{\n"
-            "\"satnav_curr_heading\": \"%u deg\",\n"
-            "\"satnav_heading_to_dest\": \"%u deg\",\n"
-            "\"satnav_distance_to_dest\": \"%u %S\",\n"
-            "\"satnav_distance_to_dest_straight_line\": \"%u %S\",\n"
+            "\"satnav_curr_heading\":\n"
+            "{\n"
+                "\"style\":\n"
+                "{\n"
+                    "\"transform\": \"rotate(%udeg)\"\n"
+                "}\n"
+            "}\n"
+            "\"satnav_curr_heading_as_text\": \"%u deg\",\n"
+            "\"satnav_heading_to_dest\":\n"
+            "{\n"
+                "\"style\":\n"
+                "{\n"
+                    "\"transform\": \"rotate(%udeg)\"\n"
+                "}\n"
+            "}\n"
+            "\"satnav_heading_to_dest_as_text\": \"%u deg\",\n"
+            "\"satnav_distance_to_dest_via_road\": \"%u %S\",\n"
+            "\"satnav_distance_to_dest_via_straight_line\": \"%u %S\",\n"
             "\"satnav_turn_at\": \"%u %S\",\n"
-            "\"satnav_heading_on_roundabout\": \"%S deg\",\n"
+            "\"satnav_heading_on_roundabout_as_text\": \"%S deg\",\n"
             "\"satnav_minutes_to_travel\": \"%u\"\n"
         "}\n"
     "}\n";
 
+
     char floatBuf[MAX_FLOAT_SIZE];
-    snprintf_P(buf, n, jsonFormatter,
+    int at = snprintf_P(buf, n, jsonFormatter,
+        currHeading,
         currHeading,
         headingToDestination,
-        distanceToDestination,
+        headingToDestination,
+        roadDistanceToDestination,
         data[5] & 0x80 ? PSTR("Km") : PSTR("m") ,
         gpsDistanceToDestination,
         data[7] & 0x80 ? PSTR("Km") : PSTR("m") ,
         distanceToNextTurn,
         data[9] & 0x80 ? PSTR("Km") : PSTR("m"),
-        headingOnRoundabout == 0x7FFF ? PSTR("---") : FloatToStr(floatBuf, headingOnRoundabout, 0),
+        headingOnRoundabout == 0x7FFF ? notApplicable3Str : FloatToStr(floatBuf, headingOnRoundabout, 0),
         minutesToTravel
     );
 
-    return VAN_PACKET_PARSE_OK;
-} // ParseSatnavGuidanceDataPkt
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
-VanPacketParseResult_t ParseSatnavGuidancePkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, int n)
+    return VAN_PACKET_PARSE_OK;
+} // ParseSatNavGuidanceDataPkt
+
+VanPacketParseResult_t ParseSatNavGuidancePkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#64E
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#64E
@@ -2080,15 +2323,19 @@ VanPacketParseResult_t ParseSatnavGuidancePkt(const char* idenStr, TVanPacketRxD
         "\"event\": \"display\",\n"
         "\"data\":\n"
         "{\n"
-            "\"satnav_guidance_instruction\": \"%s\"";
+            "\"satnav_guidance_current_instruction_icon\": \"%s\",\n"
+            "\"satnav_guidance_next_instruction_icon\": \"%s\",\n"
+            "\"satnav_guidance_turn_around_if_possible_icon\": \"%s\",\n"
+            "\"satnav_guidance_follow_road_icon\": \"%s\",\n"
+            "\"satnav_guidance_not_on_map_icon\": \"%s\"";
 
+    // Determines which guidance icon(s) will be visible
     int at = snprintf_P(buf, n, jsonFormatter,
-        data[1] == 0x01 ? "SINGLE_TURN" :
-        data[1] == 0x03 ? "DOUBLE_TURN" :
-        data[1] == 0x04 ? "TURN_AROUND_IF_POSSIBLE" :
-        data[1] == 0x05 ? "FOLLOW_ROAD" :
-        data[1] == 0x06 ? "NOT_ON_MAP" :
-        ToHexStr(data[1], data[2])
+        data[1] == 0x01 || data[1] == 0x03 ? onStr : offStr,
+        data[1] == 0x03 ? onStr : offStr,
+        data[1] == 0x04 ? onStr : offStr,
+        data[1] == 0x05 ? onStr : offStr,
+        data[1] == 0x06 ? onStr : offStr
     );
 
     if (data[1] == 0x01)  // Single turn
@@ -2097,54 +2344,58 @@ VanPacketParseResult_t ParseSatnavGuidancePkt(const char* idenStr, TVanPacketRxD
         {
             if (dataLen != 13) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
-            // One "detailed instruction" in data[4...11]
-            at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR(",\n\"current_instruction\": "));
-            PrintGuidanceInstruction(data + 4); // TODO
+            // One instruction icon: current in data[4...11]
+
+            GuidanceInstructionIconJson(PSTR("satnav_curr_turn_icon"), data + 4, buf, at, n);
         }
         else if (data[2] == 0x02)
         {
             if (dataLen != 6) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
-            // Fork or exit instruction
+            // "Fork or exit" instruction
+            // Show one of the available icons
             at += at >= JSON_BUFFER_SIZE ? 0 :
-                snprintf_P(buf + at, n - at, PSTR(",\n\"current_instruction\": \"%S\""),
-                    data[4] == 0x41 ? PSTR("KEEP_LEFT_ON_FORK") :
-                    data[4] == 0x14 ? PSTR("KEEP_RIGHT_ON_FORK") :
-                    data[4] == 0x12 ? PSTR("TAKE_RIGHT_EXIT") :
-                    ToHexStr(data[4])
+                snprintf_P(buf + at, n - at,
+                    PSTR(
+                        ",\n"
+                        "\"satnav_fork_icon_take_right_exit\": \"%S\",\n"
+                        "\"satnav_fork_icon_keep_right\": \"%S\",\n"
+                        "\"satnav_fork_icon_take_left_exit\": \"%S\",\n"
+                        "\"satnav_fork_icon_keep_left\": \"%S\""
+                    ),
+
+                    // Pretty sure there are more values
+                    data[4] == 0x12 ? onStr : offStr,
+                    data[4] == 0x14 ? onStr : offStr,
+                    data[4] == 0x21 ? onStr : offStr,  // Never seen; just guessing
+                    data[4] == 0x41 ? onStr : offStr
                 );
-        }
-        else
-        {
-            at += at >= JSON_BUFFER_SIZE ? 0 :
-                snprintf_P(buf + at, n - at, PSTR(",\n\"current_instruction\": \"unknown(%s)\""), ToHexStr(data[2]));
         } // if
     }
     else if (data[1] == 0x03)  // Double turn
     {
         if (dataLen != 23) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
-        // Two "detailed instructions": current in data[6...13], next in data[14...21]
-        at += at >= JSON_BUFFER_SIZE ? 0 :
-            snprintf_P(buf + at, n - at, PSTR(",\n\"current_instruction\": "));
-        PrintGuidanceInstruction(data + 6); // TODO
-        at += at >= JSON_BUFFER_SIZE ? 0 :
-            snprintf_P(buf + at, n - at, PSTR(",\n\"next_instruction\": "));
-        PrintGuidanceInstruction(data + 14); // TODO
+        // Two instruction icons: current in data[6...13], next in data[14...21]
+
+        GuidanceInstructionIconJson(PSTR("satnav_curr_turn_icon"), data + 6, buf, at, n);
+        GuidanceInstructionIconJson(PSTR("satnav_next_turn_icon"), data + 14, buf, at, n);
     }
     else if (data[1] == 0x04)  // Turn around if possible
     {
         if (dataLen != 3) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
+        // Show the "turn around" icon
         at += at >= JSON_BUFFER_SIZE ? 0 :
-            snprintf_P(buf + at, n - at, PSTR(",\n\"current_instruction\": \"TURN_AROUND_IF_POSSIBLE\""));
+            snprintf_P(buf + at, n - at, PSTR(",\n\"satnav_turn_around_if_possible\": \"TURN_AROUND_IF_POSSIBLE\""));
     } // if
     else if (data[1] == 0x05)  // Follow road
     {
         if (dataLen != 4) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
+        // Show one of the five available icons
         at += at >= JSON_BUFFER_SIZE ? 0 :
-            snprintf_P(buf + at, n - at, PSTR(",\n\"follow_road_next_instruction\": \"%S\""),
+            snprintf_P(buf + at, n - at, PSTR(",\n\"satnav_follow_road_next_instruction\": \"%S\""),
                 data[2] == 0x00 ? noneStr :
                 data[2] == 0x01 ? PSTR("TURN_RIGHT") :
                 data[2] == 0x02 ? PSTR("TURN_LEFT") :
@@ -2159,18 +2410,18 @@ VanPacketParseResult_t ParseSatnavGuidancePkt(const char* idenStr, TVanPacketRxD
         if (dataLen != 4) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
         at += at >= JSON_BUFFER_SIZE ? 0 :
-            snprintf_P(buf + at, n - at, PSTR(",\n\"not_on_map_follow_heading\": \"%u\""), data[2]);
+            snprintf_P(buf + at, n - at, PSTR(",\n\"satnav_not_on_map_follow_heading\": \"%u\""), data[2]);
     } // if
 
-    at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}"));
+    at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}\n"));
 
     // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(F("--> WARNING: JSON BUFFER OVERFLOW!\n"));
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
     return VAN_PACKET_PARSE_OK;
-} // ParseSatnavGuidancePkt
+} // ParseSatNavGuidancePkt
 
-VanPacketParseResult_t ParseSatnavReportPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, int n)
+VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#6CE
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#6CE
@@ -2178,49 +2429,51 @@ VanPacketParseResult_t ParseSatnavReportPkt(const char* idenStr, TVanPacketRxDes
     int dataLen = pkt.DataLen();
     if (dataLen < 3) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
+    // Each report can be built out of multiple VAN bus packets, so we keep a static buffer of the strings we've
+    // read thus far.
+    // TODO - This is pretty heavy on RAM. Use some kind of linked list, e.g. from
+    //   ESPAsyncWebServer-master\src\StringArray.h .
+    #define MAX_SATNAV_STRINGS_PER_RECORD 15
+    #define MAX_SATNAV_RECORDS 40
+    static String records[MAX_SATNAV_RECORDS][MAX_SATNAV_STRINGS_PER_RECORD];
+    static int currentRecord = 0;
+    static int currentString = 0;
+
+    // String currently being read
     #define MAX_SATNAV_STRING_SIZE 128
     static char buffer[MAX_SATNAV_STRING_SIZE];
     static int offsetInBuffer = 0;
 
     const uint8_t* data = pkt.Data();
-    int offsetInPacket = 1;
 
+    uint8_t request = data[1];
+
+    int offsetInPacket = 1;
     if ((data[0] & 0x7F) <= 7)
     {
-        // First packet of report sequence
+        // First packet of a report sequence
+
         offsetInPacket = 2;
+        currentRecord = 0;
+        currentString = 0;
         offsetInBuffer = 0;
-
-        const static char jsonFormatter[] PROGMEM =
-        "{\n"
-            "\"event\": \"display\",\n"
-            "\"data\":\n"
-            "{\n"
-                "\"satnav_report\": \"%S\"";
-
-        n -= snprintf_P(buf, n, jsonFormatter, SatNavRequestStr(data[1]));
-    }
-    else
-    {
-        // TODO - check if data[0] & 0x7F has incremented by either 1 or 9 w.r.t. the last received packet.
-        // If it has incremented by e.g. 10 (9+1) or 18 (9+9), then we have obviously missed a packet, so
-        // appending the text of the current packet to that of the previous packet would be incorrect.
-
-        // TODO
-
-        Serial.print("\n    ");
     } // if
 
     while (offsetInPacket < dataLen - 1)
     {
-        // TODO
-
         // New record?
         if (data[offsetInPacket] == 0x01)
         {
             offsetInPacket++;
+
+            if (++currentRecord >= MAX_SATNAV_RECORDS)
+            {
+                // Warning on Serial output
+                Serial.print(F("--> WARNING: too many records in satnav report!\n"));
+            } // if
+
+            currentString = 0;
             offsetInBuffer = 0;
-            Serial.print("\n    ");
         } // if
 
         int maxLen = dataLen - 1 - offsetInPacket;
@@ -2235,7 +2488,19 @@ VanPacketParseResult_t ParseSatnavReportPkt(const char* idenStr, TVanPacketRxDes
         offsetInPacket += strlen(buffer) + 1 - offsetInBuffer;
         if (offsetInPacket <= dataLen - 1)
         {
-            Serial.printf("'%s' - ", buffer);
+            // Better safe than sorry
+            if (currentRecord < MAX_SATNAV_RECORDS && currentString < MAX_SATNAV_STRINGS_PER_RECORD)
+            {
+                // Copy the current string buffer into the array
+                records[currentRecord][currentString++] = buffer;
+
+                if (currentString >= MAX_SATNAV_STRINGS_PER_RECORD)
+                {
+                    // Warning on Serial output
+                    Serial.print(F("--> WARNING: too many strings in record in satnav report!\n"));
+                } // if
+            } // if
+
             offsetInBuffer = 0;
         }
         else
@@ -2245,13 +2510,235 @@ VanPacketParseResult_t ParseSatnavReportPkt(const char* idenStr, TVanPacketRxDes
     } // while
 
     // Last packet in report sequence?
-    if (data[0] & 0x80) Serial.print("--LAST--"); // TODO
-    Serial.println();
+    if (data[0] & 0x80)
+    {
+        // Create an 'easily digestable' JSON report
+
+        int at = 0;
+
+        if (request == SR_CURRENT_STREET || request == SR_NEXT_STREET)
+        {
+            const static char jsonFormatter[] PROGMEM =
+            "{\n"
+                "\"event\": \"display\",\n"
+                "\"data\":\n"
+                "{\n"
+                    "\"satnav_%S_street\": \"%s%S%s - %s%s\"\n"
+                "}\n"
+            "}\n";
+
+            // Current/next street is in first (and only) record. Copy only city [3], district [4] (if any) and
+            // street [5, 6]; skip the other strings.
+            at = snprintf_P(buf, n, jsonFormatter,
+                request == SR_CURRENT_STREET ? PSTR("curr") : PSTR("next"),
+                records[0][3].c_str(),
+                records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
+                records[0][4].c_str(),
+                records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
+                records[0][6].c_str()
+            );
+        }
+        else if (request == SR_GPS_CHOOSE_DESTINATION || request == SR_GPS_FOR_PLACE_OF_INTEREST)
+        {
+            const static char jsonFormatter[] PROGMEM =
+            "{\n"
+                "\"event\": \"display\",\n"
+                "\"data\":\n"
+                "{\n"
+                    "\"satnav_%S_address\": \"%s%S%s - %s%s%s%s\"\n"
+                "}\n"
+            "}\n";
+
+            // Address is in first (and only) record. Copy only city [3], district [4] (if any), street [5, 6] and
+            // house number [7]; skip the other strings.
+            at = snprintf_P(buf, n, jsonFormatter,
+                request == SR_GPS_CHOOSE_DESTINATION ? PSTR("destination") : PSTR("current"),
+                records[0][3].c_str(),
+                records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
+                records[0][4].c_str(),
+                records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
+                records[0][6].c_str(),
+
+                // First string is either "C" or "V"; "C" has GPS coordinates in [7] and [8]; "V" has house number
+                // in [7]. If we see "V", show house number.
+                records[0][0] == "V" ? PSTR(" - ") : emptyStr,
+                records[0][0] == "V" ? records[0][7].c_str() : emptyStr
+            );
+        }
+        else if (request == SR_PRIVATE_ADDRESS || request == SR_BUSINESS_ADDRESS)
+        {
+            const static char jsonFormatter[] PROGMEM =
+            "{\n"
+                "\"event\": \"display\",\n"
+                "\"data\":\n"
+                "{\n"
+                    "\"satnav_%S_entry\": \"%s\",\n"
+                    "\"satnav_%S\": \"%s%S%s - %s%s - %s\"\n"
+                "}\n"
+            "}\n";
+
+            // Chosen address is in first (and only) record. Copy only city [3], district [4] (if any), street [5, 6]
+            // house number [7] and entry name [8]; skip the other strings.
+            at = snprintf_P(buf, n, jsonFormatter,
+
+                request == SR_PRIVATE_ADDRESS ? PSTR("private_address") :
+                PSTR("business_address"),
+
+                // Name of the entry
+                records[0][8].c_str(),
+
+                request == SR_PRIVATE_ADDRESS ? PSTR("private_address") :
+                PSTR("business_address"),
+
+                // Address of the entry
+                records[0][3].c_str(),
+                records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
+                records[0][4].c_str(),
+                records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
+                records[0][6].c_str(),
+                records[0][7].c_str()
+            );
+        }
+        else if (request == SR_PLACE_OF_INTEREST_CATEGORY)
+        {
+            const static char jsonFormatter[] PROGMEM =
+            "{\n"
+                "\"event\": \"display\",\n"
+                "\"data\":\n"
+                "{\n"
+                    "\"satnav_place_of_interest_address_entry\": \"%s\",\n"
+                    "\"satnav_place_of_interest_address\": \"%s%S%s - %s%s\",\n"
+                    "\"satnav_place_of_interest_address_distance\": \"%s\"\n"
+                "}\n"
+            "}\n";
+
+            // Chosen place of interest address is in first (and only) record. Copy only city [3], district [4]
+            // (if any), street [5, 6] and entry name [9]; skip the other strings.
+            at = snprintf_P(buf, n, jsonFormatter,
+
+                // Name of the place of interest
+                records[0][9].c_str(),
+
+                // Address of the place of interest
+                records[0][3].c_str(),
+                records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
+                records[0][4].c_str(),
+                records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
+                records[0][6].c_str(),
+
+                // Distance (in meters) to the place of interest (not sure)
+                records[0][11].c_str()
+            );
+        }
+        else if (request == SR_ENTER_CITY
+                 || request == SR_ENTER_STREET
+                 || request == SR_PRIVATE_ADDRESS_LIST
+                 || request == SR_BUSINESS_ADDRESS_LIST)
+        {
+            const static char jsonFormatter[] PROGMEM =
+            "{\n"
+                "\"event\": \"display\",\n"
+                "\"data\":\n"
+                "{\n"
+                    "\"satnav_%S_list\":\n"
+                    "[";
+
+            at = snprintf_P(buf, n, jsonFormatter,
+                request == SR_ENTER_CITY ? PSTR("city") :
+                request == SR_ENTER_STREET ? PSTR("street") :
+                request == SR_PRIVATE_ADDRESS_LIST ? PSTR("private_address") :
+                PSTR("business_address")
+            );
+
+            // Each item in the list is a single string in a separate record
+            for (int i = 0; i < currentRecord; i++)
+            {
+                at += at >= JSON_BUFFER_SIZE ? 0 :
+                    snprintf_P(buf + at, n - at,
+                        PSTR("%S\n\"%s\""),
+                        i == 0 ? emptyStr : commaStr,
+                        records[i][0].c_str()
+                    );
+            } // for
+
+            at += at >= JSON_BUFFER_SIZE ? 0 :
+                snprintf_P(buf + at, n - at, PSTR("\n]\n}\n}\n"));
+        }
+        else if (request == SR_ENTER_HOUSE_NUMBER)
+        {
+            const static char jsonFormatter[] PROGMEM =
+            "{\n"
+                "\"event\": \"display\",\n"
+                "\"data\":\n"
+                "{\n"
+                    "\"satnav_house_number_range\": \"%s...%s\"\n"
+                "}\n"
+            "}\n";
+
+            // Range of "house numbers" is in first (and only) record, the lowest number is in the first string, and
+            // highest number is in the second string
+            at = snprintf_P(buf, n, jsonFormatter, records[0][0].c_str(), records[0][1].c_str());
+        }
+        else if (request == SR_PLACE_OF_INTEREST_CATEGORY_LIST)
+        {
+            const static char jsonFormatter[] PROGMEM =
+            "{\n"
+                "\"event\": \"display\",\n"
+                "\"data\":\n"
+                "{\n"
+                    "\"satnav_place_of_interest_category_list\":\n"
+                    "[";
+
+            // Each "category" in the list is a single string in a separate record
+            for (int i = 0; i < currentRecord; i++)
+            {
+                at += at >= JSON_BUFFER_SIZE ? 0 :
+                    snprintf_P(buf + at, n - at,
+                        PSTR("%S\n\"%s\""),
+                        i == 0 ? emptyStr : commaStr,
+                        records[i][0].c_str()
+                    );
+            } // for
+
+            at += at >= JSON_BUFFER_SIZE ? 0 :
+                snprintf_P(buf + at, n - at, PSTR("\n]\n}\n}\n"));
+        } // if
+        else if (request == SR_SOFTWARE_MODULE_VERSIONS)
+        {
+            const static char jsonFormatter[] PROGMEM =
+            "{\n"
+                "\"event\": \"display\",\n"
+                "\"data\":\n"
+                "{\n"
+                    "\"satnav_software_modules_list\":\n"
+                    "[";
+
+            // Each "module" in the list is a triplet of strings ('module_name', then 'version' and 'date' in a rather
+            // free format) in a separate record
+            for (int i = 0; i < currentRecord; i++)
+            {
+                at += at >= JSON_BUFFER_SIZE ? 0 :
+                    snprintf_P(buf + at, n - at,
+                        PSTR("%S\n\"%s - %s - %s\""),
+                        i == 0 ? emptyStr : commaStr,
+                        records[i][0].c_str(),
+                        records[i][1].c_str(),
+                        records[i][2].c_str()
+                    );
+            } // for
+
+            at += at >= JSON_BUFFER_SIZE ? 0 :
+                snprintf_P(buf + at, n - at, PSTR("\n]\n}\n}\n"));
+        } // if
+
+        // Warning on Serial output if JSON buffer overflows
+        if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    } // if
 
     return VAN_PACKET_PARSE_OK;
-} // ParseSatnavReportPkt
+} // ParseSatNavReportPkt
 
-VanPacketParseResult_t ParseMfdToSatnavPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, int n)
+VanPacketParseResult_t ParseMfdToSatNavPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#94E
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#94E
@@ -2259,23 +2746,145 @@ VanPacketParseResult_t ParseMfdToSatnavPkt(const char* idenStr, TVanPacketRxDesc
     int dataLen = pkt.DataLen();
     if (dataLen != 4 && dataLen != 9 && dataLen != 11) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
-    // TODO
+    const uint8_t* data = pkt.Data();
+    uint8_t type = data[2];
 
+    const static char jsonFormatter[] PROGMEM =
+    "{\n"
+        "\"event\": \"display\",\n"
+        "\"data\":\n"
+        "{\n"
+            "\"mfd_to_satnav_request\": \"%S\",\n"
+            "\"mfd_to_satnav_request_type\": \"%S\"";
 
+    int at = snprintf_P(buf, n, jsonFormatter,
+        SatNavRequestStr(data[0]),
+
+        type == 0x00 ? PSTR("REQ_LIST_LENGTH") :
+        type == 0x01 ? PSTR("REQ_LIST") :
+        type == 0x02 ? PSTR("CHOOSE") :
+        ToHexStr(type)
+    );
+
+    if (data[3] != 0x00)
+    {
+        char buffer[2];
+        sprintf_P(buffer, PSTR("%c"), data[3]);
+
+        at += at >= JSON_BUFFER_SIZE ? 0 :
+            snprintf_P(buf + at,n - at,PSTR
+                (
+                    ",\n"
+                    "\"mfd_to_satnav_character\": \"%s\""
+                ),
+
+                (data[3] >= 'A' && data[3] <= 'Z') || (data[3] >= '0' && data[3] <= '9') || data[3] == '\'' ? buffer :
+                data[3] == ' ' ? "_" : // Space
+                data[3] == 0x01 ? "Esc" :
+                "?"
+            );
+    } // if
+
+    if (dataLen >= 9)
+    {
+        uint16_t selectionOrOffset = (uint16_t)data[5] << 8 | data[6];
+        uint16_t length = (uint16_t)data[7] << 8 | data[8];
+
+        if (selectionOrOffset > 0 && length > 0)
+        {
+            at += at >= JSON_BUFFER_SIZE ? 0 :
+                snprintf_P(buf + at,n - at,PSTR
+                    (
+                        ",\n"
+                        "\"mfd_to_satnav_offset\": \"%u\",\n"
+                        "\"mfd_to_satnav_length\": \"%u\""
+                    ),
+                    selectionOrOffset,
+                    length
+                );
+        }
+        else if (selectionOrOffset > 0)
+        {
+            at += at >= JSON_BUFFER_SIZE ? 0 :
+                snprintf_P(buf + at, n - at,PSTR
+                    (
+                        ",\n"
+                        "\"mfd_to_satnav_selection\": \"%u\""
+                    ),
+                    selectionOrOffset
+                );
+        } // if
+    } // if
+
+    at += at >= JSON_BUFFER_SIZE ? 0 :
+        snprintf_P(buf + at, n - at, PSTR("\n}\n}\n"));
+
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
     return VAN_PACKET_PARSE_OK;
-} // ParseMfdToSatnavPkt
+} // ParseMfdToSatNavPkt
 
-VanPacketParseResult_t ParseSatnavToMfdPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, int n)
+VanPacketParseResult_t ParseSatNavToMfdPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#74E
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#74E
 
-    // TODO
+    const uint8_t* data = pkt.Data();
 
+    const static char jsonFormatter[] PROGMEM =
+    "{\n"
+        "\"event\": \"display\",\n"
+        "\"data\":\n"
+        "{\n"
+            "\"satnav_to_mfd_response\": \"%S\",\n"
+            "\"satnav_to_mfd_list_size\": \"%u\",\n"
+            "\"satnav_to_mfd_show_characters\": \"";
+
+    int at = snprintf_P(buf, n, jsonFormatter,
+        SatNavRequestStr(data[1]),
+        (uint16_t)data[4] << 8 | data[5]
+    );
+
+    // Available letters are bit-coded in bytes 17...20. Print the letter if it is available, print a '.'
+    // if not.
+    for (int byte = 0; byte <= 3; byte++)
+    {
+        for (int bit = 0; bit < (byte == 3 ? 2 : 8); bit++)
+        {
+            at += at >= JSON_BUFFER_SIZE ? 0 :
+                snprintf_P(buf + at, n - at, PSTR("%c"), data[byte + 17] >> bit & 0x01 ? 65 + 8 * byte + bit : '.');
+
+        } // for
+    } // for
+
+    // Special character: single quote (')
+    at += at >= JSON_BUFFER_SIZE ? 0 :
+        snprintf_P(buf + at, n - at, PSTR("%c"), data[21] >> 6 & 0x01 ? '\'' : '.');
+
+    // Available numbers are bit-coded in bytes 20...21, starting with '0' at bit 2 of byte 20, ending
+    // with '9' at bit 3 of byte 21. Print the number if it is available, print a '.' if not.
+    for (int byte = 0; byte <= 1; byte++)
+    {
+        for (int bit = (byte == 0 ? 2 : 0); bit < (byte == 1 ? 3 : 8); bit++)
+        {
+            at += at >= JSON_BUFFER_SIZE ? 0 :
+                snprintf_P(buf + at, n - at, PSTR("%c"), data[byte + 20] >> bit & 0x01 ? 48 + 8 * byte + bit - 2 : '.');
+        } // for
+    } // for
+
+    // <Space>, will be shown as '_'
+    at += at >= JSON_BUFFER_SIZE ? 0 :
+        snprintf_P(buf + at, n - at, PSTR("%c"),  data[22] >> 1 & 0x01 ? '_' : '.');
+
+    at += at >= JSON_BUFFER_SIZE ? 0 :
+        snprintf_P(buf + at, n - at, PSTR("\"\n}\n}\n"));
+
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
     return VAN_PACKET_PARSE_OK;
-} // ParseSatnavToMfdPkt
+} // ParseSatNavToMfdPkt
 
 VanPacketParseResult_t ParseWheelSpeedPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, int n)
 {
@@ -2297,12 +2906,15 @@ VanPacketParseResult_t ParseWheelSpeedPkt(const char* idenStr, TVanPacketRxDesc&
 
     char floatBuf[2][MAX_FLOAT_SIZE];
 
-    snprintf_P(buf, n, jsonFormatter,
+    int at = snprintf_P(buf, n, jsonFormatter,
         FloatToStr(floatBuf[0], ((uint16_t)data[0] << 8 | data[1]) / 100.0, 2),
         FloatToStr(floatBuf[1], ((uint16_t)data[2] << 8 | data[3]) / 100.0, 2),
         (uint16_t)data[4] << 8 | data[5],
         (uint16_t)data[6] << 8 | data[7]
     );
+
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
     return VAN_PACKET_PARSE_OK;
 } // ParseWheelSpeedPkt
@@ -2325,9 +2937,12 @@ VanPacketParseResult_t ParseOdometerPkt(const char* idenStr, TVanPacketRxDesc& p
 
     char floatBuf[MAX_FLOAT_SIZE];
 
-    snprintf_P(buf, n, jsonFormatter,
+    int at = snprintf_P(buf, n, jsonFormatter,
         FloatToStr(floatBuf, ((uint32_t)data[1] << 16 | (uint32_t)data[2] << 8 | data[3]) / 10.0, 1)
     );
+
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
     return VAN_PACKET_PARSE_OK;
 } // ParseOdometerPkt
@@ -2338,51 +2953,74 @@ VanPacketParseResult_t ParseCom2000Pkt(const char* idenStr, TVanPacketRxDesc& pk
 
     const uint8_t* data = pkt.Data();
 
-    // TODO - event is not "display" but "button_press"
+    // TODO - replace event "display" by "button_press"; JavaScript on served website could react by changing to
+    // different screen or displaying popup
     const static char jsonFormatter[] PROGMEM =
     "{\n"
         "\"event\": \"display\",\n"
         "\"data\":\n"
         "{\n"
-            "\"com2000_light_switch\": \"%S%S%S%S%S%S%S%S\",\n"
-            "\"com2000_right_stalk\": \"%S%S%S%S%S%S%S%S\",\n"
-            "\"com2000_turn_signal\": \"%S%S\",\n"
-            "\"com2000_head_unit_stalk\": \"%S%S%S%S%S\",\n"
+            "\"com2000_light_switch_auto\": \"%S\",\n"
+            "\"com2000_light_switch_fog_light_forward\": \"%S\",\n"
+            "\"com2000_light_switch_fog_light_backward\": \"%S\",\n"
+            "\"com2000_light_switch_signal_beam\": \"%S\",\n"
+            "\"com2000_light_switch_full_beam\": \"%S\",\n"
+            "\"com2000_light_switch_all_off\": \"%S\",\n"
+            "\"com2000_light_switch_side_lights\": \"%S\",\n"
+            "\"com2000_light_switch_low_beam\": \"%S\",\n"
+            "\"com2000_right_stalk_button_trip_computer\": \"%S\",\n"
+            "\"com2000_right_stalk_rear_window_wash\": \"%S\",\n"
+            "\"com2000_right_stalk_rear_window_wiper\": \"%S\",\n"
+            "\"com2000_right_stalk_windscreen_wash\": \"%S\",\n"
+            "\"com2000_right_stalk_windscreen_wipe_once\": \"%S\",\n"
+            "\"com2000_right_stalk_windscreen_wipe_auto\": \"%S\",\n"
+            "\"com2000_right_stalk_windscreen_wipe_normal\": \"%S\",\n"
+            "\"com2000_right_stalk_windscreen_wipe_fast\": \"%S\",\n"
+            "\"com2000_turn_signal_left\": \"%S\",\n"
+            "\"com2000_turn_signal_right\": \"%S\",\n"
+            "\"com2000_head_unit_stalk_button_src\": \"%S\",\n"
+            "\"com2000_head_unit_stalk_button_volume_up\": \"%S\",\n"
+            "\"com2000_head_unit_stalk_button_volume_down\": \"%S\",\n"
+            "\"com2000_head_unit_stalk_button_seek_backward\": \"%S\",\n"
+            "\"com2000_head_unit_stalk_button_seek_forward\": \"%S\",\n"
             "\"com2000_head_unit_stalk_wheel_pos\": \"%d\"\n"
         "}\n"
     "}\n";
 
-    snprintf_P(buf, n, jsonFormatter,
+    int at = snprintf_P(buf, n, jsonFormatter,
 
-        data[1] & 0x01 ? PSTR("Auto light button pressed, ") : emptyStr,
-        data[1] & 0x02 ? PSTR("Fog light switch turned FORWARD, ") : emptyStr,
-        data[1] & 0x04 ? PSTR("Fog light switch turned BACKWARD, ") : emptyStr,
-        data[1] & 0x08 ? PSTR("Main beam handle gently ON, ") : emptyStr,
-        data[1] & 0x10 ? PSTR("Main beam handle fully ON, ") : emptyStr,
-        data[1] & 0x20 ? PSTR("All OFF, ") : emptyStr,
-        data[1] & 0x40 ? PSTR("Sidelights ON, ") : emptyStr,
-        data[1] & 0x80 ? PSTR("Low beam ON, ") : emptyStr,
+        data[1] & 0x01 ? onStr : offStr,
+        data[1] & 0x02 ? onStr : offStr,
+        data[1] & 0x04 ? onStr : offStr,
+        data[1] & 0x08 ? onStr : offStr,
+        data[1] & 0x10 ? onStr : offStr,
+        data[1] & 0x20 ? onStr : offStr,
+        data[1] & 0x40 ? onStr : offStr,
+        data[1] & 0x80 ? onStr : offStr,
 
-        data[2] & 0x01 ? PSTR("Trip computer button pressed, ") : emptyStr,
-        data[2] & 0x02 ? PSTR("Rear wiper switched turned to screen wash position, ") : emptyStr,
-        data[2] & 0x04 ? PSTR("Rear wiper switched turned to position 1, ") : emptyStr,
-        data[2] & 0x08 ? PSTR("Screen wash, ") : emptyStr,
-        data[2] & 0x10 ? PSTR("Single screen wipe, ") : emptyStr,
-        data[2] & 0x20 ? PSTR("Screen wipe speed 1, ") : emptyStr,
-        data[2] & 0x40 ? PSTR("Screen wipe speed 2, ") : emptyStr,
-        data[2] & 0x80 ? PSTR("Screen wipe speed 3, ") : emptyStr,
+        data[2] & 0x01 ? onStr : offStr,
+        data[2] & 0x02 ? onStr : offStr,
+        data[2] & 0x04 ? onStr : offStr,
+        data[2] & 0x08 ? onStr : offStr,
+        data[2] & 0x10 ? onStr : offStr,
+        data[2] & 0x20 ? onStr : offStr,
+        data[2] & 0x40 ? onStr : offStr,
+        data[2] & 0x80 ? onStr : offStr,
 
-        data[3] & 0x40 ? PSTR("Left signal ON, ") : emptyStr,
-        data[3] & 0x80 ? PSTR("Right signal ON, ") : emptyStr,
+        data[3] & 0x40 ? onStr : offStr,
+        data[3] & 0x80 ? onStr : offStr,
 
-        data[5] & 0x02 ? PSTR("SRC button pressed, ") : emptyStr,
-        data[5] & 0x03 ? PSTR("Volume down button pressed, ") : emptyStr,
-        data[5] & 0x08 ? PSTR("Volume up button pressed, ") : emptyStr,
-        data[5] & 0x40 ? PSTR("Seek backward button pressed, ") : emptyStr,
-        data[5] & 0x80 ? PSTR("Seek forward button pressed, ") : emptyStr,
+        data[5] & 0x02 ? onStr : offStr,
+        data[5] & 0x03 ? onStr : offStr,
+        data[5] & 0x08 ? onStr : offStr,
+        data[5] & 0x40 ? onStr : offStr,
+        data[5] & 0x80 ? onStr : offStr,
 
         (sint8_t)data[6]
     );
+
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
     return VAN_PACKET_PARSE_OK;
 } // ParseCom2000Pkt
@@ -2403,7 +3041,7 @@ VanPacketParseResult_t ParseCdChangerCmdPkt(const char* idenStr, TVanPacketRxDes
         "}\n"
     "}\n";
 
-    snprintf_P(buf, n, jsonFormatter,
+    int at = snprintf_P(buf, n, jsonFormatter,
 
         cdcCommand == 0x1101 ? PSTR("POWER_OFF") :
         cdcCommand == 0x2101 ? PSTR("POWER_OFF") :
@@ -2422,6 +3060,9 @@ VanPacketParseResult_t ParseCdChangerCmdPkt(const char* idenStr, TVanPacketRxDes
         ToHexStr(cdcCommand)
     );
 
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+
     return VAN_PACKET_PARSE_OK;
 } // ParseCdChangerCmdPkt
 
@@ -2432,6 +3073,7 @@ VanPacketParseResult_t ParseMfdToHeadUnitPkt(const char* idenStr, TVanPacketRxDe
 
     int dataLen = pkt.DataLen();
     const uint8_t* data = pkt.Data();
+    int at = 0;
 
     // Maybe this is in fact "Head unit to MFD"??
 
@@ -2453,7 +3095,7 @@ VanPacketParseResult_t ParseMfdToHeadUnitPkt(const char* idenStr, TVanPacketRxDe
             "}\n"
         "}\n";
 
-        snprintf_P(buf, n, jsonFormatter,
+        at = snprintf_P(buf, n, jsonFormatter,
             data[1] & 0x01 ? onStr : offStr,
             data[1] & 0x02 ? onStr : offStr,
             data[1] & 0x10 ? onStr : offStr,
@@ -2476,15 +3118,15 @@ VanPacketParseResult_t ParseMfdToHeadUnitPkt(const char* idenStr, TVanPacketRxDe
             "{\n"
                 "\"head_unit_update_switch_to\": \"%S\"";
 
-        int at = snprintf_P(buf, n, jsonFormatter,
+        at = snprintf_P(buf, n, jsonFormatter,
             data[1] == 0x01 ? PSTR("TUNER") :
             data[1] == 0x02 ? PSTR("INTERNAL_CD_OR_TAPE") :
             data[1] == 0x03 ? PSTR("CD_CHANGER") :
 
-            // This is the PSTR("default") mode for the head unit, to sit there and listen to the navigation
+            // This is the "default" mode for the head unit, to sit there and listen to the navigation
             // audio. The navigation audio volume is also always set (usually a lot higher than the radio)
             // whenever this source is chosen.
-            data[1] == 0x05 ? PSTR("NAVIGATION_AUDIO") :
+            data[1] == 0x05 ? PSTR("NAVIGATION") :
 
             ToHexStr(data[1])
         );
@@ -2512,7 +3154,7 @@ VanPacketParseResult_t ParseMfdToHeadUnitPkt(const char* idenStr, TVanPacketRxDe
                 // This is the "default" mode for the head unit, to sit there and listen to the navigation
                 // audio. The navigation audio volume is also always set (usually a lot higher than the radio)
                 // whenever this source is chosen.
-                (data[4] & 0x0F) == 0x05 ? PSTR("NAVIGATION_AUDIO") :
+                (data[4] & 0x0F) == 0x05 ? PSTR("NAVIGATION") :
 
                 ToHexStr((uint8_t)(data[4] & 0x0F)),
 
@@ -2529,10 +3171,7 @@ VanPacketParseResult_t ParseMfdToHeadUnitPkt(const char* idenStr, TVanPacketRxDe
             );
         } // if
 
-        at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}"));
-
-        // Warning on Serial output if JSON buffer overflows
-        if (at >= JSON_BUFFER_SIZE) Serial.print(F("--> WARNING: JSON BUFFER OVERFLOW!\n"));
+        at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}\n"));
     }
     else if (data[0] == 0x13)
     {
@@ -2547,7 +3186,7 @@ VanPacketParseResult_t ParseMfdToHeadUnitPkt(const char* idenStr, TVanPacketRxDe
             "}\n"
         "}\n";
 
-        snprintf_P(buf, n, jsonFormatter,
+        at = snprintf_P(buf, n, jsonFormatter,
             data[1] & 0x1F,
             data[1] & 0x40 ? PSTR("relative: ") : PSTR("absolute"),
             data[1] & 0x40 ?
@@ -2581,7 +3220,7 @@ VanPacketParseResult_t ParseMfdToHeadUnitPkt(const char* idenStr, TVanPacketRxDe
             "}\n"
         "}\n";
 
-        snprintf_P(buf, n, jsonFormatter,
+        at = snprintf_P(buf, n, jsonFormatter,
             (sint8_t)(0x3F) - (data[1] & 0x7F),
             (sint8_t)(0x3F) - data[2],
             (sint8_t)data[3] - 0x3F,
@@ -2602,7 +3241,7 @@ VanPacketParseResult_t ParseMfdToHeadUnitPkt(const char* idenStr, TVanPacketRxDe
             "}\n"
         "}\n";
 
-        snprintf_P(buf, n, jsonFormatter,
+        at = snprintf_P(buf, n, jsonFormatter,
             TunerBandStr(data[1] >> 4 & 0x07),
             data[1] & 0x0F
         );
@@ -2620,7 +3259,7 @@ VanPacketParseResult_t ParseMfdToHeadUnitPkt(const char* idenStr, TVanPacketRxDe
             "}\n"
         "}\n";
 
-        snprintf_P(buf, n, jsonFormatter,
+        at = snprintf_P(buf, n, jsonFormatter,
             data[1] == 0x02 ? PSTR("PAUSE") :
             data[1] == 0x03 ? PSTR("PLAY") :
             data[3] == 0xFF ? PSTR("NEXT") :
@@ -2641,7 +3280,7 @@ VanPacketParseResult_t ParseMfdToHeadUnitPkt(const char* idenStr, TVanPacketRxDe
             "}\n"
         "}\n";
 
-        snprintf_P(buf, n, jsonFormatter);
+        at = snprintf_P(buf, n, jsonFormatter);
     }
     else if (data[0] == 0xD2)
     {
@@ -2656,7 +3295,7 @@ VanPacketParseResult_t ParseMfdToHeadUnitPkt(const char* idenStr, TVanPacketRxDe
             "}\n"
         "}\n";
 
-        snprintf_P(buf, n, jsonFormatter);
+        at = snprintf_P(buf, n, jsonFormatter);
     }
     else if (data[0] == 0xD6)
     {
@@ -2671,12 +3310,15 @@ VanPacketParseResult_t ParseMfdToHeadUnitPkt(const char* idenStr, TVanPacketRxDe
             "}\n"
         "}\n";
 
-        snprintf_P(buf, n, jsonFormatter);
+        at = snprintf_P(buf, n, jsonFormatter);
     }
     else
     {
         return VAN_PACKET_PARSE_TO_BE_DECODED;
     } // if
+
+    // Warning on Serial output if JSON buffer overflows
+    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
 
     return VAN_PACKET_PARSE_OK;
 } // ParseMfdToHeadUnitPkt
@@ -2692,7 +3334,7 @@ void PrintPacketDataDiff(TVanPacketRxDesc& pkt, IdenHandler_t* handler)
     if (handler->prevData != NULL)
     {
         // First line: print the new packet's data where it differs from the previous packet
-        Serial.printf_P(PSTR("DIFF: %03X (%s) "), iden, handler->idenStr);
+        Serial.printf_P(PSTR("DIFF: 0x%03X (%s) "), iden, handler->idenStr);
         for (int i = 0; i < dataLen; i++)
         {
             char diffByte[3] = "  ";
@@ -2714,10 +3356,34 @@ void PrintPacketDataDiff(TVanPacketRxDesc& pkt, IdenHandler_t* handler)
     } // if
 
     // Now print the new packet's data in full
-    Serial.printf_P(PSTR("FULL: %03X (%s) "), iden, handler->idenStr);
+    Serial.printf_P(PSTR("FULL: 0x%03X (%s) "), iden, handler->idenStr);
     for (int i = 0; i < dataLen; i++) Serial.printf_P(PSTR("%02X%c"), data[i], i < dataLen - 1 ? '-' : ' ');
     Serial.println();
 } // PrintPacketDataDiff
+
+#ifdef PRINT_JSON_BUFFERS_ON_SERIAL
+// Pretty-print a JSON formatted string, adding indentation
+void PrintJsonText(const char* jsonBuffer)
+{
+    // Number of spaces to add for each indentation level
+    #define PRETTY_PRINT_JSON_INDENT 2
+
+    size_t j = 0;
+    int indent = 0;
+    while (j < strlen(jsonBuffer))
+    {
+        const char* subString = jsonBuffer + j;
+
+        if (subString[0] == '}' || subString[0] == ']') indent -= PRETTY_PRINT_JSON_INDENT;
+
+        size_t n = strcspn(subString, "\n");
+        if (n != strlen(subString)) Serial.printf("%*s%.*s\n", indent, "", n, subString);
+        j = j + n + 1;
+
+        if (subString[0] == '{' || subString[0] == '[') indent += PRETTY_PRINT_JSON_INDENT;
+    } // while
+} // PrintJsonText
+#endif // PRINT_JSON_BUFFERS_ON_SERIAL
 
 static IdenHandler_t handlers[] = 
 {
@@ -2739,14 +3405,14 @@ static IdenHandler_t handlers[] =
     { 0x464, "aircon_1", 5, &ParseAirCon1Pkt },
     { 0x4DC, "aircon_2", 7, &ParseAirCon2Pkt },
     { 0x4EC, "cd_changer", -1, &ParseCdChangerPkt },
-    { 0x54E, "satnav_status_1", 6, &ParseSatnavStatus1Pkt },
-    { 0x7CE, "satnav_status_2", 20, &ParseSatnavStatus2Pkt },
-    { 0x8CE, "satnav_status_3", -1, &ParseSatnavStatus3Pkt },
-    { 0x9CE, "satnav_guidance_data", 16, &ParseSatnavGuidanceDataPkt },
-    { 0x64E, "satnav_guidance", -1, &ParseSatnavGuidancePkt },
-    { 0x6CE, "satnav_report", -1, &ParseSatnavReportPkt },
-    { 0x94E, "mfd_to_satnav", -1, &ParseMfdToSatnavPkt },
-    { 0x74E, "satnav_to_mfd", 27, &ParseSatnavToMfdPkt },
+    { 0x54E, "satnav_status_1", 6, &ParseSatNavStatus1Pkt },
+    { 0x7CE, "satnav_status_2", 20, &ParseSatNavStatus2Pkt },
+    { 0x8CE, "satnav_status_3", -1, &ParseSatNavStatus3Pkt },
+    { 0x9CE, "satnav_guidance_data", 16, &ParseSatNavGuidanceDataPkt },
+    { 0x64E, "satnav_guidance", -1, &ParseSatNavGuidancePkt },
+    { 0x6CE, "satnav_report", -1, &ParseSatNavReportPkt },
+    { 0x94E, "mfd_to_satnav", -1, &ParseMfdToSatNavPkt },
+    { 0x74E, "satnav_to_mfd", 27, &ParseSatNavToMfdPkt },
     { 0x744, "wheel_speed", 5, &ParseWheelSpeedPkt },
     { 0x8FC, "odometer", 5, &ParseOdometerPkt },
     { 0x450, "com2000", 10, &ParseCom2000Pkt },
@@ -2770,6 +3436,9 @@ const char* ParseVanPacketToJson(TVanPacketRxDesc& pkt)
     uint16_t iden = pkt.Iden();
     IdenHandler_t* handler = handlers;
 
+    // TODO - remove
+    //if (iden != 0x8C4 /* || pkt.Data()[1] != 0xD3 */) return "";
+
     // Search the correct handler. Relying on short-circuit boolean evaluation.
     while (handler != handlers_end && handler->iden != iden) handler++;
 
@@ -2787,20 +3456,22 @@ const char* ParseVanPacketToJson(TVanPacketRxDesc& pkt)
         // Relying on short-circuit boolean evaluation
         if (handler->prevData != NULL && memcmp(data, handler->prevData, dataLen) == 0) return "";  // Duplicate packet
 
+        Serial.printf_P(PSTR("---> Received: %s packet (0x%03X)\n"), handler->idenStr, iden);
+
         // Print the new packet on Serial, highlighting the bytes that differ
         PrintPacketDataDiff(pkt, handler);
 
         int result = handler->parser(handler->idenStr, pkt, jsonBuffer, JSON_BUFFER_SIZE);
 
-        #ifdef PRINT_JSON_BUFFERS_ON_SERIAL
         if (result == VAN_PACKET_PARSE_OK)
         {
-            Serial.printf_P(PSTR("Parsed: %s (0x%03X): "), handler->idenStr, iden);
-            Serial.println(jsonBuffer);
-        } // if
-        #endif // PRINT_JSON_BUFFERS_ON_SERIAL
+            #ifdef PRINT_JSON_BUFFERS_ON_SERIAL
+            Serial.print(F("Parsed to JSON object:\n"));
+            PrintJsonText(jsonBuffer);
+            #endif // PRINT_JSON_BUFFERS_ON_SERIAL
 
-        return jsonBuffer;
+            return jsonBuffer;
+        } // if
     } // if
 
     return ""; // Unrecognized IDEN value
