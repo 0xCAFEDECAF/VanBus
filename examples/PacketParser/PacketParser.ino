@@ -174,42 +174,42 @@ const char* TunerBandStr(uint8_t data)
         data == TB_FM3 ? PSTR("FM3") :  // Never seen, just guessing
         data == TB_FMAST ? PSTR("FMAST") :
         data == TB_AM ? PSTR("AM") :
-        data == TB_PTY_SELECT ? PSTR("PTY_SELECT") :  // When selecting PTY to scan for
+        data == TB_PTY_SELECT ? PSTR("PTY_SELECT") :  // When selecting PTY to search for
         ToHexStr(data);
 } // TunerBandStr
 
-// Tuner scan mode
+// Tuner search mode
 // Bits:
 //  2  1  0
 // ---+--+---
 //  0  0  0 : Not searching
 //  0  0  1 : Manual tuning
-//  0  1  0 : Scanning by frequency
+//  0  1  0 : Searching by frequency
 //  0  1  1 : 
-//  1  0  0 : Scanning for station with matching PTY
+//  1  0  0 : Searching for station with matching PTY
 //  1  0  1 : 
 //  1  1  0 : 
 //  1  1  1 : Auto-station search in the FMAST band (long-press "Radio Band" button)
-enum TunerScanMode_t
+enum TunerSearchMode_t
 {
     TS_NOT_SEARCHING = 0,
     TS_MANUAL = 1,
     TS_BY_FREQUENCY = 2,
     TS_BY_MATCHING_PTY = 4,
     TS_FM_AST = 7
-}; // enum TunerScanMode_t
+}; // enum TunerSearchMode_t
 
 // Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
-const char* TunerScanModeStr(uint8_t data)
+const char* TunerSearchModeStr(uint8_t data)
 {
     return
         data == TS_NOT_SEARCHING ? PSTR("NOT_SEARCHING") :
         data == TS_MANUAL ? PSTR("MANUAL_TUNING") :
-        data == TS_BY_FREQUENCY ? PSTR("SCANNING_BY_FREQUENCY") :
-        data == TS_BY_MATCHING_PTY ? PSTR("SCANNING_MATCHING_PTY") : // Scanning for station with matching PTY
-        data == TS_FM_AST ? PSTR("FM_AST_SEARCH") : // Auto-station search in the FMAST band (long-press Radio Band button)
+        data == TS_BY_FREQUENCY ? PSTR("SEARCHING_BY_FREQUENCY") :
+        data == TS_BY_MATCHING_PTY ? PSTR("SEARCHING_MATCHING_PTY") : // Searching for station with matching PTY
+        data == TS_FM_AST ? PSTR("FM_AST_SCAN") : // Auto-station scan in the FMAST band (long-press "Radio Band" button)
         ToHexStr(data);
-} // TunerScanModeStr
+} // TunerSearchModeStr
 
 // Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
 const char* PtyStr(uint8_t ptyCode)
@@ -269,7 +269,7 @@ const char* RadioPiCountry(uint8_t countryCode)
         countryCode == 0x09 ? PSTR("Denmark") :
         countryCode == 0x0A ? PSTR("Austria") :
         countryCode == 0x0B ? PSTR("Hungary") :
-        countryCode == 0x0C ? PSTR("UK") :
+        countryCode == 0x0C ? PSTR("United Kingdom") :
         countryCode == 0x0E ? PSTR("Spain") :
         countryCode == 0x0F ? PSTR("France") :
         ToHexStr(countryCode);
@@ -296,35 +296,58 @@ const char* RadioPiAreaCoverage(uint8_t coverageCode)
 // - MFD_TO_SATNAV_IDEN (0x94E): data[0]. Following values of data[1] seen:
 //   0x02, 0x05, 0x06, 0x08, 0x09, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x1B, 0x1C, 0x1D
 //
+enum SatNavRequest_t
+{
+    SR_ENTER_COUNTRY = 0x00,  // Never seen, just guessing
+    SR_ENTER_PROVINCE = 0x01,  // Never seen, just guessing
+    SR_ENTER_CITY = 0x02,  // Or: list of cities?
+    SR_ENTER_DISTRICT = 0x03,  // Never seen, just guessing
+    SR_ENTER_NEIGHBORHOOD = 0x04,  // Never seen, just guessing
+    SR_ENTER_STREET = 0x05,  // Or: list of streets?
+    SR_ENTER_HOUSE_NUMBER = 0x06,  // Or: range of house numbers?
+    SR_ENTER_HOUSE_NUMBER_LETTER = 0x07,  // Never seen, just guessing
+    SR_PLACE_OF_INTEREST_CATEGORY_LIST = 0x08,
+    SR_PLACE_OF_INTEREST_CATEGORY = 0x09,  // Or: place of interest address?
+    SR_GPS_FOR_PLACE_OF_INTEREST = 0x0E,  // Or: current address?
+    SR_NEXT_STREET = 0x0F,  // Shown during navigation in the (solid line) top box
+    SR_CURRENT_STREET = 0x10,  // Shown during navigation in the (dashed line) bottom box
+    SR_PRIVATE_ADDRESS = 0x11,
+    SR_BUSINESS_ADDRESS = 0x12,
+    SR_SOFTWARE_MODULE_VERSIONS = 0x13,
+    SR_PRIVATE_ADDRESS_LIST = 0x1B,
+    SR_BUSINESS_ADDRESS_LIST = 0x1C,
+    SR_GPS_CHOOSE_DESTINATION = 0x1D  // Or: current or last destination?
+}; // enum SatNavRequest_t
+
 // Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
 const char* SatNavRequestStr(uint8_t data)
 {
     return
-        data == 0x00 ? PSTR("ENTER_COUNTRY") :  // Never seen, just guessing
-        data == 0x01 ? PSTR("ENTER_PROVINCE") :  // Never seen, just guessing
-        data == 0x02 ? PSTR("ENTER_CITY") :
-        data == 0x03 ? PSTR("ENTER_DISTRICT") :  // Never seen, just guessing
-        data == 0x04 ? PSTR("ENTER_NEIGHBORHOOD") :  // Never seen, just guessing
-        data == 0x05 ? PSTR("ENTER_STREET") :
-        data == 0x06 ? PSTR("ENTER_HOUSE_NUMBER") :
-        data == 0x07 ? PSTR("ENTER_HOUSE_NUMBER_LETTER") :  // Never seen, just guessing
-        data == 0x08 ? PSTR("PLACE_OF_INTEREST_CATEGORY_LIST") :
-        data == 0x09 ? PSTR("PLACE_OF_INTEREST_CATEGORY") :
-        data == 0x0E ? PSTR("GPS_FOR_PLACE_OF_INTEREST") :
-        data == 0x0F ? PSTR("NEXT_STREET") : // Shown during navigation in the (solid line) top box
-        data == 0x10 ? PSTR("CURRENT_STREET") : // Shown during navigation in the (dashed line) bottom box
-        data == 0x11 ? PSTR("PRIVATE_ADDRESS") :
-        data == 0x12 ? PSTR("BUSINESS_ADDRESS") :
-        data == 0x13 ? PSTR("SOFTWARE_MODULE_VERSIONS") :
-        data == 0x1B ? PSTR("PRIVATE_ADDRESS_LIST") :
-        data == 0x1C ? PSTR("BUSINESS_ADDRESS_LIST") :
-        data == 0x1D ? PSTR("GPS_CHOOSE_DESTINATION") :
+        data == SR_ENTER_COUNTRY ? PSTR("ENTER_COUNTRY") :
+        data == SR_ENTER_PROVINCE ? PSTR("ENTER_PROVINCE") :
+        data == SR_ENTER_CITY ? PSTR("ENTER_CITY") :
+        data == SR_ENTER_DISTRICT ? PSTR("ENTER_DISTRICT") :
+        data == SR_ENTER_NEIGHBORHOOD ? PSTR("ENTER_NEIGHBORHOOD") :
+        data == SR_ENTER_STREET ? PSTR("ENTER_STREET") :
+        data == SR_ENTER_HOUSE_NUMBER ? PSTR("ENTER_HOUSE_NUMBER") :
+        data == SR_ENTER_HOUSE_NUMBER_LETTER ? PSTR("ENTER_HOUSE_NUMBER_LETTER") :
+        data == SR_PLACE_OF_INTEREST_CATEGORY_LIST ? PSTR("PLACE_OF_INTEREST_CATEGORY_LIST") :
+        data == SR_PLACE_OF_INTEREST_CATEGORY ? PSTR("PLACE_OF_INTEREST_CATEGORY") :
+        data == SR_GPS_FOR_PLACE_OF_INTEREST ? PSTR("GPS_FOR_PLACE_OF_INTEREST") :
+        data == SR_NEXT_STREET ? PSTR("NEXT_STREET") :
+        data == SR_CURRENT_STREET ? PSTR("CURRENT_STREET") :
+        data == SR_PRIVATE_ADDRESS ? PSTR("PRIVATE_ADDRESS") :
+        data == SR_BUSINESS_ADDRESS ? PSTR("BUSINESS_ADDRESS") :
+        data == SR_SOFTWARE_MODULE_VERSIONS ? PSTR("SOFTWARE_MODULE_VERSIONS") :
+        data == SR_PRIVATE_ADDRESS_LIST ? PSTR("PRIVATE_ADDRESS_LIST") :
+        data == SR_BUSINESS_ADDRESS_LIST ? PSTR("BUSINESS_ADDRESS_LIST") :
+        data == SR_GPS_CHOOSE_DESTINATION ? PSTR("GPS_CHOOSE_DESTINATION") :
         ToHexStr(data);
 } // SatNavRequestStr
 
-// Attempt to show a detailed SatNnav guidance instruction in "Ascii art"
+// Attempt to show a detailed SatNav guidance instruction in "Ascii art"
 //
-// A detailed SatNnav guidance instruction consists of 8 bytes:
+// A detailed SatNav guidance instruction consists of 8 bytes:
 // * 0   : turn angle in increments of 22.5 degrees, measured clockwise, starting with 0 at 6 o-clock.
 //         E.g.: 0x4 == 90 deg left, 0x8 = 180 deg = straight ahead, 0xC = 270 deg = 90 deg right.
 //         Turn angle is shown here as (vertical) (d|sl)ash ('\', '|', '/', or '-').
@@ -775,7 +798,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                         (data[2] & 0x1F) == 0x1E ? PSTR("CD_CHANGER") :
                         ToHexStr(data[2]),
 
-                        data[2] & 0xC0 ? PSTR(" (held)") :
+                        (data[2] & 0xC0) == 0xC0 ? PSTR(" (held)") :
                         data[2] & 0x40 ? PSTR(" (released)") :
                         data[2] & 0x80 ? PSTR(" (repeat)") :
                         emptyStr
@@ -1273,20 +1296,18 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     // data[2]: radio band and preset position
                     uint8_t band = data[2] & 0x07;
                     uint8_t presetPos = data[2] >> 3 & 0x0F;
+                    char presetPosBuffer[12];
+                    sprintf_P(presetPosBuffer, PSTR(", memory=%u"), presetPos);
 
-                    // data[3]: scanning bits
-                    bool scanDx = data[3] & 0x02;  // Tuner sensitivity: distant (Dx) or local (Lo)
+                    // data[3]: search bits
+                    bool dxSensitivity = data[3] & 0x02;  // Tuner sensitivity: distant (Dx) or local (Lo)
                     bool ptyStandbyMode = data[3] & 0x04;
 
-                    uint8_t scanMode = data[3] >> 3 & 0x07;
+                    uint8_t searchMode = data[3] >> 3 & 0x07;
+                    bool searchDirectionUp = data[3] & 0x80;
+                    bool anySearchBusy = (searchMode != TS_NOT_SEARCHING);
 
-                    bool manualScan = data[3] & 0x08;
-                    bool scanningByFreq = data[3] & 0x10;
-                    bool fmastSearch = data[3] & 0x20;  // Auto-station search (long-press "Radio Band" button)
-
-                    bool scanDirectionUp = data[3] & 0x80;
-
-                    // data[4] and data[5]: frequency tuned in to
+                    // data[4] and data[5]: frequency being scanned or tuned in to
                     uint16_t frequency = (uint16_t)data[5] << 8 | data[4];
 
                     // data[6] - Reception status? Like: receiving station? Stereo? RDS bits like MS, TP, TA, AF?
@@ -1311,64 +1332,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     char signalStrengthBuffer[3];
                     sprintf_P(signalStrengthBuffer, PSTR("%u"), signalStrength);
 
-                    // data[7]: TA, RDS and REG (regional) bits
-                    bool rdsSelected = data[7] & 0x01;
-                    bool taSelected = data[7] & 0x02;
-                    bool regional = data[7] & 0x04;  // Long-press "RDS" button
-                    bool rdsAvailable = data[7] & 0x20;
-                    bool taAvailable = data[7] & 0x40;
-                    bool taAnnounce = data[7] & 0x80;
-
-                    // data[8] and data[9]: PI code
-                    // See also:
-                    // - https://en.wikipedia.org/wiki/Radio_Data_System#Program_Identification_Code_(PI_Code)
-                    // - https://radio-tv-nederland.nl/rds/rds.html
-                    // - https://people.uta.fi/~jk54415/dx/pi-codes.html
-                    // - http://poupa.cz/rds/countrycodes.htm
-                    // - https://www.pira.cz/rds/p232man.pdf
-                    uint16_t piCode = (uint16_t)data[8] << 8 | data[9];
-                    uint8_t countryCode = data[8] >> 4 & 0x0F;
-                    uint8_t coverageCode = data[8] & 0x0F;
-
-                    // data[10]: for PTY-based scan mode
-                    // & 0x1F: PTY code to scan
-                    // & 0x20: 0 = PTY of station matches selected; 1 = no match
-                    // & 0x40: 1 = "Select PTY" dialog visible (long-press "TA" button; press "<<" or ">>" to change)
-                    uint8_t selectedPty = data[10] & 0x1F;
-                    bool ptyMatch = (data[10] & 0x20) == 0;  // PTY of station matches selected PTY
-                    bool ptySelectionMenu = data[10] & 0x40; 
-
-                    // data[11]: PTY code of current station
-                    uint8_t currPty = data[11] & 0x1F;
-
-                    // data[12]...data[20]: RDS text
-                    char rdsTxt[9];
-                    strncpy(rdsTxt, (const char*) data + 12, 8);
-                    rdsTxt[8] = 0;
-
-                    char piBuffer[40];
-                    sprintf_P(piBuffer, PSTR("%04X(%S, %S)"),
-                        piCode,
-                        RadioPiCountry(countryCode),
-                        RadioPiAreaCoverage(coverageCode)
-                    );
-
-                    char currPtyBuffer[40];
-                    sprintf_P(currPtyBuffer, PSTR("%u(%S)"), currPty, PtyStr(currPty));
-
-                    char selectedPtyBuffer[40];
-                    sprintf_P(selectedPtyBuffer, PSTR("%u(%S)"), selectedPty, PtyStr(selectedPty));
-
-                    char presetPosBuffer[20];
-                    sprintf_P(presetPosBuffer, PSTR(", memory=%u"), presetPos);
-
-                    bool anyScanBusy = (scanMode != TS_NOT_SEARCHING);
-
                     char floatBuf[MAX_FLOAT_SIZE];
                     SERIAL.printf_P(
                         PSTR(
                             "band=%S%S, %S %S, signal_strength=%S,\n"
-                            "    scan_mode=%S%S%S,\n"
+                            "    search_mode=%S%S%S,\n"
                         ),
                         TunerBandStr(band),
                         presetPos == 0 ? emptyStr : presetPosBuffer,
@@ -1380,26 +1348,74 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
                         // TODO - check:
                         // - not sure if applicable in AM mode
-                        // - signalStrength == 15 always means "not applicable" or "no signal"? Not just while scanning?
-                        //   In other words: maybe 14 is the highest possible signal strength, and 15 just means: no
-                        //   signal.
-                        signalStrength == 15 && (scanMode == TS_BY_FREQUENCY || scanMode == TS_BY_MATCHING_PTY)
-                            ? notApplicable2Str
-                            : signalStrengthBuffer,
+                        // - signalStrength == 15 always means "not applicable" or "no signal"? Not just while searching?
+                        //   In other words: maybe 14 is the highest possible signal strength, and 15 just means: not
+                        //   applicable.
+                        // signalStrength == 15 && (searchMode == TS_BY_FREQUENCY || searchMode == TS_BY_MATCHING_PTY)
+                            // ? notApplicable2Str
+                            // : signalStrengthBuffer,
+                        signalStrength == 15 ? notApplicable2Str : signalStrengthBuffer,
 
-                        TunerScanModeStr(scanMode),
+                        TunerSearchModeStr(searchMode),
 
-                        // Scan sensitivity: distant (Dx) or local (Lo)
-                        // TODO - not sure if this bit is applicable for the various values of 'scanMode'
-                        ! anyScanBusy ? emptyStr :
-                            scanDx ? PSTR(", sensitivity=Dx") : PSTR(", sensitivity=Lo"),
+                        // Search sensitivity: distant (Dx) or local (Lo)
+                        // TODO - not sure if this bit is applicable for the various values of 'searchMode'
+                        // ! anySearchBusy ? emptyStr : dxSensitivity ? PSTR(", sensitivity=Dx") : PSTR(", sensitivity=Lo"),
+                        dxSensitivity ? PSTR(", sensitivity=Dx") : PSTR(", sensitivity=Lo"),
 
-                        ! anyScanBusy ? emptyStr :
-                            scanDirectionUp ? PSTR(", scan_direction=UP") : PSTR(", scan_direction=DOWN")
+                        ! anySearchBusy ? emptyStr : 
+                            searchDirectionUp ? PSTR(", search_direction=UP") : PSTR(", search_direction=DOWN")
                     );
 
                     if (band != TB_AM)
                     {
+                        // FM bands only
+
+                        // data[7]: TA, RDS and REG (regional) bits
+                        bool rdsSelected = data[7] & 0x01;
+                        bool taSelected = data[7] & 0x02;
+                        bool regional = data[7] & 0x04;  // Long-press "RDS" button
+                        bool rdsAvailable = data[7] & 0x20;
+                        bool taAvailable = data[7] & 0x40;
+                        bool taAnnounce = data[7] & 0x80;
+
+                        // data[8] and data[9]: PI code
+                        // See also:
+                        // - https://en.wikipedia.org/wiki/Radio_Data_System#Program_Identification_Code_(PI_Code)
+                        // - https://radio-tv-nederland.nl/rds/rds.html
+                        // - https://people.uta.fi/~jk54415/dx/pi-codes.html
+                        // - http://poupa.cz/rds/countrycodes.htm
+                        // - https://www.pira.cz/rds/p232man.pdf
+                        uint16_t piCode = (uint16_t)data[8] << 8 | data[9];
+                        uint8_t countryCode = piCode >> 12 & 0x0F;
+                        uint8_t coverageCode = piCode >> 8 & 0x0F;
+                        char piBuffer[40];
+                        sprintf_P(piBuffer, PSTR("%04X(%S, %S)"),
+                            piCode,
+                            RadioPiCountry(countryCode),
+                            RadioPiAreaCoverage(coverageCode)
+                        );
+
+                        // data[10]: for PTY-based search mode
+                        // & 0x1F: PTY code to search
+                        // & 0x20: 0 = PTY of station matches selected; 1 = no match
+                        // & 0x40: 1 = "Select PTY" dialog visible (long-press "TA" button; press "<<" or ">>" to change)
+                        uint8_t selectedPty = data[10] & 0x1F;
+                        bool ptyMatch = (data[10] & 0x20) == 0;  // PTY of station matches selected PTY
+                        bool ptySelectionMenu = data[10] & 0x40; 
+                        char selectedPtyBuffer[40];
+                        sprintf_P(selectedPtyBuffer, PSTR("%u(%S)"), selectedPty, PtyStr(selectedPty));
+
+                        // data[11]: PTY code of current station
+                        uint8_t currPty = data[11] & 0x1F;
+                        char currPtyBuffer[40];
+                        sprintf_P(currPtyBuffer, PSTR("%u(%S)"), currPty, PtyStr(currPty));
+
+                        // data[12]...data[20]: RDS text
+                        char rdsTxt[9];
+                        strncpy(rdsTxt, (const char*) data + 12, 8);
+                        rdsTxt[8] = 0;
+
                         SERIAL.printf_P(
                             PSTR(
                                 "    pty_selection_menu=%S, selected_pty=%s, pty_standby_mode=%S, pty_match=%S, pty=%S,\n"
@@ -1465,15 +1481,18 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                         return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                     } // if
 
+                    uint8_t tunerBand = data[2] >> 4 & 0x07;
+                    uint8_t tunerMemory = data[2] & 0x0F;
+
                     char rdsOrFreqTxt[9];
                     strncpy(rdsOrFreqTxt, (const char*) data + 3, 8);
                     rdsOrFreqTxt[8] = 0;
 
-                    SERIAL.printf_P(PSTR("band=%S, memory=%u, %S=\"%s\"\n"),
-                        TunerBandStr(data[2] >> 4 & 0x07),
-                        data[2] & 0x0F,
-                        data[2] & 0x80 ? PSTR("RDS_TEXT") : PSTR("FREQUENCY"),
-                        rdsOrFreqTxt
+                    SERIAL.printf_P(PSTR("band=%S, memory=%u, \"%s%S\"\n"),
+                        TunerBandStr(tunerBand),
+                        tunerMemory,
+                        rdsOrFreqTxt,
+                        tunerBand == TB_AM ? PSTR(" KHz") : data[2] & 0x80 ? emptyStr : PSTR(" MHz")
                     );
                 }
                 break;
@@ -1976,28 +1995,28 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
                 // TODO - check; total guess
                 status == 0x0000 ? PSTR("NOT_OPERATING") :
-                status == 0x0001 ? PSTR("0x0001") :
-                status == 0x0020 ? PSTR("0x0020") : // Nearly at destination ??
+                status == 0x0001 ? ToHexStr(status) :  // Seen this but what is it??
+                status == 0x0020 ? ToHexStr(status) :  // Seen this but what is it?? Nearly at destination ??
                 status == 0x0080 ? PSTR("READY") :
-                status == 0x0101 ? PSTR("0x0101") :
+                status == 0x0101 ? ToHexStr(status) :  // Seen this but what is it??
                 //status == 0x0200 ? PSTR("INITIALISING") : // No, definitely not this
                 status == 0x0200 ? PSTR("READING_DISC_1") :
-                status == 0x0220 ? PSTR("0x0220") :
+                status == 0x0220 ? ToHexStr(status) :  // Seen this but what is it??
                 status == 0x0300 ? PSTR("IN_GUIDANCE_MODE_1") :
                 status == 0x0301 ? PSTR("IN_GUIDANCE_MODE_2") :
                 status == 0x0320 ? PSTR("STOPPING_GUIDANCE") :
                 //status == 0x0400 ? PSTR("TERMS_AND_CONDITIONS_ACCEPTED") : // No, definitely not this
                 status == 0x0400 ? PSTR("START_OF_AUDIO_MESSAGE") :
                 status == 0x0410 ? PSTR("ARRIVED_AT_DESTINATION_1") :
-                status == 0x0600 ? PSTR("0x0600") :
+                status == 0x0600 ? ToHexStr(status) :  // Seen this but what is it??
                 status == 0x0700 ? PSTR("INSTRUCTION_AUDIO_MESSAGE_START_1") :
                 status == 0x0701 ? PSTR("INSTRUCTION_AUDIO_MESSAGE_START_2") :
                 status == 0x0800 ? PSTR("END_OF_AUDIO_MESSAGE") :  // Follows 0x0400, 0x0700, 0x0701
                 status == 0x4000 ? PSTR("GUIDANCE_STOPPED") :
-                status == 0x4001 ? PSTR("0x4001") :
+                status == 0x4001 ? ToHexStr(status) :  // Seen this but what is it??
                 status == 0x4200 ? PSTR("ARRIVED_AT_DESTINATION_2") :
                 status == 0x9000 ? PSTR("READING_DISC_2") :
-                status == 0x9080 ? PSTR("0x9080") :
+                status == 0x9080 ? ToHexStr(status) :  // Seen this but what is it??
                 ToHexStr(data[1], data[2]),
 
                 data[4] == 0x0B ? PSTR(" reason=0x0B") :  // Seen with status == 0x4001
@@ -2570,9 +2589,12 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
                     // Fork or exit instruction
                     SERIAL.printf_P(PSTR("    current_instruction=%S\n"),
+
+                        // Pretty sure there are more values
                         data[4] == 0x41 ? PSTR("KEEP_LEFT_ON_FORK") :
                         data[4] == 0x14 ? PSTR("KEEP_RIGHT_ON_FORK") :
                         data[4] == 0x12 ? PSTR("TAKE_RIGHT_EXIT") :
+
                         ToHexStr(data[4])
                     );
                 }
@@ -2687,6 +2709,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             //     decimal notation. So the just given example would translate to: 49°54'56"N 6°04'05"E. There
             //     seems to be however some offset, because the shown GPS coordinates do not exactly match the
             //     destination.
+            // Then, for place of interest address:
+            // - Name (e.g. 'CINE SCALA')
+            // - '?'
+            // - Distance in meters from current location? (e.g. '12000')
+
 
             #define MAX_SATNAV_STRING_SIZE 128
             static char buffer[MAX_SATNAV_STRING_SIZE];
@@ -2696,7 +2723,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if ((data[0] & 0x7F) <= 7)
             {
-                // First packet of report sequence
+                // First packet of a report sequence
                 offsetInPacket = 2;
                 offsetInBuffer = 0;
 
@@ -2843,9 +2870,9 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 SERIAL.printf_P(
                     PSTR(", letter=%s"),
                     (data[3] >= 'A' && data[3] <= 'Z') || (data[3] >= '0' && data[3] <= '9') || data[3] == '\'' ? buffer :
-                        data[3] == ' ' ? "_" : // Space
-                        data[3] == 0x01 ? "Esc" :
-                        "?"
+                    data[3] == ' ' ? "_" : // Space
+                    data[3] == 0x01 ? "Esc" :
+                    "?"
                 );
             } // if
 
@@ -3433,7 +3460,7 @@ void loop()
     while (VanBusRx.Available())
     {
         TVanPacketRxDesc pkt;
-        bool isQueueOverrun;
+        bool isQueueOverrun = false;
         VanBusRx.Receive(pkt, &isQueueOverrun);
 
         if (isQueueOverrun) SERIAL.print(F("QUEUE OVERRUN!\n"));
@@ -3447,113 +3474,25 @@ void loop()
         // Choose either of the if-statements below (not both)
 
         // Show all packets, but discard the following:
-
-        // Head unit packets
         if (
             false
-            || iden == VIN_IDEN
-            ////|| iden == ENGINE_IDEN
+            // || iden == VIN_IDEN
+            // || iden == ENGINE_IDEN
             // || iden == HEAD_UNIT_STALK_IDEN
-            || iden == LIGHTS_STATUS_IDEN
+            // || iden == LIGHTS_STATUS_IDEN
             // || iden == DEVICE_REPORT
-            || iden == CAR_STATUS1_IDEN
-            ////|| iden == CAR_STATUS2_IDEN
-            || iden == DASHBOARD_IDEN
-            || iden == DASHBOARD_BUTTONS_IDEN
+            // || iden == CAR_STATUS1_IDEN
+            // || iden == CAR_STATUS2_IDEN
+            // || iden == DASHBOARD_IDEN
+            // || iden == DASHBOARD_BUTTONS_IDEN
             // || iden == HEAD_UNIT_IDEN
-            || iden == TIME_IDEN
+            // || iden == TIME_IDEN
             // || iden == AUDIO_SETTINGS_IDEN
             // || iden == MFD_STATUS_IDEN
-            || iden == SATNAV_GUIDANCE_DATA_IDEN
-            || iden == AIRCON1_IDEN
-            || iden == AIRCON2_IDEN
-            // || iden == CDCHANGER_IDEN
-            || iden == SATNAV_STATUS_1_IDEN
-            || iden == SATNAV_GUIDANCE_IDEN
-            || iden == SATNAV_REPORT_IDEN
-            || iden == SATNAV_TO_MFD_IDEN
-            ////|| iden == SATNAV_STATUS_2_IDEN
-            || iden == SATNAV_STATUS_3_IDEN
-            || iden == MFD_TO_SATNAV_IDEN
-            || iden == SATNAV_DOWNLOADING_IDEN
-            || iden == SATNAV_DOWNLOADED1_IDEN
-            || iden == SATNAV_DOWNLOADED2_IDEN
-            || iden == WHEEL_SPEED_IDEN
-            || iden == ODOMETER_IDEN
-            // || iden == COM2000_IDEN
-            // || iden == CDCHANGER_COMMAND_IDEN
-            // || iden == MFD_TO_HEAD_UNIT_IDEN
-            || iden == AIR_CONDITIONER_DIAG_IDEN
-            || iden == AIR_CONDITIONER_DIAG_COMMAND_IDEN
-            || iden == ECU_IDEN
-           )
-        {
-            break;
-        } // if
-/*
-        // Aircon packets
-        if (
-            false
-            || iden == VIN_IDEN
-            // || iden == ENGINE_IDEN
-            || iden == HEAD_UNIT_STALK_IDEN
-            || iden == LIGHTS_STATUS_IDEN
-            || iden == DEVICE_REPORT
-            // || iden == CAR_STATUS1_IDEN
-            || iden == CAR_STATUS2_IDEN
-            || iden == DASHBOARD_IDEN
-            || iden == DASHBOARD_BUTTONS_IDEN
-            || iden == HEAD_UNIT_IDEN
-            || iden == TIME_IDEN
-            || iden == AUDIO_SETTINGS_IDEN
-            || iden == MFD_STATUS_IDEN
-            || iden == SATNAV_GUIDANCE_DATA_IDEN
+            // || iden == SATNAV_GUIDANCE_DATA_IDEN
             // || iden == AIRCON1_IDEN
             // || iden == AIRCON2_IDEN
-            || iden == CDCHANGER_IDEN
-            || iden == SATNAV_STATUS_1_IDEN
-            || iden == SATNAV_GUIDANCE_IDEN
-            || iden == SATNAV_REPORT_IDEN
-            || iden == SATNAV_TO_MFD_IDEN
-            || iden == SATNAV_STATUS_2_IDEN
-            || iden == SATNAV_STATUS_3_IDEN
-            || iden == MFD_TO_SATNAV_IDEN
-            || iden == SATNAV_DOWNLOADING_IDEN
-            || iden == SATNAV_DOWNLOADED1_IDEN
-            || iden == SATNAV_DOWNLOADED2_IDEN
-            || iden == WHEEL_SPEED_IDEN
-            || iden == ODOMETER_IDEN
-            || iden == COM2000_IDEN
-            || iden == CDCHANGER_COMMAND_IDEN
-            || iden == MFD_TO_HEAD_UNIT_IDEN
-            // || iden == AIR_CONDITIONER_DIAG_IDEN
-            // || iden == AIR_CONDITIONER_DIAG_COMMAND_IDEN
-            || iden == ECU_IDEN
-           )
-        {
-            break;
-        } // if
-
-        // SatNav packets
-        if (
-            false
-            || iden == VIN_IDEN
-            || iden == ENGINE_IDEN
-            || iden == HEAD_UNIT_STALK_IDEN
-            || iden == LIGHTS_STATUS_IDEN
-            // || iden == DEVICE_REPORT
-            // || iden == CAR_STATUS1_IDEN //
-            || iden == CAR_STATUS2_IDEN
-            || iden == DASHBOARD_IDEN
-            || iden == DASHBOARD_BUTTONS_IDEN
-            || iden == HEAD_UNIT_IDEN
-            || iden == TIME_IDEN
-            // || iden == AUDIO_SETTINGS_IDEN
-            || iden == MFD_STATUS_IDEN
-            // || iden == SATNAV_GUIDANCE_DATA_IDEN
-            || iden == AIRCON1_IDEN
-            || iden == AIRCON2_IDEN
-            || iden == CDCHANGER_IDEN
+            // || iden == CDCHANGER_IDEN
             // || iden == SATNAV_STATUS_1_IDEN
             // || iden == SATNAV_GUIDANCE_IDEN
             // || iden == SATNAV_REPORT_IDEN
@@ -3566,17 +3505,17 @@ void loop()
             // || iden == SATNAV_DOWNLOADED2_IDEN
             // || iden == WHEEL_SPEED_IDEN
             // || iden == ODOMETER_IDEN
-            // || iden == COM2000_IDEN //
-            || iden == CDCHANGER_COMMAND_IDEN
-            || iden == MFD_TO_HEAD_UNIT_IDEN
-            || iden == AIR_CONDITIONER_DIAG_IDEN
-            || iden == AIR_CONDITIONER_DIAG_COMMAND_IDEN
-            || iden == ECU_IDEN
+            // || iden == COM2000_IDEN
+            // || iden == CDCHANGER_COMMAND_IDEN
+            // || iden == MFD_TO_HEAD_UNIT_IDEN
+            // || iden == AIR_CONDITIONER_DIAG_IDEN
+            // || iden == AIR_CONDITIONER_DIAG_COMMAND_IDEN
+            // || iden == ECU_IDEN
            )
         {
             break;
         } // if
-*/
+
         // Show no packets, except the following:
         // if (
             // true
