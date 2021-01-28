@@ -129,7 +129,23 @@ char webpage[] PROGMEM = R"=====(
               }
               else if (!!jsonObj[item] && typeof(jsonObj[item]) == "object")
               {
-                  // Handling of "change attribute" events
+                  // Handling of "change attribute" events. Examples:
+                  //
+                  // {
+                  //   "event": "display",
+                  //   "data": {
+                  //     "satnav_curr_heading_svg": { "transform": "rotate(247.5)" }
+                  //   }
+                  // }
+                  //
+                  // {
+                  //   "event": "display",
+                  //   "data": {
+                  //     "notification_on_mfd": {
+                  //       "style": { "display": "block" }
+                  //     }
+                  //   }
+                  // }
 
                   var selector = '#' + item;
                   if($(selector).length > 0)
@@ -192,10 +208,27 @@ char webpage[] PROGMEM = R"=====(
       <p>Economy mode: <b id="economy_mode">---</b></p>
       <p>In reverse: <b id="in_reverse">---</b></p>
       <p>Trailer: <b id="trailer">---</b></p>
+
       <p>Coolant temperature: <b id="water_temp">---</b> deg C</p>
+
+      <div style="height:40px;">
+        <!-- Linear gauge -->
+        <div id="water_temp_perc" style="height:30px; transform:scaleX(0.6); transform-origin:left center;">
+          <svg>
+            <line style="stroke:rgb(41,55,74); stroke-width:30;" x1="0" y1="15" x2="400" y2="15" />
+          </svg>
+        </div>
+        <!-- Reference bar -->
+        <div style="height:10px;">
+          <svg>
+            <line style="stroke:#dfe7f2; stroke-width:10;" x1="0" y1="5" x2="400" y2="5" />
+          </svg>
+        </div>
+      </div>
+
       <p>Odometer 1: <b id="odometer_1">---</b></p>
       <p>Odometer 2: <b id="odometer_2">---</b></p>
-      <p>Exterior temperature: <b id="exterior_temperature">---</b> deg C</p>
+      <p>Exterior temperature: <b id="exterior_temperature">---</b></p>
     </div>
     <hr/>
     <div>
@@ -218,7 +251,24 @@ char webpage[] PROGMEM = R"=====(
       <p>Auto gearbox: <b id="auto_gearbox">---</b></p>
       <p>Oil temperature: <b id="oil_temperature">---</b></p>
       <p>Fuel level: <b id="fuel_level">---</b></p>
+
       <p>Oil level (raw): <b id="oil_level_raw">---</b></p>
+
+      <div style="height:40px;">
+        <!-- Linear gauge -->
+        <div id="oil_level_raw_perc" style="height:30px; transform:scaleX(0.6); transform-origin:left center;">
+          <svg>
+            <line style="stroke:rgb(41,55,74); stroke-width:30;" x1="0" y1="15" x2="400" y2="15" />
+          </svg>
+        </div>
+        <!-- Reference bar -->
+        <div style="height:10px;">
+          <svg>
+            <line style="stroke:#dfe7f2; stroke-width:10;" x1="0" y1="5" x2="400" y2="5" />
+          </svg>
+        </div>
+      </div>
+
       <p>Oil level (dash): <b id="oil_level_dash">---</b></p>
       <p>LPG fuel level: <b id="lpg_fuel_level">---</b></p>
       <p>Cruise control: <b id="cruise_control">---</b></p>
@@ -241,16 +291,26 @@ char webpage[] PROGMEM = R"=====(
     </div>
     <hr/>
     <div>
+      <p>Wheel sensors</p>
+      <p>Speed rear right: <b id="wheel_speed_rear_right">---</b></p>
+      <p>Speed rear left: <b id="wheel_speed_rear_left">---</b></p>
+      <p>Pulses rear right: <b id="wheel_pulses_rear_right">---</b></p>
+      <p>Pulses rear right: <b id="wheel_pulses_rear_left">---</b></p>
+    </div>
+    <hr/>
+    <div>
       <p>Warnings and notifications</p>
       <p>Active list</p>
       <textarea id="alarm_list" rows="10" cols="80"></textarea>
-      <p>Message shown on multi-function display: <b id="message_displayed_on_mfd">---</b></p>
+      <div id="notification_on_mfd" style="display:none">
+        <p>Message shown on multi-function display: <b id="message_displayed_on_mfd">---</b></p>
+      </div>
     </div>
     <hr/>
     <div>
       <p>Dashboard</p>
-      <p>Engine RPM: <b id="rpm">---</b> /min</p>
-      <p>Vehicle speed: <b id="speed">---</b> km/h</p>
+      <p>Engine RPM: <b id="engine_rpm">---</b> /min</p>
+      <p>Vehicle speed: <b id="vehicle_speed">---</b> km/h</p>
     </div>
     <hr/>
     <div>
@@ -259,19 +319,54 @@ char webpage[] PROGMEM = R"=====(
       <p>Door lock: <b id="door_lock">---</b></p>
       <p>Dash light - set brightness: <b id="dashboard_programmed_brightness">---</b></p>
       <p>ESP: <b id="esp">---</b></p>
+
       <p>Fuel level (filtered): <b id="fuel_level_filtered">---</b> litres</p>
+
+      <div style="height:40px;">
+        <!-- Linear gauge -->
+        <div id="fuel_level_filtered_perc" style="height:30px; transform:scaleX(0.6); transform-origin:left center;">
+          <svg>
+            <line style="stroke:rgb(41,55,74); stroke-width:30;" x1="0" y1="15" x2="400" y2="15" />
+          </svg>
+        </div>
+        <!-- Reference bar -->
+        <div style="height:10px;">
+          <svg>
+            <line style="stroke:#dfe7f2; stroke-width:10;" x1="0" y1="5" x2="400" y2="5" />
+          </svg>
+        </div>
+      </div>
+
       <p>Fuel level (raw): <b id="fuel_level_raw">---</b> litres</p>
     </div>
     <hr/>
     <div>
       <p>Head Unit</p>
+      <p>Report: <b id="head_unit_report">---</b></p>
       <p>Power: <b id="power">---</b></p>
       <p>Tape present: <b id="tape_present">---</b></p>
       <p>CD present: <b id="cd_present">---</b></p>
       <p>Source: <b id="source">---</b></p>
       <p>External mute: <b id="ext_mute">---</b></p>
       <p>Mute: <b id="mute">---</b></p>
+
       <p>Volume: <b id="volume">---</b> (updated: <b id="volume_update">---</b>)</p>
+
+      <div style="height:40px;">
+        <!-- Linear gauge -->
+        <div id="volume_perc" style="height:30px; transform:scaleX(0.6); transform-origin:left center;">
+          <svg>
+            <line style="stroke:rgb(41,55,74); stroke-width:30;" x1="0" y1="15" x2="400" y2="15" />
+          </svg>
+        </div>
+        <!-- Reference bar -->
+        <div style="height:10px;">
+          <svg>
+            <line style="stroke:#dfe7f2; stroke-width:10;" x1="0" y1="5" x2="400" y2="5" />
+          </svg>
+        </div>
+      </div>
+
       <p>Audio menu: <b id="audio_menu">---</b></p>
       <p>Bass: <b id="bass">---</b> (updated: <b id="bass_update">---</b>)</p>
       <p>Treble: <b id="treble">---</b> (updated: <b id="treble_update">---</b>)</p>
@@ -380,7 +475,7 @@ char webpage[] PROGMEM = R"=====(
       <p>A/C enabled: <b id="ac_enabled">---</b></p>
       <p>Rear heater 2: <b id="rear_heater_2">---</b></p>
       <p>A/C compressor: <b id="ac_compressor">---</b></p>
-      <p>Contact key position: <b id="contact_key_position">---</b></p>
+      <p>Contact key position: <b id="contact_key_position_ac">---</b></p>
       <p>Condenser temperature: <b id="condenser_temperature">---</b> deg C</p>
       <p>Evaporator temperature: <b id="evaporator_temperature">---</b> deg C</p>
     </div>
@@ -392,6 +487,8 @@ char webpage[] PROGMEM = R"=====(
       <p>Status 3: <b id="satnav_status_3">---</b></p>
       <p>Disc: <b id="satnav_disc_present">---</b></p>
       <p>Disc status: <b id="satnav_disc_status">---</b></p>
+      <p>System ID</p>
+      <textarea id="satnav_system_id" rows="5" cols="80"></textarea>
       <p>GPS fix: <b id="satnav_gps_fix">---</b></p>
       <p>GPS fix list: <b id="satnav_gps_fix_lost">---</b></p>
       <p>GPS scanning: <b id="satnav_gps_scanning">---</b></p>
@@ -425,12 +522,11 @@ char webpage[] PROGMEM = R"=====(
     <hr/>
     <div>
       <p>SatNav guidance instruction</p>
-      <p>Current instruction icon: <b id="satnav_guidance_current_instruction_icon">---</b></p>
-      <p>Next instruction icon: <b id="satnav_guidance_next_instruction_icon">---</b></p>
-      <p>'Turn around if possible' icon: <b id="satnav_guidance_turn_around_if_possible_icon">---</b></p>
-      <p>'Follow road' icon: <b id="satnav_guidance_follow_road_icon">---</b></p>
-      <p>'Not on map' icon: <b id="satnav_guidance_not_on_map_icon">---</b></p>
-      <p>Current turn icon direction: <b id="satnav_next_turn_icon_direction_as_text">---</b></p>
+      <p>Current turn icon: <b style="display:none;" id="satnav_curr_turn_icon">VISIBLE</b></p>
+      <p>Next turn icon: <b style="display:none;" d="satnav_next_turn_icon">VISIBLE</b></p>
+      <p>'Turn around if possible' icon: <b style="display:none;" id="satnav_turn_around_if_possible_icon">VISIBLE</b></p>
+      <p>'Follow road' icon: <b style="display:none;" id="satnav_follow_road_icon">VISIBLE</b></p>
+      <p>'Not on map' icon: <b style="display:none;" id="satnav_not_on_map_icon">VISIBLE</b></p>
       <p>Current turn icon leg 22.5 : <b id="satnav_curr_turn_icon_leg_22_5">---</b></p>
       <p>Current turn icon leg 45.0 : <b id="satnav_curr_turn_icon_leg_45_0">---</b></p>
       <p>Current turn icon leg 67.5 : <b id="satnav_curr_turn_icon_leg_67_5">---</b></p>
@@ -461,7 +557,6 @@ char webpage[] PROGMEM = R"=====(
       <p>Current turn icon no entry 292.5: <b id="satnav_curr_turn_icon_no_entry_292_5">---</b></p>
       <p>Current turn icon no entry 315.0: <b id="satnav_curr_turn_icon_no_entry_315_0">---</b></p>
       <p>Current turn icon no entry 337.5: <b id="satnav_curr_turn_icon_no_entry_337_5">---</b></p>
-      <p>Next turn icon direction: <b id="satnav_next_turn_icon_direction_as_text">---</b></p>
       <p>Next turn icon leg 22.5 : <b id="satnav_next_turn_icon_leg_22_5">---</b></p>
       <p>Next turn icon leg 45.0 : <b id="satnav_next_turn_icon_leg_45_0">---</b></p>
       <p>Next turn icon leg 67.5 : <b id="satnav_next_turn_icon_leg_67_5">---</b></p>
@@ -615,34 +710,6 @@ char webpage[] PROGMEM = R"=====(
     </div>
     <hr/>
     <div>
-      <p>engine: <b id="engine">---</b></p>
-      <p>audio_stalk: <b id="audio_stalk">---</b></p>
-      <p>lights_status: <b id="lights_status">---</b></p>
-      <p>head_unit_buttons: <b id="head_unit_buttons">---</b></p>
-      <p>car_status_1: <b id="car_status_1">---</b></p>
-      <p>car_status_2: <b id="car_status_2">---</b></p>
-      <p>dashboard: <b id="dashboard">---</b></p>
-      <p>dashboard_buttons: <b id="dashboard_buttons">---</b></p>
-      <p>head_unit: <b id="head_unit">---</b></p>
-      <p>time: <b id="time">---</b></p>
-      <p>audio_settings: <b id="audio_settings">---</b></p>
-      <p>display_status: <b id="display_status">---</b></p>
-      <p>stalk_or_satnav: <b id="stalk_or_satnav">---</b></p>
-      <p>aircon_1: <b id="aircon_1">---</b></p>
-      <p>aircon_2: <b id="aircon_2">---</b></p>
-      <p>cd_changer: <b id="cd_changer">---</b></p>
-      <p>satnav_1: <b id="satnav_1">---</b></p>
-      <p>satnav_2: <b id="satnav_2">---</b></p>
-      <p>satnav_3: <b id="satnav_3">---</b></p>
-      <p>satnav_4: <b id="satnav_4">---</b></p>
-      <p>satnav_5: <b id="satnav_5">---</b></p>
-      <p>satnav_6: <b id="satnav_6">---</b></p>
-      <p>satnav_7: <b id="satnav_7">---</b></p>
-      <p>wheel_speed: <b id="wheel_speed">---</b></p>
-      <p>odometer: <b id="odometer">---</b></p>
-      <p>com2000: <b id="com2000">---</b></p>
-      <p>cd_changer_command: <b id="cd_changer_command">---</b></p>
-      <p>display_to_head_unit: <b id="display_to_head_unit">---</b></p>
       <p>aircon_diag: <b id="aircon_diag">---</b></p>
       <p>aircon_diag_command: <b id="aircon_diag_command">---</b></p>
     </div>

@@ -46,6 +46,8 @@ static const char PROGMEM yesStr[] = "YES";
 static const char PROGMEM noStr[] = "NO";
 static const char PROGMEM presentStr[] = "PRESENT";
 static const char PROGMEM notPresentStr[] = "NOT_PRESENT";
+static const char PROGMEM styleDisplayBlockStr[] = "block";  // To set 'style="display:block;"' in HTML
+static const char PROGMEM styleDisplayNoneStr[] = "none";  // To set 'style="display:none;"' in HTML
 static const char PROGMEM noneStr[] = "NONE";
 static const char PROGMEM updatedStr[] = "(UPD)";
 static const char PROGMEM notApplicable2Str[] = "--";
@@ -142,7 +144,7 @@ const char* TunerSearchModeStr(uint8_t data)
         data == TS_MANUAL ? PSTR("MANUAL_TUNING") :
         data == TS_BY_FREQUENCY ? PSTR("SEARCHING_BY_FREQUENCY") :
         data == TS_BY_MATCHING_PTY ? PSTR("SEARCHING_MATCHING_PTY") : // Searching for station with matching PTY
-        data == TS_FM_AST ? PSTR("FM_AST_SCAN") : // Auto-station scan in the FMAST band (long-press "Radio Band" button)
+        data == TS_FM_AST ? PSTR("FM_AST_SCAN") : // AutoSTore scan in the FMAST band (long-press "Radio Band" button)
         ToHexStr(data);
 } // TunerSearchModeStr
 
@@ -171,7 +173,7 @@ const char* PtyStrFull(uint8_t ptyCode)
         ptyCode == 15 ? PSTR("Other Music") :
         ptyCode == 16 ? PSTR("Weather") :
         ptyCode == 17 ? PSTR("Finance") :
-        ptyCode == 18 ? PSTR("Children's Programmes") :
+        ptyCode == 18 ? PSTR("Children’s Programmes") :
         ptyCode == 19 ? PSTR("Social Affairs") :
         ptyCode == 20 ? PSTR("Religion") :
         ptyCode == 21 ? PSTR("Phone-in") :
@@ -331,7 +333,7 @@ enum SatNavRequest_t
     SR_ENTER_HOUSE_NUMBER = 0x06,  // Or: range of house numbers?
     SR_ENTER_HOUSE_NUMBER_LETTER = 0x07,  // Never seen, just guessing
     SR_PLACE_OF_INTEREST_CATEGORY_LIST = 0x08,
-    SR_PLACE_OF_INTEREST_CATEGORY = 0x09,  // Or: place of interest address?
+    SR_PLACE_OF_INTEREST_ADDRESS = 0x09,
     SR_GPS_FOR_PLACE_OF_INTEREST = 0x0E,  // Or: current address?
     SR_NEXT_STREET = 0x0F,  // Shown during navigation in the (solid line) top box
     SR_CURRENT_STREET = 0x10,  // Shown during navigation in the (dashed line) bottom box
@@ -356,7 +358,7 @@ const char* SatNavRequestStr(uint8_t data)
         data == SR_ENTER_HOUSE_NUMBER ? PSTR("ENTER_HOUSE_NUMBER") :
         data == SR_ENTER_HOUSE_NUMBER_LETTER ? PSTR("ENTER_HOUSE_NUMBER_LETTER") :
         data == SR_PLACE_OF_INTEREST_CATEGORY_LIST ? PSTR("PLACE_OF_INTEREST_CATEGORY_LIST") :
-        data == SR_PLACE_OF_INTEREST_CATEGORY ? PSTR("PLACE_OF_INTEREST_CATEGORY") :
+        data == SR_PLACE_OF_INTEREST_ADDRESS ? PSTR("PLACE_OF_INTEREST_ADDRESS") :
         data == SR_GPS_FOR_PLACE_OF_INTEREST ? PSTR("GPS_FOR_PLACE_OF_INTEREST") :
         data == SR_NEXT_STREET ? PSTR("NEXT_STREET") :
         data == SR_CURRENT_STREET ? PSTR("CURRENT_STREET") :
@@ -505,6 +507,7 @@ VanPacketParseResult_t ParseEnginePkt(const char* idenStr, TVanPacketRxDesc& pkt
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#8A4
 
     const uint8_t* data = pkt.Data();
+    sint16_t waterTemp = (uint16_t)data[2] - 39;  // TODO - or: data[2] / 2
 
     const static char jsonFormatter[] PROGMEM =
     "{\n"
@@ -519,30 +522,45 @@ VanPacketParseResult_t ParseEnginePkt(const char* idenStr, TVanPacketRxDesc& pkt
             "\"in_reverse\": \"%S\",\n"
             "\"trailer\": \"%S\",\n"
             "\"water_temp\": \"%S\",\n"
+            "\"water_temp_perc\":\n"
+            "{\n"
+                "\"style\":\n"
+                "{\n"
+                    "\"transform\": \"scaleX(%S)\"\n"
+                "}\n"
+            "},\n"
             "\"odometer_1\": \"%s\",\n"
-            "\"exterior_temperature\": \"%s\"\n"
+            "\"exterior_temperature\": \"%s &deg;C\"\n"
         "}\n"
     "}\n";
 
-    char floatBuf[3][MAX_FLOAT_SIZE];
+    char floatBuf[4][MAX_FLOAT_SIZE];
     int at = snprintf_P(buf, n, jsonFormatter,
 
         data[0] & 0x80 ? PSTR("FULL") : PSTR("DIMMED (LIGHTS ON)"),
         data[0] & 0x0F,
 
         (data[1] & 0x03) == 0x00 ? offStr :
-            (data[1] & 0x03) == 0x01 ? PSTR("ACC") :
-            (data[1] & 0x03) == 0x03 ? onStr :
-            (data[1] & 0x03) == 0x02 ? PSTR("START_ENGINE") :
-            ToHexStr((uint8_t)(data[1] & 0x03)),
+        (data[1] & 0x03) == 0x01 ? PSTR("ACC") :
+        (data[1] & 0x03) == 0x03 ? onStr :
+        (data[1] & 0x03) == 0x02 ? PSTR("START_ENGINE") :
+        ToHexStr((uint8_t)(data[1] & 0x03)),
 
         data[1] & 0x04 ? PSTR("RUNNING") : offStr,
         data[1] & 0x10 ? onStr : offStr,
         data[1] & 0x20 ? yesStr : noStr,
         data[1] & 0x40 ? presentStr : notPresentStr,
-        data[2] == 0xFF ? notApplicable3Str : FloatToStr(floatBuf[0], data[2] - 39, 0),  // TODO - or: data[2] / 2
-        FloatToStr(floatBuf[1], ((uint32_t)data[3] << 16 | (uint32_t)data[4] << 8 | data[5]) / 10.0, 1),
-        FloatToStr(floatBuf[2], (data[6] - 0x50) / 2.0, 1)
+        data[2] == 0xFF ? notApplicable3Str : FloatToStr(floatBuf[0], waterTemp, 0),
+
+        // TODO - hard coded value 130 degrees Celsius for 100%
+        #define MAX_COOLANT_TEMP (130)
+        data[2] == 0xFF ?
+            PSTR("0") :
+            waterTemp >= MAX_COOLANT_TEMP ? PSTR("1") :
+                FloatToStr(floatBuf[1], (float)waterTemp / MAX_COOLANT_TEMP, 2),
+
+        FloatToStr(floatBuf[2], ((uint32_t)data[3] << 16 | (uint32_t)data[4] << 8 | data[5]) / 10.0, 1),
+        FloatToStr(floatBuf[3], (data[6] - 0x50) / 2.0, 1)
     );
 
     // Warning on Serial output if JSON buffer overflows
@@ -621,7 +639,7 @@ VanPacketParseResult_t ParseLightsStatusPkt(const char* idenStr, TVanPacketRxDes
         data[1] & 0x01 ? yesStr : noStr,
 
         ((uint16_t)data[2] << 8 | data[3]) * 20,
-        (((uint16_t)data[2] << 8 | data[3]) * 20) / 100 * 100,
+        (((uint16_t)data[2] << 8 | data[3]) * 20) / 100 * 100,  // Round downwards to nearest multiple of 100 kms
 
         data[5] & 0x80 ? PSTR("DIPPED_BEAM ") : emptyStr,
         data[5] & 0x40 ? PSTR("HIGH_BEAM ") : emptyStr,
@@ -665,7 +683,24 @@ VanPacketParseResult_t ParseLightsStatusPkt(const char* idenStr, TVanPacketRxDes
     } // if
 
     at += at >= JSON_BUFFER_SIZE ? 0 :
-        snprintf_P(buf + at, n - at, PSTR(",\n\"oil_level_raw\": \"%u\""), data[8]),
+        snprintf_P(buf + at, n - at, PSTR(",\n\"oil_level_raw\": \"%u\""), data[8]);
+
+    #define MAX_OIL_LEVEL (0x55)
+    char floatBuf[MAX_FLOAT_SIZE];
+    at += at >= JSON_BUFFER_SIZE ? 0 :
+        snprintf_P(buf + at, n - at,
+            ",\n"
+            "\"oil_level_raw_perc\":\n"
+            "{\n"
+                "\"style\":\n"
+                "{\n"
+                    "\"transform\": \"scaleX(%S)\"\n"
+                "}\n"
+            "}",
+            data[8] >= MAX_OIL_LEVEL ?
+                PSTR("1") :
+                FloatToStr(floatBuf, (float)data[8] / MAX_OIL_LEVEL, 2)
+        );
 
     at += at >= JSON_BUFFER_SIZE ? 0 :
         snprintf_P(buf + at, n - at, PSTR(",\n\"oil_level_dash\": \"%S\""),
@@ -802,14 +837,14 @@ VanPacketParseResult_t ParseDeviceReportPkt(const char* idenStr, TVanPacketRxDes
             // TODO - remove; just for experimenting
 
             const static char jsonFormatter[] PROGMEM =
-                ",\n"
-                "\"satnav_curr_heading\":\n"
+            ",\n"
+            "\"satnav_curr_heading\":\n"
+            "{\n"
+                "\"style\":\n"
                 "{\n"
-                    "\"style\":\n"
-                    "{\n"
-                        "\"transform\": \"rotate(%udeg)\"\n"
-                    "}\n"
-                "}";
+                    "\"transform\": \"rotate(%udeg)\"\n"
+                "}\n"
+            "}";
 
             at += at >= JSON_BUFFER_SIZE ? 0 :
                 snprintf_P(buf + at, n - at, jsonFormatter, (data[2] & 0x1F) * 22);
@@ -1124,7 +1159,7 @@ VanPacketParseResult_t ParseCarStatus2Pkt(const char* idenStr, TVanPacketRxDesc&
 
     const static char jsonFormatter[] PROGMEM =
     "{\n"
-        "\"event\": \"notification\",\n"
+        "\"event\": \"display\",\n"
         "\"data\": {\n"
             "\"alarm_list\":\n"
             "[";
@@ -1153,9 +1188,34 @@ VanPacketParseResult_t ParseCarStatus2Pkt(const char* idenStr, TVanPacketRxDesc&
 
     at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n]"));
 
+    const static char jsonFormatterPopup[] PROGMEM =
+    ",\n"
+    "\"notification_on_mfd\":\n"
+    "{\n"
+        "\"style\":\n"
+        "{\n"
+            "\"display\": \"%S\"\n"
+        "}\n"
+    "}";
+
     uint8_t currentMsg = data[9];
-    at += at >= JSON_BUFFER_SIZE ? 0 :
-        snprintf_P(buf, n, PSTR(",\n\"message_displayed_on_mfd\": \"%S\""), msgTable[currentMsg]);
+    if (currentMsg != 0xFF)
+    {
+        // Set the popup text
+        at += at >= JSON_BUFFER_SIZE ? 0 :
+            snprintf_P(buf, n, PSTR(
+                ",\n\"message_displayed_on_mfd\": \"%S\""), msgTable[currentMsg]);
+
+        // TODO - Set the popup icon
+
+        // Make the popup appear
+        at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, jsonFormatterPopup, PSTR("block"));
+    }
+    else
+    {
+        // Make the popup disappear
+        at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, jsonFormatterPopup, PSTR("none"));
+    } // if
 
     at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}\n"));
 
@@ -1179,8 +1239,8 @@ VanPacketParseResult_t ParseDashboardPkt(const char* idenStr, TVanPacketRxDesc& 
         "\"event\": \"display\",\n"
         "\"data\":\n"
         "{\n"
-            "\"rpm\": \"%S\",\n"
-            "\"speed\": \"%S\"\n"
+            "\"engine_rpm\": \"%S\",\n"
+            "\"vehicle_speed\": \"%S\"\n"
         "}\n"
     "}\n";
 
@@ -1209,6 +1269,7 @@ VanPacketParseResult_t ParseDashboardButtonsPkt(const char* idenStr, TVanPacketR
     if (dataLen != 11 && dataLen != 12) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
     const uint8_t* data = pkt.Data();
+    float fuelLevelFiltered = data[4] / 2.0;
 
     const static char jsonFormatter[] PROGMEM =
     "{\n"
@@ -1220,13 +1281,20 @@ VanPacketParseResult_t ParseDashboardButtonsPkt(const char* idenStr, TVanPacketR
             "\"dashboard_programmed_brightness\": \"%u\",\n"
             "\"esp\": \"%S\",\n"
             "\"fuel_level_filtered\": \"%s\",\n"
+            "\"fuel_level_filtered_perc\":\n"
+            "{\n"
+                "\"style\":\n"
+                "{\n"
+                    "\"transform\": \"scaleX(%S)\"\n"
+                "}\n"
+            "},\n"
             "\"fuel_level_raw\": \"%s\"\n"
         "}\n"
     "}\n";
 
     // data[6..10] - always 00-FF-00-FF-00
 
-    char floatBuf[2][MAX_FLOAT_SIZE];
+    char floatBuf[3][MAX_FLOAT_SIZE];
     int at = snprintf_P(buf, n, jsonFormatter,
         data[0] & 0x02 ? onStr : offStr,
         data[2] & 0x40 ? PSTR("LOCKED") : PSTR("UNLOCKED"),
@@ -1234,8 +1302,15 @@ VanPacketParseResult_t ParseDashboardButtonsPkt(const char* idenStr, TVanPacketR
         data[3] & 0x02 ? onStr : offStr,
 
         // Surely fuel level. Test with tank full shows definitely level is in litres.
-        FloatToStr(floatBuf[0], data[4] / 2.0, 1),
-        FloatToStr(floatBuf[1], data[5] / 2.0, 1)
+        FloatToStr(floatBuf[0], fuelLevelFiltered, 1),
+
+        // TODO - hard coded "full" value of 80.0
+        #define FULL_TANK_L (80.0)
+        fuelLevelFiltered >= FULL_TANK_L ?
+            PSTR("1") :
+            FloatToStr(floatBuf[1], fuelLevelFiltered / FULL_TANK_L, 2),
+
+        FloatToStr(floatBuf[2], data[5] / 2.0, 1)
     );
 
     // Warning on Serial output if JSON buffer overflows
@@ -1324,7 +1399,7 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
                     "\"fm_band_1\": \"%S\",\n"
                     "\"fm_band_2\": \"%S\",\n"
                     "\"fm_band_ast\": \"%S\",\n"
-                    "\"am_lw_band\": \"%S\",\n"
+                    "\"am_band\": \"%S\",\n"
                     "\"memory\": \"%S\",\n"
                     "\"frequency\": \"%S\",\n"
                     "\"frequency_h\": \"%S\",\n"
@@ -1487,30 +1562,44 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
             if (dataLen != 5) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
             uint8_t status = data[2] & 0x3C;
-            char buffer[5];
-            sprintf_P(buffer, PSTR("0x%02X"), status);
 
             const static char jsonFormatter[] PROGMEM =
             "{\n"
                 "\"event\": \"display\",\n"
                 "\"data\":\n"
                 "{\n"
+                    "\"tape_side\": \"%S\",\n"
                     "\"tape_status\": \"%S\",\n"
-                    "\"tape_side\": \"%S\"\n"
+                    "\"tape_status_stopped\": \"%S\",\n"
+                    "\"tape_status_loading\": \"%S\",\n"
+                    "\"tape_status_play\": \"%S\",\n"
+                    "\"tape_status_fast_forward\": \"%S\",\n"
+                    "\"tape_status_next_track\": \"%S\",\n"
+                    "\"tape_status_rewind\": \"%S\",\n"
+                    "\"tape_status_previous_track\": \"%S\"\n"
                 "}\n"
             "}\n";
 
             at = snprintf_P(buf, n, jsonFormatter,
+
+                data[2] & 0x01 ? PSTR("2") : PSTR("1"),
+
                 status == 0x00 ? PSTR("STOPPED") :
                 status == 0x04 ? PSTR("LOADING") :
-                status == 0x0C ? PSTR("PLAYING") :
+                status == 0x0C ? PSTR("PLAY") :
                 status == 0x10 ? PSTR("FAST_FORWARD") :
                 status == 0x14 ? PSTR("NEXT_TRACK") :
                 status == 0x30 ? PSTR("REWIND") :
                 status == 0x34 ? PSTR("PREVIOUS_TRACK") :
-                buffer,
+                ToHexStr(status),
 
-                data[2] & 0x01 ? PSTR("2") : PSTR("1")
+                status == 0x00 ? onStr : offStr,
+                status == 0x04 ? onStr : offStr,
+                status == 0x0C ? onStr : offStr,
+                status == 0x10 ? onStr : offStr,
+                status == 0x14 ? onStr : offStr,
+                status == 0x30 ? onStr : offStr,
+                status == 0x34 ? onStr : offStr
             );
         }
         break;
@@ -1553,13 +1642,24 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
             // TODO - do we know the fixed numbers? Seems like this can only be 10 or 12.
             if (dataLen < 10) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
+            char trackTime[7];
+            sprintf_P(trackTime, PSTR("%X:%02X"), GetBcd(data[5]), GetBcd(data[6]));
+
+            bool searching = data[3] & 0x10;
+
             const static char jsonFormatter[] PROGMEM =
             "{\n"
                 "\"event\": \"display\",\n"
                 "\"data\":\n"
                 "{\n"
                     "\"cd_status\": \"%S\",\n"
-                    "\"cd_track_time\": \"%u:%u\",\n"
+                    "\"cd_status_inserted\": \"%S\",\n"
+                    "\"cd_status_pause\": \"%S\",\n"
+                    "\"cd_status_play\": \"%S\",\n"
+                    "\"cd_status_fast_forward\": \"%S\",\n"
+                    "\"cd_status_rewind\": \"%S\",\n"
+                    "\"cd_status_searching\": \"%S\",\n"
+                    "\"cd_track_time\": \"%S\",\n"
                     "\"cd_current_track\": \"%u\"";
 
             at = snprintf_P(buf, n, jsonFormatter,
@@ -1573,8 +1673,15 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
                 data[3] == 0x05 ? PSTR("REWIND") :
                 ToHexStr(data[3]),
 
-                GetBcd(data[5]),
-                GetBcd(data[6]),
+                (data[3] & 0x0F) == 0x01 ? onStr : offStr,
+                (data[3] & 0x0F) == 0x02 ? onStr : offStr,
+                (data[3] & 0x0F) == 0x03 ? onStr : offStr,
+                (data[3] & 0x0F) == 0x04 ? onStr : offStr,
+                (data[3] & 0x0F) == 0x05 ? onStr : offStr,
+
+                searching ? onStr : offStr,
+
+                searching ? PSTR("--:--") : trackTime,
 
                 GetBcd(data[7])
             );
@@ -1664,6 +1771,7 @@ VanPacketParseResult_t ParseAudioSettingsPkt(const char* idenStr, TVanPacketRxDe
     // https://github.com/morcibacsi/PSAVanCanBridge/blob/master/src/Van/Structs/VanRadioInfoStructs.h
 
     const uint8_t* data = pkt.Data();
+    uint8_t volume = data[5] & 0x7F;
 
     const static char jsonFormatter[] PROGMEM =
     "{\n"
@@ -1678,6 +1786,13 @@ VanPacketParseResult_t ParseAudioSettingsPkt(const char* idenStr, TVanPacketRxDe
             "\"mute\": \"%S\",\n"
             "\"volume\": \"%u\",\n"
             "\"volume_update\": \"%S\",\n"
+            "\"volume_perc\":\n"
+            "{\n"
+                "\"style\":\n"
+                "{\n"
+                    "\"transform\": \"scaleX(%S)\"\n"
+                "}\n"
+            "},\n"
             "\"audio_menu\": \"%S\",\n"
             "\"bass\": \"%+d\",\n"
             "\"bass_update\": \"%S\",\n"
@@ -1692,12 +1807,14 @@ VanPacketParseResult_t ParseAudioSettingsPkt(const char* idenStr, TVanPacketRxDe
         "}\n"
     "}\n";
 
-    int at = snprintf_P(buf, n, jsonFormatter,
-        data[2] & 0x01 ? onStr : offStr,  // power
-        data[4] & 0x20 ? yesStr : noStr,  // tape
-        data[4] & 0x40 ? yesStr : noStr,  // cd
+    char floatBuf[MAX_FLOAT_SIZE];
 
-        (data[4] & 0x0F) == 0x00 ? noneStr :  // source
+    int at = snprintf_P(buf, n, jsonFormatter,
+        data[2] & 0x01 ? onStr : offStr,  // Power
+        data[4] & 0x20 ? yesStr : noStr,  // Tape present
+        data[4] & 0x40 ? yesStr : noStr,  // CD present
+
+        (data[4] & 0x0F) == 0x00 ? noneStr :  // Source of audio
         (data[4] & 0x0F) == 0x01 ? PSTR("TUNER") :
         (data[4] & 0x0F) == 0x02 ?
             data[4] & 0x20 ? PSTR("TAPE") : 
@@ -1712,28 +1829,32 @@ VanPacketParseResult_t ParseAudioSettingsPkt(const char* idenStr, TVanPacketRxDe
 
         ToHexStr((uint8_t)(data[4] & 0x0F)),
 
-        // ext_mute. Activated when head unit ISO connector A pin 1 ("Phone mute") is pulled LOW (to Ground).
+        // External mute. Activated when head unit ISO connector A pin 1 ("Phone mute") is pulled LOW (to Ground).
         data[1] & 0x02 ? onStr : offStr,
 
-        // mute. To activate: press both VOL_UP and VOL_DOWN buttons on stalk.
+        // Mute. To activate: press both VOL_UP and VOL_DOWN buttons on stalk.
         data[1] & 0x01 ? onStr : offStr,
 
-        data[5] & 0x7F,  // volume
+        volume,
         data[5] & 0x80 ? yesStr : noStr,
 
-        // audio_menu. Bug: if CD changer is playing, this one is always "OPEN" (even if it isn't).
+        // TODO - hard coded value 30 for 100%
+        #define MAX_AUDIO_VOLUME (30)
+        FloatToStr(floatBuf, (float)volume / MAX_AUDIO_VOLUME, 2),
+
+        // Audio menu. Bug: if CD changer is playing, this one is always "OPEN" (even if it isn't).
         data[1] & 0x20 ? PSTR("OPEN") : PSTR("CLOSED"),
 
-        (sint8_t)(data[8] & 0x7F) - 0x3F,  // bass
+        (sint8_t)(data[8] & 0x7F) - 0x3F,  // Bass
         data[8] & 0x80 ? yesStr : noStr,
-        (sint8_t)(data[9] & 0x7F) - 0x3F,  // treble
+        (sint8_t)(data[9] & 0x7F) - 0x3F,  // Treble
         data[9] & 0x80 ? yesStr : noStr,
-        data[1] & 0x10 ? onStr : offStr,  // loudness
-        (sint8_t)(0x3F) - (data[7] & 0x7F),  // fader
+        data[1] & 0x10 ? onStr : offStr,  // Loudness
+        (sint8_t)(0x3F) - (data[7] & 0x7F),  // Fader
         data[7] & 0x80 ? yesStr : noStr,
-        (sint8_t)(0x3F) - (data[6] & 0x7F),  // balance
+        (sint8_t)(0x3F) - (data[6] & 0x7F),  // Balance
         data[6] & 0x80 ? yesStr : noStr,
-        data[1] & 0x04 ? onStr : offStr  // auto_volume
+        data[1] & 0x04 ? onStr : offStr  // Auto volume
     );
 
     // Warning on Serial output if JSON buffer overflows
@@ -1921,7 +2042,7 @@ VanPacketParseResult_t ParseAirCon2Pkt(const char* idenStr, TVanPacketRxDesc& pk
             "\"ac_enabled\": \"%S\",\n"
             "\"rear_heater_2\": \"%S\",\n"
             "\"ac_compressor\": \"%S\",\n"
-            "\"contact_key_position\": \"%S\",\n"
+            "\"contact_key_position_ac\": \"%S\",\n"
             "\"condenser_temperature\": \"%S\",\n"
             "\"evaporator_temperature\": \"%s\"\n"
         "}\n"
@@ -1973,9 +2094,15 @@ VanPacketParseResult_t ParseCdChangerPkt(const char* idenStr, TVanPacketRxDesc& 
         "{\n"
             "\"cd_changer_random\": \"%S\",\n"
             "\"cd_changer_status\": \"%S\",\n"
+            "\"cd_changer_status_pause\": \"%S\",\n"
+            "\"cd_changer_status_play\": \"%S\",\n"
+            "\"cd_changer_status_fast_forward\": \"%S\",\n"
+            "\"cd_changer_status_rewind\": \"%S\",\n"
+            "\"cd_changer_status_search\": \"%S\",\n"
+            "\"cd_changer_status_next_track\": \"%S\",\n"
+            "\"cd_changer_status_previous_track\": \"%S\",\n"
             "\"cd_changer_cartridge_present\": \"%S\",\n"
             "\"cd_changer_track_time\": \"%S:%S\",\n"
-            "\"cd_changer_track_info\": \"%u/%S\",\n"
             "\"cd_changer_current_track\": \"%u\",\n"
             "\"cd_changer_total_tracks\": \"%S\",\n"
             "\"cd_changer_current_cd\": \"%u\",\n"
@@ -1988,24 +2115,37 @@ VanPacketParseResult_t ParseCdChangerPkt(const char* idenStr, TVanPacketRxDesc& 
         "}\n"
     "}\n";
 
-    char floatBuf[3][MAX_FLOAT_SIZE];
+    char floatBuf[MAX_FLOAT_SIZE];
 
-    const char* trackTimeSec = data[4] == 0xFF ? notApplicable2Str : FloatToStr(floatBuf[0], GetBcd(data[4]), 0);
-    const char* trackTimeMin = data[5] == 0xFF ? notApplicable2Str : FloatToStr(floatBuf[1], GetBcd(data[5]), 0);
+    const char* trackTimeSec = data[4] == 0xFF ? notApplicable2Str : FloatToStr(floatBuf, GetBcd(data[4]), 0);
+    const char* trackTimeMin = data[5] == 0xFF ? notApplicable2Str : FloatToStr(floatBuf, GetBcd(data[5]), 0);
 
     uint8_t currentTrack = GetBcd(data[6]);
-    const char* totalTracks = data[8] == 0xFF ? notApplicable2Str : FloatToStr(floatBuf[2], GetBcd(data[8]), 0);
+    const char* totalTracks = data[8] == 0xFF ? notApplicable2Str : FloatToStr(floatBuf, GetBcd(data[8]), 0);
 
     int at = snprintf_P(buf, n, jsonFormatter,
         data[1] == 0x01 ? onStr : offStr,
 
-        data[2] == 0x41 ? offStr :
+        data[2] == 0x40 ? PSTR("POWER_OFF") :  // Not sure
+        data[2] == 0x41 ? PSTR("POWER_ON") : // Not sure
+        data[2] == 0x49 ? PSTR("INITIALIZE") :  // Not sure
+        data[2] == 0xC0 ? PSTR("POWER_ON_READY") :  // Not sure
         data[2] == 0xC1 ? PSTR("PAUSE") :
-        data[2] == 0xD3 ? PSTR("SEARCHING") :
-        data[2] == 0xC3 ? PSTR("PLAYING") :
+        data[2] == 0xC3 ? PSTR("PLAY") :
         data[2] == 0xC4 ? PSTR("FAST_FORWARD") :
         data[2] == 0xC5 ? PSTR("REWIND") :
+        data[2] == 0xD3 ? PSTR("SEARCH") :
+        data[2] == 0xD4 ? PSTR("NEXT_TRACK") :  // Not sure
+        data[2] == 0xD5 ? PSTR("PREVIOUS_TRACK") :  // Not sure
         ToHexStr(data[2]),
+
+        data[2] == 0xC1 ? onStr : offStr,
+        data[2] == 0xC3 ? onStr : offStr,
+        data[2] == 0xC4 ? onStr : offStr,
+        data[2] == 0xC5 ? onStr : offStr,
+        data[2] == 0xD3 ? onStr : offStr,
+        data[2] == 0xD4 ? onStr : offStr,
+        data[2] == 0xD5 ? onStr : offStr,
 
         data[3] == 0x16 ? yesStr :
         data[3] == 0x06 ? noStr :
@@ -2014,8 +2154,6 @@ VanPacketParseResult_t ParseCdChangerPkt(const char* idenStr, TVanPacketRxDesc& 
         trackTimeMin,
         trackTimeSec,
 
-        currentTrack,
-        totalTracks,
         currentTrack,
         totalTracks,
 
@@ -2251,7 +2389,9 @@ VanPacketParseResult_t ParseSatNavGuidanceDataPkt(const char* idenStr, TVanPacke
     uint16_t gpsDistanceToDestination = (uint16_t)(data[7] & 0x7F) << 8 | data[8];
     uint16_t distanceToNextTurn = (uint16_t)(data[9] & 0x7F) << 8 | data[10];
     uint16_t headingOnRoundabout = (uint16_t)data[11] << 8 | data[12];
-    uint16_t minutesToTravel = (uint16_t)data[13] << 8 | data[14];  // Not sure, just guessing
+
+    // TODO - Not sure, just guessing. could also be number of instructions still to be done
+    uint16_t minutesToTravel = (uint16_t)data[13] << 8 | data[14];
 
     const static char jsonFormatter[] PROGMEM =
     "{\n"
@@ -2323,19 +2463,49 @@ VanPacketParseResult_t ParseSatNavGuidancePkt(const char* idenStr, TVanPacketRxD
         "\"event\": \"display\",\n"
         "\"data\":\n"
         "{\n"
-            "\"satnav_guidance_current_instruction_icon\": \"%s\",\n"
-            "\"satnav_guidance_next_instruction_icon\": \"%s\",\n"
-            "\"satnav_guidance_turn_around_if_possible_icon\": \"%s\",\n"
-            "\"satnav_guidance_follow_road_icon\": \"%s\",\n"
-            "\"satnav_guidance_not_on_map_icon\": \"%s\"";
+            "\"satnav_curr_turn_icon\":\n"
+            "{\n"
+                "\"style\":\n"
+                "{\n"
+                    "\"display\": \"%S\"\n"
+                "}\n"
+            "},\n"
+            "\"satnav_next_turn_icon\":\n"
+            "{\n"
+                "\"style\":\n"
+                "{\n"
+                    "\"display\": \"%S\"\n"
+                "}\n"
+            "},\n"
+            "\"satnav_turn_around_if_possible_icon\":\n"
+            "{\n"
+                "\"style\":\n"
+                "{\n"
+                    "\"display\": \"%S\"\n"
+                "}\n"
+            "},\n"
+            "\"satnav_follow_road_icon\":\n"
+            "{\n"
+                "\"style\":\n"
+                "{\n"
+                    "\"display\": \"%S\"\n"
+                "}\n"
+            "},\n"
+            "\"satnav_not_on_map_icon\":\n"
+            "{\n"
+                "\"style\":\n"
+                "{\n"
+                    "\"display\": \"%S\"\n"
+                "}\n"
+            "}";
 
     // Determines which guidance icon(s) will be visible
     int at = snprintf_P(buf, n, jsonFormatter,
-        data[1] == 0x01 || data[1] == 0x03 ? onStr : offStr,
-        data[1] == 0x03 ? onStr : offStr,
-        data[1] == 0x04 ? onStr : offStr,
-        data[1] == 0x05 ? onStr : offStr,
-        data[1] == 0x06 ? onStr : offStr
+        data[1] == 0x01 || data[1] == 0x03 ? styleDisplayBlockStr : styleDisplayNoneStr,
+        data[1] == 0x03 ? styleDisplayBlockStr : styleDisplayNoneStr,
+        data[1] == 0x04 ? styleDisplayBlockStr : styleDisplayNoneStr,
+        data[1] == 0x05 ? styleDisplayBlockStr : styleDisplayNoneStr,
+        data[1] == 0x06 ? styleDisplayBlockStr : styleDisplayNoneStr
     );
 
     if (data[1] == 0x01)  // Single turn
@@ -2385,9 +2555,7 @@ VanPacketParseResult_t ParseSatNavGuidancePkt(const char* idenStr, TVanPacketRxD
     {
         if (dataLen != 3) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
-        // Show the "turn around" icon
-        at += at >= JSON_BUFFER_SIZE ? 0 :
-            snprintf_P(buf + at, n - at, PSTR(",\n\"satnav_turn_around_if_possible\": \"TURN_AROUND_IF_POSSIBLE\""));
+        // No further data in this packet
     } // if
     else if (data[1] == 0x05)  // Follow road
     {
@@ -2492,9 +2660,9 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
             if (currentRecord < MAX_SATNAV_RECORDS && currentString < MAX_SATNAV_STRINGS_PER_RECORD)
             {
                 // Copy the current string buffer into the array
-                records[currentRecord][currentString++] = buffer;
+                records[currentRecord][currentString] = buffer;
 
-                if (currentString >= MAX_SATNAV_STRINGS_PER_RECORD)
+                if (++currentString >= MAX_SATNAV_STRINGS_PER_RECORD)
                 {
                     // Warning on Serial output
                     Serial.print(F("--> WARNING: too many strings in record in satnav report!\n"));
@@ -2523,7 +2691,7 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
                 "\"event\": \"display\",\n"
                 "\"data\":\n"
                 "{\n"
-                    "\"satnav_%S_street\": \"%s%S%s - %s%s\"\n"
+                    "\"satnav_%S_street\": \"%s%s (%s%S%s)\"\n"
                 "}\n"
             "}\n";
 
@@ -2531,11 +2699,15 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
             // street [5, 6]; skip the other strings.
             at = snprintf_P(buf, n, jsonFormatter,
                 request == SR_CURRENT_STREET ? PSTR("curr") : PSTR("next"),
+
+                // Street
+                records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
+                records[0][6].c_str(),
+
+                // City - District (optional)
                 records[0][3].c_str(),
                 records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
-                records[0][4].c_str(),
-                records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
-                records[0][6].c_str()
+                records[0][4].c_str()
             );
         }
         else if (request == SR_GPS_CHOOSE_DESTINATION || request == SR_GPS_FOR_PLACE_OF_INTEREST)
@@ -2545,7 +2717,7 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
                 "\"event\": \"display\",\n"
                 "\"data\":\n"
                 "{\n"
-                    "\"satnav_%S_address\": \"%s%S%s - %s%s%s%s\"\n"
+                    "\"satnav_%S_address\": \"%s%s%s%s (%s%S%s)\"\n"
                 "}\n"
             "}\n";
 
@@ -2553,16 +2725,20 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
             // house number [7]; skip the other strings.
             at = snprintf_P(buf, n, jsonFormatter,
                 request == SR_GPS_CHOOSE_DESTINATION ? PSTR("destination") : PSTR("current"),
-                records[0][3].c_str(),
-                records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
-                records[0][4].c_str(),
+
+                // Street
                 records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
                 records[0][6].c_str(),
 
                 // First string is either "C" or "V"; "C" has GPS coordinates in [7] and [8]; "V" has house number
                 // in [7]. If we see "V", show house number.
-                records[0][0] == "V" ? PSTR(" - ") : emptyStr,
-                records[0][0] == "V" ? records[0][7].c_str() : emptyStr
+                records[0][0] == "V" ? PSTR(" ") : emptyStr,
+                records[0][0] == "V" ? records[0][7].c_str() : emptyStr,
+
+                // City - District (optional)
+                records[0][3].c_str(),
+                records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
+                records[0][4].c_str()
             );
         }
         else if (request == SR_PRIVATE_ADDRESS || request == SR_BUSINESS_ADDRESS)
@@ -2573,7 +2749,7 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
                 "\"data\":\n"
                 "{\n"
                     "\"satnav_%S_entry\": \"%s\",\n"
-                    "\"satnav_%S\": \"%s%S%s - %s%s - %s\"\n"
+                    "\"satnav_%S\": \"%s%s %s (%s%S%s)\"\n"
                 "}\n"
             "}\n";
 
@@ -2581,25 +2757,27 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
             // house number [7] and entry name [8]; skip the other strings.
             at = snprintf_P(buf, n, jsonFormatter,
 
-                request == SR_PRIVATE_ADDRESS ? PSTR("private_address") :
-                PSTR("business_address"),
+                request == SR_PRIVATE_ADDRESS ? PSTR("private_address") : PSTR("business_address"),
 
                 // Name of the entry
                 records[0][8].c_str(),
 
-                request == SR_PRIVATE_ADDRESS ? PSTR("private_address") :
-                PSTR("business_address"),
+                request == SR_PRIVATE_ADDRESS ? PSTR("private_address") : PSTR("business_address"),
 
                 // Address of the entry
-                records[0][3].c_str(),
-                records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
-                records[0][4].c_str(),
+
+                // Street and house number
                 records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
                 records[0][6].c_str(),
                 records[0][7].c_str()
+
+                // City - District (optional)
+                records[0][3].c_str(),
+                records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
+                records[0][4].c_str(),
             );
         }
-        else if (request == SR_PLACE_OF_INTEREST_CATEGORY)
+        else if (request == SR_PLACE_OF_INTEREST_ADDRESS)
         {
             const static char jsonFormatter[] PROGMEM =
             "{\n"
@@ -2607,26 +2785,30 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
                 "\"data\":\n"
                 "{\n"
                     "\"satnav_place_of_interest_address_entry\": \"%s\",\n"
-                    "\"satnav_place_of_interest_address\": \"%s%S%s - %s%s\",\n"
+                    "\"satnav_place_of_interest_address\": \"%s%s (%s%S%s)\",\n"
                     "\"satnav_place_of_interest_address_distance\": \"%s\"\n"
                 "}\n"
             "}\n";
 
             // Chosen place of interest address is in first (and only) record. Copy only city [3], district [4]
-            // (if any), street [5, 6] and entry name [9]; skip the other strings.
+            // (if any), street [5, 6], entry name [9] and distance [11]; skip the other strings.
             at = snprintf_P(buf, n, jsonFormatter,
 
                 // Name of the place of interest
                 records[0][9].c_str(),
 
                 // Address of the place of interest
+
+                // Street
+                records[0][5].c_str() + 1,  // Skip the fixed first letter 'G' or 'I'
+                records[0][6].c_str(),
+
+                // City - District (optional)
                 records[0][3].c_str(),
                 records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
                 records[0][4].c_str(),
-                records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
-                records[0][6].c_str(),
 
-                // Distance (in meters) to the place of interest (not sure)
+                // Distance (in meters) to the place of interest. TODO - not sure
                 records[0][11].c_str()
             );
         }
@@ -2772,7 +2954,7 @@ VanPacketParseResult_t ParseMfdToSatNavPkt(const char* idenStr, TVanPacketRxDesc
         sprintf_P(buffer, PSTR("%c"), data[3]);
 
         at += at >= JSON_BUFFER_SIZE ? 0 :
-            snprintf_P(buf + at,n - at,PSTR
+            snprintf_P(buf + at, n - at, PSTR
                 (
                     ",\n"
                     "\"mfd_to_satnav_character\": \"%s\""
@@ -2793,7 +2975,7 @@ VanPacketParseResult_t ParseMfdToSatNavPkt(const char* idenStr, TVanPacketRxDesc
         if (selectionOrOffset > 0 && length > 0)
         {
             at += at >= JSON_BUFFER_SIZE ? 0 :
-                snprintf_P(buf + at,n - at,PSTR
+                snprintf_P(buf + at, n - at, PSTR
                     (
                         ",\n"
                         "\"mfd_to_satnav_offset\": \"%u\",\n"
@@ -2806,7 +2988,7 @@ VanPacketParseResult_t ParseMfdToSatNavPkt(const char* idenStr, TVanPacketRxDesc
         else if (selectionOrOffset > 0)
         {
             at += at >= JSON_BUFFER_SIZE ? 0 :
-                snprintf_P(buf + at, n - at,PSTR
+                snprintf_P(buf + at, n - at, PSTR
                     (
                         ",\n"
                         "\"mfd_to_satnav_selection\": \"%u\""
