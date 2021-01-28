@@ -307,7 +307,7 @@ enum SatNavRequest_t
     SR_ENTER_HOUSE_NUMBER = 0x06,  // Or: range of house numbers?
     SR_ENTER_HOUSE_NUMBER_LETTER = 0x07,  // Never seen, just guessing
     SR_PLACE_OF_INTEREST_CATEGORY_LIST = 0x08,
-    SR_PLACE_OF_INTEREST_CATEGORY = 0x09,  // Or: place of interest address?
+    SR_PLACE_OF_INTEREST_ADDRESS = 0x09,
     SR_GPS_FOR_PLACE_OF_INTEREST = 0x0E,  // Or: current address?
     SR_NEXT_STREET = 0x0F,  // Shown during navigation in the (solid line) top box
     SR_CURRENT_STREET = 0x10,  // Shown during navigation in the (dashed line) bottom box
@@ -332,7 +332,7 @@ const char* SatNavRequestStr(uint8_t data)
         data == SR_ENTER_HOUSE_NUMBER ? PSTR("ENTER_HOUSE_NUMBER") :
         data == SR_ENTER_HOUSE_NUMBER_LETTER ? PSTR("ENTER_HOUSE_NUMBER_LETTER") :
         data == SR_PLACE_OF_INTEREST_CATEGORY_LIST ? PSTR("PLACE_OF_INTEREST_CATEGORY_LIST") :
-        data == SR_PLACE_OF_INTEREST_CATEGORY ? PSTR("PLACE_OF_INTEREST_CATEGORY") :
+        data == SR_PLACE_OF_INTEREST_ADDRESS ? PSTR("PLACE_OF_INTEREST_ADDRESS") :
         data == SR_GPS_FOR_PLACE_OF_INTEREST ? PSTR("GPS_FOR_PLACE_OF_INTEREST") :
         data == SR_NEXT_STREET ? PSTR("NEXT_STREET") :
         data == SR_CURRENT_STREET ? PSTR("CURRENT_STREET") :
@@ -826,7 +826,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
-                // Unknown what this is. Surely not the head unit. Could be:
+                // TODO - Unknown what this is. Surely not the head unit. Could be:
                 // - MFD unit - this type of packet is showing often when the MFD is changing to another screen
                 // - Aircon panel
                 // - CD changer (seems unlikely)
@@ -868,7 +868,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
-                // Unknown what this is. Surely not the MFD and not the head unit.
+                // TODO - Unknown what this is. Surely not the MFD and not the head unit.
                 // Seems to be sent more often when engine is running. Could be:
                 // - Aircon panel
                 // - CD changer (seems unlikely)
@@ -2694,26 +2694,38 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // Character set is "Extended ASCII/Windows-1252"; e.g. ë is 0xEB.
             // See also: https://bytetool.web.app/en/ascii/
             //
-            // Address format:
-            // - Starts with "V" (Ville? Vers?) or "C" (Country? Courant? Chosen? Choisi?)
-            // - Country
-            // - Province
-            // - City
-            // - District (or empty)
-            // - String "G" (iGnore?) which can be followed by text that is not important for searching on, e.g.
-            //   "GRue de"
-            // - Street name
-            // - Either:
-            //   - House number (or "0" if unknown or not applicable), or
-            //   - GPS coordinates (e.g. "+495456", "+060405"). Note that these coordinates are in degrees, NOT in
-            //     decimal notation. So the just given example would translate to: 49°54'56"N 6°04'05"E. There
-            //     seems to be however some offset, because the shown GPS coordinates do not exactly match the
-            //     destination.
-            // Then, for place of interest address:
-            // - Name (e.g. 'CINE SCALA')
-            // - '?'
-            // - Distance in meters from current location? (e.g. '12000')
-
+            // An address is formatted as an array of strings. There can be up to 12 array elements ([0]...[11]):
+            //
+            // [0] "V" (Ville? Vers?) or "C" (Country? Courant? Chosen? Choisi?)
+            //     Observed:
+            //     * "V": the address ends with city, then street and house number (or '0' if unknown or not applicable)
+            //     * "C" the address ends with city, then GPS "coordinate"
+            // [1] Country
+            // [2] Province
+            // [3] City
+            // [4] District (or empty string)
+            // [5] Either:
+            //     * "G": (iGnore?) which can be followed by text that is not important for searching on, e.g.
+            //            "GRue de"
+            //     * "I": Next entry is not a street name but a building name ??
+            // [6] Street name (important part)
+            //
+            // Then, depending on the content of string [0] ("V" or "C"):
+            // * "V"
+            //   [7]: house number (or "0" if unknown or not applicable),
+            // * "C"
+            //   [7], [8]: GPS coordinates (e.g. "+495456", "+060405"). Note that these coordinates are in degrees, NOT
+            //             in decimal notation. So the just given example would translate to: 49°54'56"N 6°04'05"E.
+            //             There seems to be however some offset, because the shown GPS coordinates do not exactly
+            //             match the destination.
+            //
+            // For  "private" and "business" address (always "V"):
+            // [8] Name of entry (e.g. 'HOME')
+            //
+            // For "place of interest" address (always "C"):
+            // [9] Name of entry (e.g. 'CINE SCALA')
+            // [10] '?'
+            // [11] Distance in meters from current location (e.g. '12000'). TODO - not sure.
 
             #define MAX_SATNAV_STRING_SIZE 128
             static char buffer[MAX_SATNAV_STRING_SIZE];
@@ -3302,7 +3314,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
-                // Not sure what this is. Seen just before a trafic announcement was issued by the tuner.
+                // TODO - Not sure what this is. Seen just before a trafic announcement was issued by the tuner.
 
                 SERIAL.printf_P(PSTR("traffic_announcement=%s\n"), ToHexStr(data[1]));
             }
