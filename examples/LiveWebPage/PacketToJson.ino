@@ -2769,12 +2769,12 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
                 // Street and house number
                 records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
                 records[0][6].c_str(),
-                records[0][7].c_str()
+                records[0][7].c_str(),
 
                 // City - District (optional)
                 records[0][3].c_str(),
                 records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
-                records[0][4].c_str(),
+                records[0][4].c_str()
             );
         }
         else if (request == SR_PLACE_OF_INTEREST_ADDRESS)
