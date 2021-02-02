@@ -304,7 +304,7 @@ enum SatNavRequest_t
     SR_ENTER_DISTRICT = 0x03,  // Never seen, just guessing
     SR_ENTER_NEIGHBORHOOD = 0x04,  // Never seen, just guessing
     SR_ENTER_STREET = 0x05,  // Or: list of streets?
-    SR_ENTER_HOUSE_NUMBER = 0x06,  // Or: range of house numbers?
+    SR_ENTER_HOUSE_NUMBER = 0x06,  // Range of house numbers to choose from
     SR_ENTER_HOUSE_NUMBER_LETTER = 0x07,  // Never seen, just guessing
     SR_PLACE_OF_INTEREST_CATEGORY_LIST = 0x08,
     SR_PLACE_OF_INTEREST_ADDRESS = 0x09,
@@ -2675,13 +2675,15 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
-            // Possible meanings of data:
+            // Meanings of data:
             //
-            // data[0]: starts low (0x02, 0x05), then increments every time with either 9 or 1.
+            // data[0]: starts low for the first packet in the sequence (0x02, 0x05), then increments with each
+            //   subsequent packet with either 9 or 1.
             //   & 0x80: last packet in sequence
-            //   --> Last data byte (data[dataLen - 1]) is always the same as the first (data[0]).
             //
-            // data[1]: Code of report; see below
+            // data[1]: Code of report; see function SatNavRequestStr(). Only in first packet.
+            //
+            // data[dataLen - 1] (last data byte): always the same as the first (data[0]).
             //
             // Lists are formatted as follows:
             // - Record: terminated with '\1', containing a set of:
@@ -2696,10 +2698,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             //
             // An address is formatted as an array of strings. There can be up to 12 array elements ([0]...[11]):
             //
-            // [0] "V" (Ville? Vers?) or "C" (Country? Courant? Chosen? Choisi?)
+            // [0] "V" (Ville? Vers?) or "C" (Coordinates?)
             //     Observed:
-            //     * "V": the address ends with city, then street and house number (or '0' if unknown or not applicable)
-            //     * "C" the address ends with city, then GPS "coordinate"
+            //     * "V": the address ends with city (+ optional district), then street and house number (or '0'
+            //            if unknown or not applicable)
+            //     * "C" the address ends with city (+ optional district), then GPS "coordinate"
             // [1] Country
             // [2] Province
             // [3] City
@@ -2711,21 +2714,21 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // [6] Street name (important part)
             //
             // Then, depending on the content of string [0] ("V" or "C"):
-            // * "V"
+            // * Type "V"
             //   [7]: house number (or "0" if unknown or not applicable),
-            // * "C"
+            // * Type "C"
             //   [7], [8]: GPS coordinates (e.g. "+495456", "+060405"). Note that these coordinates are in degrees, NOT
             //             in decimal notation. So the just given example would translate to: 49°54'56"N 6°04'05"E.
             //             There seems to be however some offset, because the shown GPS coordinates do not exactly
             //             match the destination.
             //
-            // For  "private" and "business" address (always "V"):
-            // [8] Name of entry (e.g. 'HOME')
+            // For  "private" and "business" address (always type "V"):
+            // [8] Name of entry (e.g. "HOME")
             //
-            // For "place of interest" address (always "C"):
-            // [9] Name of entry (e.g. 'CINE SCALA')
-            // [10] '?'
-            // [11] Distance in meters from current location (e.g. '12000'). TODO - not sure.
+            // For "place of interest" address (always type "C"):
+            // [9] Name of entry (e.g. "CINE SCALA")
+            // [10] Always "?"
+            // [11] Distance in meters from current location (e.g. "12000"). TODO - not sure.
 
             #define MAX_SATNAV_STRING_SIZE 128
             static char buffer[MAX_SATNAV_STRING_SIZE];
@@ -3466,6 +3469,18 @@ void setup()
     VanBusRx.Setup(RX_PIN);
 } // setup
 
+enum VanPacketFilter_t
+{
+    VAN_PACKETS_ALL_EXCEPT,
+    VAN_PACKETS_NONE_EXCEPT,
+    VAN_PACKETS_HEAD_UNIT,
+    VAN_PACKETS_AIRCON,
+    VAN_PACKETS_SAT_NAV
+}; // enum VanPacketParseResult_t
+
+// Defined in PacketFilter.ino
+bool isPacketSelected(uint16_t iden, VanPacketFilter_t filter);
+
 void loop()
 {
     int n = 0;
@@ -3480,96 +3495,8 @@ void loop()
         pkt.CheckCrcAndRepair();
 
         // Filter on specific IDENs
-
         uint16_t iden = pkt.Iden();
-
-        // Choose either of the if-statements below (not both)
-
-        // Show all packets, but discard the following:
-        if (
-            false
-            // || iden == VIN_IDEN
-            // || iden == ENGINE_IDEN
-            // || iden == HEAD_UNIT_STALK_IDEN
-            // || iden == LIGHTS_STATUS_IDEN
-            // || iden == DEVICE_REPORT
-            // || iden == CAR_STATUS1_IDEN
-            // || iden == CAR_STATUS2_IDEN
-            // || iden == DASHBOARD_IDEN
-            // || iden == DASHBOARD_BUTTONS_IDEN
-            // || iden == HEAD_UNIT_IDEN
-            // || iden == TIME_IDEN
-            // || iden == AUDIO_SETTINGS_IDEN
-            // || iden == MFD_STATUS_IDEN
-            // || iden == SATNAV_GUIDANCE_DATA_IDEN
-            // || iden == AIRCON1_IDEN
-            // || iden == AIRCON2_IDEN
-            // || iden == CDCHANGER_IDEN
-            // || iden == SATNAV_STATUS_1_IDEN
-            // || iden == SATNAV_GUIDANCE_IDEN
-            // || iden == SATNAV_REPORT_IDEN
-            // || iden == SATNAV_TO_MFD_IDEN
-            // || iden == SATNAV_STATUS_2_IDEN
-            // || iden == SATNAV_STATUS_3_IDEN
-            // || iden == MFD_TO_SATNAV_IDEN
-            // || iden == SATNAV_DOWNLOADING_IDEN
-            // || iden == SATNAV_DOWNLOADED1_IDEN
-            // || iden == SATNAV_DOWNLOADED2_IDEN
-            // || iden == WHEEL_SPEED_IDEN
-            // || iden == ODOMETER_IDEN
-            // || iden == COM2000_IDEN
-            // || iden == CDCHANGER_COMMAND_IDEN
-            // || iden == MFD_TO_HEAD_UNIT_IDEN
-            // || iden == AIR_CONDITIONER_DIAG_IDEN
-            // || iden == AIR_CONDITIONER_DIAG_COMMAND_IDEN
-            // || iden == ECU_IDEN
-           )
-        {
-            break;
-        } // if
-
-        // Show no packets, except the following:
-        // if (
-            // true
-            // && iden != VIN_IDEN
-            // && iden != ENGINE_IDEN
-            // && iden != HEAD_UNIT_STALK_IDEN
-            // && iden != LIGHTS_STATUS_IDEN
-            // && iden != DEVICE_REPORT
-            // && iden != CAR_STATUS1_IDEN
-            // && iden != CAR_STATUS2_IDEN
-            // && iden != DASHBOARD_IDEN
-            // && iden != DASHBOARD_BUTTONS_IDEN
-            // && iden != HEAD_UNIT_IDEN
-            // && iden != TIME_IDEN
-            // && iden != AUDIO_SETTINGS_IDEN
-            // && iden != MFD_STATUS_IDEN
-            // && iden != SATNAV_GUIDANCE_DATA_IDEN
-            // && iden != AIRCON1_IDEN
-            // && iden != AIRCON2_IDEN
-            // && iden != CDCHANGER_IDEN
-            // && iden != SATNAV_STATUS_1_IDEN
-            // && iden != SATNAV_GUIDANCE_IDEN
-            // && iden != SATNAV_REPORT_IDEN
-            // && iden != SATNAV_TO_MFD_IDEN
-            // && iden != SATNAV_STATUS_2_IDEN
-            // && iden != SATNAV_STATUS_3_IDEN
-            // && iden != MFD_TO_SATNAV_IDEN
-            // && iden != SATNAV_DOWNLOADING_IDEN
-            // && iden != SATNAV_DOWNLOADED1_IDEN
-            // && iden != SATNAV_DOWNLOADED2_IDEN
-            // && iden != WHEEL_SPEED_IDEN
-            // && iden != ODOMETER_IDEN
-            // && iden != COM2000_IDEN
-            // && iden != CDCHANGER_COMMAND_IDEN
-            // && iden != MFD_TO_HEAD_UNIT_IDEN
-            // && iden != AIR_CONDITIONER_DIAG_IDEN
-            // && iden != AIR_CONDITIONER_DIAG_COMMAND_IDEN
-            // && iden != ECU_IDEN
-           // )
-        // {
-            // break;
-        // } // if
+        if (! isPacketSelected(iden, VAN_PACKETS_HEAD_UNIT)) continue;
 
         // Show packet as parsed by ISR
         VanPacketParseResult_t parseResult = ParseVanPacket(&pkt);
