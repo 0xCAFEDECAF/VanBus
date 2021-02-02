@@ -330,7 +330,7 @@ enum SatNavRequest_t
     SR_ENTER_DISTRICT = 0x03,  // Never seen, just guessing
     SR_ENTER_NEIGHBORHOOD = 0x04,  // Never seen, just guessing
     SR_ENTER_STREET = 0x05,  // Or: list of streets?
-    SR_ENTER_HOUSE_NUMBER = 0x06,  // Or: range of house numbers?
+    SR_ENTER_HOUSE_NUMBER = 0x06,  // Range of house numbers to choose from
     SR_ENTER_HOUSE_NUMBER_LETTER = 0x07,  // Never seen, just guessing
     SR_PLACE_OF_INTEREST_CATEGORY_LIST = 0x08,
     SR_PLACE_OF_INTEREST_ADDRESS = 0x09,
@@ -1470,8 +1470,8 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
                 bool rdsSelected = data[7] & 0x01;
                 bool taSelected = data[7] & 0x02;
                 bool regional = data[7] & 0x04;  // Long-press "RDS" button
-                bool rdsAvailable = data[7] & 0x20;
-                bool taAvailable = data[7] & 0x40;
+                bool rdsNotAvailable = (data[7] & 0x20) == 0;
+                bool taNotAvailable = (data[7] & 0x40) == 0;
                 bool taAnnounce = data[7] & 0x80;
 
                 // data[8] and data[9]: PI code
@@ -1520,9 +1520,9 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
                     "\"pi_area_coverage\": \"%S\",\n"
                     "\"regional\": \"%S\",\n"
                     "\"ta_selected\": \"%S\",\n"
-                    "\"ta_available\": \"%S\",\n"
+                    "\"ta_not_available\": \"%S\",\n"
                     "\"rds_selected\": \"%S\",\n"
-                    "\"rds_available\": \"%S\",\n"
+                    "\"rds_not_available\": \"%S\",\n"
                     "\"rds_text\": \"%s\",\n"
                     "\"info_trafic\": \"%S\"";
 
@@ -1542,9 +1542,9 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
 
                         regional ? onStr : offStr,
                         taSelected ? yesStr : noStr,
-                        taAvailable ? yesStr : noStr,
+                        taNotAvailable ? yesStr : noStr,
                         rdsSelected ? yesStr : noStr,
-                        rdsAvailable ? yesStr : noStr,
+                        rdsNotAvailable ? yesStr : noStr,
                         rdsTxt,
 
                         taAnnounce ? yesStr : noStr
@@ -2597,7 +2597,7 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
     int dataLen = pkt.DataLen();
     if (dataLen < 3) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
-    // Each report can be built out of multiple VAN bus packets, so we keep a static buffer of the strings we've
+    // Each report is a sequence of one or more VAN bus packets, so we keep a static buffer of the strings we've
     // read thus far.
     // TODO - This is pretty heavy on RAM. Use some kind of linked list, e.g. from
     //   ESPAsyncWebServer-master\src\StringArray.h .
@@ -2614,13 +2614,14 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
 
     const uint8_t* data = pkt.Data();
 
-    uint8_t request = data[1];
+    static uint8_t request;
 
     int offsetInPacket = 1;
     if ((data[0] & 0x7F) <= 7)
     {
         // First packet of a report sequence
 
+        request = data[1];
         offsetInPacket = 2;
         currentRecord = 0;
         currentString = 0;
@@ -2800,7 +2801,7 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
                 // Address of the place of interest
 
                 // Street
-                records[0][5].c_str() + 1,  // Skip the fixed first letter 'G' or 'I'
+                records[0][5].c_str() + 1,  // Skip the fixed first letter ('G' or 'I')
                 records[0][6].c_str(),
 
                 // City - District (optional)

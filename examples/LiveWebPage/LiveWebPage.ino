@@ -55,10 +55,6 @@ int RX_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
 ESP8266WebServer webServer;
 WebSocketsServer webSocket = WebSocketsServer(81);
 
-// TODO - use AP mode?
-char* ssid = "MyCar"; // Choose yours
-char* password = "MyCar"; // Fill in yours
-
 char webpage[] PROGMEM = R"=====(
 <!DOCTYPE html>
 <html lang='en'>
@@ -395,8 +391,8 @@ char webpage[] PROGMEM = R"=====(
       <p>PI country: <b id="pi_country">---</b></p>
       <p>PI area coverage: <b id="pi_area_coverage">---</b></p>
       <p>Regional: <b id="regional">---</b></p>
-      <p>TA available: <b id="ta_available">---</b></p>
-      <p>RDS available: <b id="rds_available">---</b></p>
+      <p>TA not available: <b id="ta_not_available">---</b></p>
+      <p>RDS not available: <b id="rds_not_available">---</b></p>
       <p>TA: <b id="ta_selected">---</b></p>
       <p>RDS: <b id="rds_selected">---</b></p>
       <p>RDS Text: <b id="rds_text">---</b></p>
@@ -718,10 +714,8 @@ char webpage[] PROGMEM = R"=====(
 </html>
 )=====";
 
-const char* getHostname()
-{
-    return "Car";
-} // getHostname
+// Defined in Wifi.ino
+void setupWifi();
 
 void setup()
 {
@@ -729,18 +723,7 @@ void setup()
     Serial.begin(115200);
     Serial.println(F("Starting VAN bus live web page server"));
 
-    Serial.printf_P(PSTR("Connecting to Wifi SSID '%s' "), ssid);
-
-    // TODO - move to after WiFi.status() == WL_CONNECTED ?
-    WiFi.hostname(getHostname());
-
-    WiFi.begin(ssid,password);
-    while (WiFi.status() != WL_CONNECTED)
-    {
-        Serial.print(".");
-        delay(500);
-    }
-    Serial.println(F(" OK"));
+    setupWifi();
 
     webServer.on("/",[](){
         webServer.send_P(200, "text/html", webpage);  
