@@ -322,8 +322,6 @@ void ICACHE_RAM_ATTR WaitAckIsr()
     VanBusRx._AdvanceHead();
 } // WaitAckIsr
 
-//#define VAN_RX_ISR_DEBUGGING
-
 // Pin level change interrupt handler
 void ICACHE_RAM_ATTR RxPinChangeIsr()
 {
@@ -556,11 +554,10 @@ void TVanPacketRxQueue::Setup(uint8_t rxPin)
     timer1_disable();
 } // TVanPacketRxQueue::Setup
 
+#ifdef VAN_RX_ISR_DEBUGGING
+
 void TIsrDebugPacket::Dump(Stream& s) const
 {
-#ifndef VAN_RX_ISR_DEBUGGING
-    s.println(F("No ISR debug data; please re-compile with VAN_RX_ISR_DEBUGGING defined"));
-#else
     // Parse packet outside ISR
 
     unsigned int atBit = 0;
@@ -757,7 +754,8 @@ void TIsrDebugPacket::Dump(Stream& s) const
     } // while
 
     #undef reset()
-#endif // VAN_RX_ISR_DEBUGGING
 } // TIsrDebugPacket::Dump
+
+#endif // VAN_RX_ISR_DEBUGGING
 
 TVanPacketRxQueue VanBusRx;

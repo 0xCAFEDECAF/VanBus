@@ -28,6 +28,8 @@
 
 #include <Arduino.h>
 
+//#define VAN_RX_ISR_DEBUGGING
+
 // VAN_BIT_DOMINANT, VAN_BIT_RECESSIVE: pick the logic
 
 // MCP2551 CAN_H pin connected to VAN_DATA, CAN_L connected to VAN_DATA_BAR
@@ -60,6 +62,8 @@ char* FloatToStr(char* buffer, float f, int prec = 1);
 
 uint16_t _crc(const uint8_t bytes[], int size);
 
+#ifdef VAN_RX_ISR_DEBUGGING
+
 // ISR invocation data, for debugging purposes
 
 // In theory, there can be 33 * 8 = 264 ISR invocations, but in practice 128 is enough for the vast majority of cases
@@ -90,6 +94,8 @@ class TIsrDebugPacket
     friend void RxPinChangeIsr();
     friend class TVanPacketRxDesc;
 }; // TIsrDebugPacket
+
+#endif // VAN_RX_ISR_DEBUGGING
 
 enum PacketReadState_t { VAN_RX_VACANT, VAN_RX_SEARCHING, VAN_RX_LOADING, VAN_RX_WAITING_ACK, VAN_RX_DONE };
 enum PacketReadResult_t { VAN_RX_PACKET_OK, VAN_RX_ERROR_NBITS, VAN_RX_ERROR_MANCHESTER, VAN_RX_ERROR_MAX_PACKET };
@@ -130,7 +136,9 @@ class TVanPacketRxDesc
     // + 1 for terminating '\0'
     #define VAN_MAX_DUMP_RAW_SIZE (38 + VAN_MAX_DATA_BYTES * 3 + 45 + 1)
 
+#ifdef VAN_RX_ISR_DEBUGGING
     const TIsrDebugPacket& getIsrDebugPacket() const { return isrDebugPacket; }
+#endif // VAN_RX_ISR_DEBUGGING
 
     // String representation of various fields.
     // Notes:
@@ -164,7 +172,11 @@ class TVanPacketRxDesc
     PacketReadState_t state;
     PacketReadResult_t result;
     PacketAck_t ack;
+
+#ifdef VAN_RX_ISR_DEBUGGING
     TIsrDebugPacket isrDebugPacket;  // For debugging of packet reception inside ISR
+#endif // VAN_RX_ISR_DEBUGGING
+
     uint32_t seqNo;
     uint8_t slot;  // in RxQueue
 
@@ -174,7 +186,9 @@ class TVanPacketRxDesc
         state = VAN_RX_VACANT;
         result = VAN_RX_PACKET_OK; // TODO - not necessary
         ack = VAN_NO_ACK; // TODO - not necessary
+#ifdef VAN_RX_ISR_DEBUGGING
         isrDebugPacket.Init();
+#endif // VAN_RX_ISR_DEBUGGING
     } // Init
 
     friend void RxPinChangeIsr();
