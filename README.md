@@ -277,7 +277,7 @@ Returns the RESULT field of the VAN packet as a string, either "OK" or a string 
 
 ## ⚠️ Limitations, Caveats
 
-The library times the incoming bits using an interrupt service routine (ISR) that triggers on pin "change" events (see the internal function ```PinChangeIsr``` in [VanBusRx.cpp](https://github.com/0xCAFEDECAF/VanBus/blob/master/VanBusRx.cpp#L326)). It seems that the invocation of the ISR is often quite late (or maybe the bits are wobbly on the line already).
+The library times the incoming bits using an interrupt service routine (ISR) that triggers on pin "change" events (see the internal function ```RxPinChangeIsr``` in [VanBusRx.cpp](https://github.com/0xCAFEDECAF/VanBus/blob/master/VanBusRx.cpp#L326)). It seems that the invocation of the ISR is often quite late (or maybe the bits are wobbly on the line already).
 
 I had to do a bit of tweaking to be able to reconstruct the real bits from the number of CPU cycles that have elapsed between the ISR invocations. Still, not all packets are received error-free. Even after trying to "repair" a packet (see function [```bool CheckCrcAndRepair()```](#CheckCrcAndRepair)), the long-term average packet loss is around 0.01% ... 0.015% (between 1 in 10,000 and 1 in 6,666), which is ok(-ish). I am investigating how to improve on this.
 
