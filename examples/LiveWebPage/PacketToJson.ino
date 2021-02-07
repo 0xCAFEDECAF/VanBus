@@ -10,7 +10,7 @@
 
 // Uncomment to see the JSON buffers printed on the Serial port.
 // Note: printing the JSON buffers takes pretty long, so it leads to more Rx queue overruns.
-#define PRINT_JSON_BUFFERS_ON_SERIAL
+//#define PRINT_JSON_BUFFERS_ON_SERIAL
 
 #define JSON_BUFFER_SIZE 2048
 char jsonBuffer[JSON_BUFFER_SIZE];
@@ -543,7 +543,7 @@ VanPacketParseResult_t ParseEnginePkt(const char* idenStr, TVanPacketRxDesc& pkt
         (data[1] & 0x03) == 0x00 ? offStr :
         (data[1] & 0x03) == 0x01 ? PSTR("ACC") :
         (data[1] & 0x03) == 0x03 ? onStr :
-        (data[1] & 0x03) == 0x02 ? PSTR("START_ENGINE") :
+        (data[1] & 0x03) == 0x02 ? PSTR("START") :
         ToHexStr((uint8_t)(data[1] & 0x03)),
 
         data[1] & 0x04 ? PSTR("RUNNING") : offStr,
@@ -3114,7 +3114,7 @@ VanPacketParseResult_t ParseOdometerPkt(const char* idenStr, TVanPacketRxDesc& p
         "\"event\": \"display\",\n"
         "\"data\":\n"
         "{\n"
-            "\"odometer_2\": \"%lu\"\n"
+            "\"odometer_2\": \"%s\"\n"
         "}\n"
     "}\n";
 
