@@ -32,7 +32,8 @@
  * In order to compile this sketch, you need to additionally install the following libraries:
  * (Arduino IDE --> Menu 'Sketch' --> 'Include Library' --> 'Manage Libraries...')
  *
- * - "WebSockets" by Markus Sattler (tested with version 2.2.0)
+ * - "WebSockets" by Markus Sattler (https://github.com/Links2004/arduinoWebSockets) 
+ *   --> Tested with version 2.2.0 and 2.3.3 .
  *
  * The web site itself, as served by this sketch, uses jQuery, which it downloads from:
  * https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js
@@ -726,7 +727,9 @@ void setup()
     setupWifi();
 
     webServer.on("/",[](){
+        unsigned long start = millis();
         webServer.send_P(200, "text/html", webpage);  
+        Serial.printf_P(PSTR("Sending HTML took: %lu msec\n"), millis() - start);
     });
     webServer.begin();
     webSocket.begin();
@@ -751,7 +754,12 @@ void loop()
     if (VanBusRx.Receive(pkt, &isQueueOverrun))
     {
         const char* json = ParseVanPacketToJson(pkt);
-        if (strlen(json) > 0) webSocket.broadcastTXT(json);
+        if (strlen(json) > 0)
+        {
+            unsigned long start = millis();
+            webSocket.broadcastTXT(json);
+            Serial.printf_P(PSTR("Sending JSON via 'webSocket.broadcastTXT' took: %lu msec\n"), millis() - start);
+        } // if
     } // if
 
     if (isQueueOverrun) Serial.print(F("QUEUE OVERRUN!\n"));
