@@ -5,12 +5,12 @@
  *
  * Version 0.0.2 - December, 2020
  *
- * MIT license, all text above must be included in any redistribution.   
+ * MIT license, all text above must be included in any redistribution.
  */
 
 // Uncomment to see the JSON buffers printed on the Serial port.
 // Note: printing the JSON buffers takes pretty long, so it leads to more Rx queue overruns.
-//#define PRINT_JSON_BUFFERS_ON_SERIAL
+#define PRINT_JSON_BUFFERS_ON_SERIAL
 
 #define JSON_BUFFER_SIZE 2048
 char jsonBuffer[JSON_BUFFER_SIZE];
@@ -44,6 +44,8 @@ static const char PROGMEM onStr[] = "ON";
 static const char PROGMEM offStr[] = "OFF";
 static const char PROGMEM yesStr[] = "YES";
 static const char PROGMEM noStr[] = "NO";
+static const char PROGMEM openStr[] = "OPEN";
+static const char PROGMEM closedStr[] = "CLOSED";
 static const char PROGMEM presentStr[] = "PRESENT";
 static const char PROGMEM notPresentStr[] = "NOT_PRESENT";
 static const char PROGMEM styleDisplayBlockStr[] = "block";  // To set 'style="display:block;"' in HTML
@@ -59,7 +61,7 @@ inline uint8_t GetBcd(uint8_t bcd)
     return (bcd >> 4 & 0x0F) * 10 + (bcd & 0x0F);
 } // GetBcd
 
-// Uses statically allocated buffer, so don't call twice within the same printf invocation 
+// Uses statically allocated buffer, so don't call twice within the same printf invocation
 char* ToHexStr(uint8_t data)
 {
     #define MAX_UINT8_HEX_STR_SIZE 5
@@ -69,7 +71,7 @@ char* ToHexStr(uint8_t data)
     return buffer;
 } // ToHexStr
 
-// Uses statically allocated buffer, so don't call twice within the same printf invocation 
+// Uses statically allocated buffer, so don't call twice within the same printf invocation
 char* ToHexStr(uint8_t data1, uint8_t data2)
 {
     #define MAX_2_UINT8_HEX_STR_SIZE 10
@@ -79,7 +81,7 @@ char* ToHexStr(uint8_t data1, uint8_t data2)
     return buffer;
 } // ToHexStr
 
-// Uses statically allocated buffer, so don't call twice within the same printf invocation 
+// Uses statically allocated buffer, so don't call twice within the same printf invocation
 char* ToHexStr(uint16_t data)
 {
     #define MAX_UINT16_HEX_STR_SIZE 7
@@ -122,10 +124,10 @@ const char* TunerBandStr(uint8_t data)
 //  0  0  0 : Not searching
 //  0  0  1 : Manual tuning
 //  0  1  0 : Searching by frequency
-//  0  1  1 : 
+//  0  1  1 :
 //  1  0  0 : Searching for station with matching PTY
-//  1  0  1 : 
-//  1  1  0 : 
+//  1  0  1 :
+//  1  1  0 :
 //  1  1  1 : Auto-station search in the FMAST band (long-press "Radio Band" button)
 enum TunerSearchMode_t
 {
@@ -282,7 +284,7 @@ const char* RadioPiCountry(uint8_t countryCode)
     // See also:
     // - http://poupa.cz/rds/countrycodes.htm
     // - https://radio-tv-nederland.nl/rds/PI%20codes%20Europe.jpg
-    // More than one country is assigned to the same code, just listing the most likely.
+    // Note: more than one country is assigned to the same code, just listing the most likely.
     return
         countryCode == 0x01 || countryCode == 0x0D ? PSTR("DE") :  // Germany
         countryCode == 0x02 ? PSTR("IE") :  // Ireland
@@ -335,8 +337,8 @@ enum SatNavRequest_t
     SR_PLACE_OF_INTEREST_CATEGORY_LIST = 0x08,
     SR_PLACE_OF_INTEREST_ADDRESS = 0x09,
     SR_GPS_FOR_PLACE_OF_INTEREST = 0x0E,  // Or: current address?
-    SR_NEXT_STREET = 0x0F,  // Shown during navigation in the (solid line) top box
-    SR_CURRENT_STREET = 0x10,  // Shown during navigation in the (dashed line) bottom box
+    SR_NEXT_STREET = 0x0F,  // Shown during SatNav guidance in the (solid line) top box
+    SR_CURRENT_STREET = 0x10,  // Shown during SatNav guidance in the (dashed line) bottom box
     SR_PRIVATE_ADDRESS = 0x11,
     SR_BUSINESS_ADDRESS = 0x12,
     SR_SOFTWARE_MODULE_VERSIONS = 0x13,
@@ -349,25 +351,25 @@ enum SatNavRequest_t
 const char* SatNavRequestStr(uint8_t data)
 {
     return
-        data == SR_ENTER_COUNTRY ? PSTR("ENTER_COUNTRY") :
-        data == SR_ENTER_PROVINCE ? PSTR("ENTER_PROVINCE") :
-        data == SR_ENTER_CITY ? PSTR("ENTER_CITY") :
-        data == SR_ENTER_DISTRICT ? PSTR("ENTER_DISTRICT") :
-        data == SR_ENTER_NEIGHBORHOOD ? PSTR("ENTER_NEIGHBORHOOD") :
-        data == SR_ENTER_STREET ? PSTR("ENTER_STREET") :
-        data == SR_ENTER_HOUSE_NUMBER ? PSTR("ENTER_HOUSE_NUMBER") :
-        data == SR_ENTER_HOUSE_NUMBER_LETTER ? PSTR("ENTER_HOUSE_NUMBER_LETTER") :
-        data == SR_PLACE_OF_INTEREST_CATEGORY_LIST ? PSTR("PLACE_OF_INTEREST_CATEGORY_LIST") :
-        data == SR_PLACE_OF_INTEREST_ADDRESS ? PSTR("PLACE_OF_INTEREST_ADDRESS") :
-        data == SR_GPS_FOR_PLACE_OF_INTEREST ? PSTR("GPS_FOR_PLACE_OF_INTEREST") :
-        data == SR_NEXT_STREET ? PSTR("NEXT_STREET") :
-        data == SR_CURRENT_STREET ? PSTR("CURRENT_STREET") :
-        data == SR_PRIVATE_ADDRESS ? PSTR("PRIVATE_ADDRESS") :
-        data == SR_BUSINESS_ADDRESS ? PSTR("BUSINESS_ADDRESS") :
-        data == SR_SOFTWARE_MODULE_VERSIONS ? PSTR("SOFTWARE_MODULE_VERSIONS") :
-        data == SR_PRIVATE_ADDRESS_LIST ? PSTR("PRIVATE_ADDRESS_LIST") :
-        data == SR_BUSINESS_ADDRESS_LIST ? PSTR("BUSINESS_ADDRESS_LIST") :
-        data == SR_GPS_CHOOSE_DESTINATION ? PSTR("GPS_CHOOSE_DESTINATION") :
+        data == SR_ENTER_COUNTRY ? PSTR("Enter country:") :
+        data == SR_ENTER_PROVINCE ? PSTR("Enter province:") :
+        data == SR_ENTER_CITY ? PSTR("Enter city:") :
+        data == SR_ENTER_DISTRICT ? PSTR("Enter district:") :
+        data == SR_ENTER_NEIGHBORHOOD ? PSTR("Enter neighborhood:") :
+        data == SR_ENTER_STREET ? PSTR("Enter street:") :
+        data == SR_ENTER_HOUSE_NUMBER ? PSTR("Enter house number:") :
+        data == SR_ENTER_HOUSE_NUMBER_LETTER ? PSTR("Enter house number letter:") :
+        data == SR_PLACE_OF_INTEREST_CATEGORY_LIST ? PSTR("Place of interest categories:") :
+        data == SR_PLACE_OF_INTEREST_ADDRESS ? PSTR("Place of interest address:") :
+        data == SR_GPS_FOR_PLACE_OF_INTEREST ? PSTR("GPS for place of interest:") :
+        data == SR_NEXT_STREET ? PSTR("Next street:") :
+        data == SR_CURRENT_STREET ? PSTR("Current street:") :
+        data == SR_PRIVATE_ADDRESS ? PSTR("Private address:") :
+        data == SR_BUSINESS_ADDRESS ? PSTR("Business address:") :
+        data == SR_SOFTWARE_MODULE_VERSIONS ? PSTR("Software module versions:") :
+        data == SR_PRIVATE_ADDRESS_LIST ? PSTR("Private address list:") :
+        data == SR_BUSINESS_ADDRESS_LIST ? PSTR("Business address list:") :
+        data == SR_GPS_CHOOSE_DESTINATION ? PSTR("Current destination:") :
         ToHexStr(data);
 } // SatNavRequestStr
 
@@ -399,7 +401,7 @@ void GuidanceInstructionIconJson(const char* iconName, const uint8_t data[8], ch
                 iconName,
                 degrees10 / 10,
                 degrees10 % 10,
-                legBits & 1 >> legBit ? onStr : offStr 
+                legBits & 1 >> legBit ? onStr : offStr
             );
     } // for
 
@@ -445,7 +447,9 @@ void GuidanceInstructionIconJson(const char* iconName, const uint8_t data[8], ch
 } // GuidanceInstructionIconJson
 
 #if 0
+
 #include <PrintEx.h>
+
 const char* PacketRawToStr(TVanPacketRxDesc& pkt)
 {
     static char dumpBuffer[MAX_DUMP_RAW_SIZE];
@@ -477,6 +481,7 @@ VanPacketParseResult_t DefaultPacketParser(const char* idenStr, TVanPacketRxDesc
 
     return VAN_PACKET_PARSE_OK;
 } // DefaultPacketParser
+
 #endif
 
 VanPacketParseResult_t ParseVinPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, int n)
@@ -517,7 +522,7 @@ VanPacketParseResult_t ParseEnginePkt(const char* idenStr, TVanPacketRxDesc& pkt
             "\"dash_light\": \"%S\",\n"
             "\"dash_actual_brightness\": \"%u\",\n"
             "\"contact_key_position\": \"%S\",\n"
-            "\"engine\": \"%S\",\n"
+            "\"engine_running\": \"%S\",\n"
             "\"economy_mode\": \"%S\",\n"
             "\"in_reverse\": \"%S\",\n"
             "\"trailer\": \"%S\",\n"
@@ -546,7 +551,7 @@ VanPacketParseResult_t ParseEnginePkt(const char* idenStr, TVanPacketRxDesc& pkt
         (data[1] & 0x03) == 0x02 ? PSTR("START") :
         ToHexStr((uint8_t)(data[1] & 0x03)),
 
-        data[1] & 0x04 ? PSTR("RUNNING") : offStr,
+        data[1] & 0x04 ? yesStr : noStr,
         data[1] & 0x10 ? onStr : offStr,
         data[1] & 0x20 ? yesStr : noStr,
         data[1] & 0x40 ? presentStr : notPresentStr,
@@ -810,12 +815,12 @@ VanPacketParseResult_t ParseDeviceReportPkt(const char* idenStr, TVanPacketRxDes
                 snprintf_P(buf + at, n - at,
                     PSTR(",\n\"head_unit_button_pressed\": \"%S%S\""),
 
-                    (data[2] & 0x1F) == 0x01 ? PSTR("'1'") :
-                    (data[2] & 0x1F) == 0x02 ? PSTR("'2'") :
-                    (data[2] & 0x1F) == 0x03 ? PSTR("'3'") :
-                    (data[2] & 0x1F) == 0x04 ? PSTR("'4'") :
-                    (data[2] & 0x1F) == 0x05 ? PSTR("'5'") :
-                    (data[2] & 0x1F) == 0x06 ? PSTR("'6'") :
+                    (data[2] & 0x1F) == 0x01 ? PSTR("1") :
+                    (data[2] & 0x1F) == 0x02 ? PSTR("2") :
+                    (data[2] & 0x1F) == 0x03 ? PSTR("3") :
+                    (data[2] & 0x1F) == 0x04 ? PSTR("4") :
+                    (data[2] & 0x1F) == 0x05 ? PSTR("5") :
+                    (data[2] & 0x1F) == 0x06 ? PSTR("6") :
                     (data[2] & 0x1F) == 0x11 ? PSTR("AUDIO_DOWN") :
                     (data[2] & 0x1F) == 0x12 ? PSTR("AUDIO_UP") :
                     (data[2] & 0x1F) == 0x13 ? PSTR("SEEK_BACKWARD") :
@@ -833,22 +838,6 @@ VanPacketParseResult_t ParseDeviceReportPkt(const char* idenStr, TVanPacketRxDes
                     data[2] & 0x80 ? PSTR(" (repeat)") :
                     emptyStr
                 );
-
-            // TODO - remove; just for experimenting
-
-            const static char jsonFormatter[] PROGMEM =
-            ",\n"
-            "\"satnav_curr_heading\":\n"
-            "{\n"
-                "\"style\":\n"
-                "{\n"
-                    "\"transform\": \"rotate(%udeg)\"\n"
-                "}\n"
-            "}";
-
-            at += at >= JSON_BUFFER_SIZE ? 0 :
-                snprintf_P(buf + at, n - at, jsonFormatter, (data[2] & 0x1F) * 22);
-
         } // if
 
         at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}\n"));
@@ -911,7 +900,11 @@ VanPacketParseResult_t ParseCarStatus1Pkt(const char* idenStr, TVanPacketRxDesc&
         "\"event\": \"display\",\n"
         "\"data\":\n"
         "{\n"
-            "\"doors\": \"%S%S%S%S%S\",\n"
+            "\"door_front_right\": \"%S\",\n"
+            "\"door_front_left\": \"%S\",\n"
+            "\"door_rear_right\": \"%S\",\n"
+            "\"door_rear_left\": \"%S\",\n"
+            "\"door_boot\": \"%S\",\n"
             "\"right_stalk_button\": \"%S\",\n"
             "\"avg_speed_1\": \"%u\",\n"
             "\"avg_speed_2\": \"%u\",\n"
@@ -931,11 +924,11 @@ VanPacketParseResult_t ParseCarStatus1Pkt(const char* idenStr, TVanPacketRxDesc&
 
     char floatBuf[3][MAX_FLOAT_SIZE];
     int at = snprintf_P(buf, n, jsonFormatter,
-        data[7] & 0x80 ? PSTR("FRONT_RIGHT ") : emptyStr,
-        data[7] & 0x40 ? PSTR("FRONT_LEFT ") : emptyStr,
-        data[7] & 0x20 ? PSTR("REAR_RIGHT ") : emptyStr,
-        data[7] & 0x10 ? PSTR("REAR_LEFT ") : emptyStr,
-        data[7] & 0x08 ? PSTR("BOOT ") : emptyStr,
+        data[7] & 0x80 ? openStr : closedStr,
+        data[7] & 0x40 ? openStr : closedStr,
+        data[7] & 0x20 ? openStr : closedStr,
+        data[7] & 0x10 ? openStr : closedStr,
+        data[7] & 0x08 ? openStr : closedStr,
         data[10] & 0x01 ? PSTR("PRESSED") : PSTR("RELEASED"),
         data[11],
         data[12],
@@ -978,165 +971,166 @@ VanPacketParseResult_t ParseCarStatus2Pkt(const char* idenStr, TVanPacketRxDesc&
     int dataLen = pkt.DataLen();
     if (dataLen != 14 && dataLen != 16) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
-    // PROGMEM array of PROGMEM strings
-    // See also: https://arduino-esp8266.readthedocs.io/en/latest/PROGMEM.html
-
+    // All known notifications.
+    // By convention, the first two bytes are either "! " for warnings or "i " (or just "  ") for information.
     // TODO - translate into all languages
 
     // Byte 0
-    static const char msg_0_0[] PROGMEM = "Tyre pressure low";
-    static const char msg_0_1[] PROGMEM = "Door open";
-    static const char msg_0_2[] PROGMEM = "Auto gearbox temperature too high";
-    static const char msg_0_3[] PROGMEM = "Brake system fault"; // and exclamation mark on instrument cluster
-    static const char msg_0_4[] PROGMEM = "Hydraulic suspension fault";
-    static const char msg_0_5[] PROGMEM = "Suspension fault";
-    static const char msg_0_6[] PROGMEM = "Engine oil temperature too high"; // and oil can on instrument cluster
-    static const char msg_0_7[] PROGMEM = "Water temperature too high";
+    static const char msg_0_0[] PROGMEM = "! Tyre pressure low";
+    static const char msg_0_1[] PROGMEM = "  Door open";
+    static const char msg_0_2[] PROGMEM = "! Auto gearbox temperature too high";
+    static const char msg_0_3[] PROGMEM = "! Brake system fault"; // and exclamation mark on instrument cluster
+    static const char msg_0_4[] PROGMEM = "! Hydraulic suspension fault";
+    static const char msg_0_5[] PROGMEM = "! Suspension fault";
+    static const char msg_0_6[] PROGMEM = "! Engine oil temperature too high"; // and oil can on instrument cluster
+    static const char msg_0_7[] PROGMEM = "! Water temperature too high";
 
     // Byte 1
-    static const char msg_1_0[] PROGMEM = "Unblock diesel filter"; // and mil icon on instrument cluster
-    static const char msg_1_1[] PROGMEM = "Stop car icon";
-    static const char msg_1_2[] PROGMEM = "Diesel additive too low";
-    static const char msg_1_3[] PROGMEM = "Fuel cap open";
-    static const char msg_1_4[] PROGMEM = "Tyres punctured";
-    static const char msg_1_5[] PROGMEM = "Coolant level low"; // and icon on instrument cluster
-    static const char msg_1_6[] PROGMEM = "Oil pressure too low";
-    static const char msg_1_7[] PROGMEM = "Oil level too low";
+    static const char msg_1_0[] PROGMEM = "  Unblock diesel filter"; // and mil icon on instrument cluster
+    static const char msg_1_1[] PROGMEM = "! Stop car icon";
+    static const char msg_1_2[] PROGMEM = "! Diesel additive too low";
+    static const char msg_1_3[] PROGMEM = "! Fuel cap open";
+    static const char msg_1_4[] PROGMEM = "! Tyres punctured";
+    static const char msg_1_5[] PROGMEM = "! Coolant level low"; // and icon on instrument cluster
+    static const char msg_1_6[] PROGMEM = "! Oil pressure too low";
+    static const char msg_1_7[] PROGMEM = "! Oil level too low";
 
     // Byte 2
-    static const char msg_2_0[] PROGMEM = "Noooo.... the famous \"Antipollution fault\" :-(";
-    static const char msg_2_1[] PROGMEM = "Brake pads worn";
-    static const char msg_2_2[] PROGMEM = "Diagnosis ok";
-    static const char msg_2_3[] PROGMEM = "Auto gearbox faulty";
-    static const char msg_2_4[] PROGMEM = "ESP"; // and icon on instrument cluster
-    static const char msg_2_5[] PROGMEM = "ABS";
-    static const char msg_2_6[] PROGMEM = "Suspension or steering fault";
-    static const char msg_2_7[] PROGMEM = "Braking system faulty";
+    static const char msg_2_0[] PROGMEM = "! Antipollution fault";
+    static const char msg_2_1[] PROGMEM = "! Brake pads worn";
+    static const char msg_2_2[] PROGMEM = "  Diagnosis ok";
+    static const char msg_2_3[] PROGMEM = "! Auto gearbox faulty";
+    static const char msg_2_4[] PROGMEM = "! ESP"; // and icon on instrument cluster
+    static const char msg_2_5[] PROGMEM = "! ABS";
+    static const char msg_2_6[] PROGMEM = "! Suspension or steering fault";
+    static const char msg_2_7[] PROGMEM = "! Braking system faulty";
 
     // Byte 3
-    static const char msg_3_0[] PROGMEM = "Side airbag faulty";
-    static const char msg_3_1[] PROGMEM = "Airbags faulty";
-    static const char msg_3_2[] PROGMEM = "Cruise control faulty";
-    static const char msg_3_3[] PROGMEM = "Engine temperature too high";
-    static const char msg_3_4[] PROGMEM = "Fault: Load shedding in progress"; // RT3 mono
-    static const char msg_3_5[] PROGMEM = "Ambient brightness sensor fault";
-    static const char msg_3_6[] PROGMEM = "Rain sensor fault";
-    static const char msg_3_7[] PROGMEM = "Water in diesel fuel filter"; // and icon on instrument cluster
+    static const char msg_3_0[] PROGMEM = "! Side airbag faulty";
+    static const char msg_3_1[] PROGMEM = "! Airbags faulty";
+    static const char msg_3_2[] PROGMEM = "! Cruise control faulty";
+    static const char msg_3_3[] PROGMEM = "! Engine temperature too high";
+    static const char msg_3_4[] PROGMEM = "! Fault: Load shedding in progress"; // RT3 mono
+    static const char msg_3_5[] PROGMEM = "! Ambient brightness sensor fault";
+    static const char msg_3_6[] PROGMEM = "! Rain sensor fault";
+    static const char msg_3_7[] PROGMEM = "  Water in diesel fuel filter"; // and icon on instrument cluster
 
     // Byte 4
-    static const char msg_4_0[] PROGMEM = "Left rear sliding door faulty";
-    static const char msg_4_1[] PROGMEM = "Headlight corrector fault";
-    static const char msg_4_2[] PROGMEM = "Right rear sliding door faulty";
-    static const char msg_4_3[] PROGMEM = "No broken lamp"; // RT3 mono
-    static const char msg_4_4[] PROGMEM = "Battery low";
-    static const char msg_4_5[] PROGMEM = "Battery charge fault"; // and battery icon on instrument cluster
-    static const char msg_4_6[] PROGMEM = "Diesel particle filter faulty";
-    static const char msg_4_7[] PROGMEM = "Catalytic converter fault"; // MIL icon flashing on instrument cluster
+    static const char msg_4_0[] PROGMEM = "! Left rear sliding door faulty";
+    static const char msg_4_1[] PROGMEM = "! Headlight corrector fault";
+    static const char msg_4_2[] PROGMEM = "! Right rear sliding door faulty";
+    static const char msg_4_3[] PROGMEM = "  No broken lamp"; // RT3 mono
+    static const char msg_4_4[] PROGMEM = "! Battery low";
+    static const char msg_4_5[] PROGMEM = "! Battery charge fault"; // and battery icon on instrument cluster
+    static const char msg_4_6[] PROGMEM = "! Diesel particle filter faulty";
+    static const char msg_4_7[] PROGMEM = "! Catalytic converter fault"; // MIL icon flashing on instrument cluster
 
     // Byte 5
-    static const char msg_5_0[] PROGMEM = "Handbrake on";
-    static const char msg_5_1[] PROGMEM = "Seatbelt warning";
-    static const char msg_5_2[] PROGMEM = "Passenger airbag deactivated"; // and icon on instrument cluster
-    static const char msg_5_3[] PROGMEM = "Screen washer liquid level too low";
-    static const char msg_5_4[] PROGMEM = "Current speed too high";
-    static const char msg_5_5[] PROGMEM = "Ignition key left in";
-    static const char msg_5_6[] PROGMEM = "Sidelights left on";
-    static const char msg_5_7[] PROGMEM = "Hill holder active"; // On RT3 mono: Driver's seatbelt not fastened
+    static const char msg_5_0[] PROGMEM = "! Handbrake on";
+    static const char msg_5_1[] PROGMEM = "! Seatbelt warning";
+    static const char msg_5_2[] PROGMEM = "  Passenger airbag deactivated"; // and icon on instrument cluster
+    static const char msg_5_3[] PROGMEM = "  Screen washer liquid level too low";
+    static const char msg_5_4[] PROGMEM = "  Current speed too high";
+    static const char msg_5_5[] PROGMEM = "  Ignition key left in";
+    static const char msg_5_6[] PROGMEM = "  Sidelights left on";
+    static const char msg_5_7[] PROGMEM = "  Hill holder active"; // On RT3 mono: Driver's seatbelt not fastened
 
     // Byte 6
-    static const char msg_6_0[] PROGMEM = "Shock sensor faulty";
-    static const char msg_6_1[] PROGMEM = "Seatbelt warning"; // not sure; there is no message with 0x31 so could not check
-    static const char msg_6_2[] PROGMEM = "Check and re-init tyre pressure";
-    static const char msg_6_3[] PROGMEM = "Remote control battery low";
-    static const char msg_6_4[] PROGMEM = "Left stick button pressed";
-    static const char msg_6_5[] PROGMEM = "Put automatic gearbox in P position";
-    static const char msg_6_6[] PROGMEM = "Stop lights test: brake gently";
-    static const char msg_6_7[] PROGMEM = "Fuel level low";
+    static const char msg_6_0[] PROGMEM = "  Shock sensor faulty";
+    static const char msg_6_1[] PROGMEM = "  Seatbelt warning"; // not sure; there is no message with 0x31 so could not check
+    static const char msg_6_2[] PROGMEM = "  Check and re-init tyre pressure";
+    static const char msg_6_3[] PROGMEM = "  Remote control battery low";
+    static const char msg_6_4[] PROGMEM = "  Left stick button pressed";
+    static const char msg_6_5[] PROGMEM = "  Put automatic gearbox in P position";
+    static const char msg_6_6[] PROGMEM = "  Stop lights test: brake gently";
+    static const char msg_6_7[] PROGMEM = "! Fuel level low";
 
     // Byte 7
-    static const char msg_7_0[] PROGMEM = "Automatic headlamp lighting deactivated";
-    static const char msg_7_1[] PROGMEM = "Rear LH passenger seatbelt not fastened";
-    static const char msg_7_2[] PROGMEM = "Rear RH passenger seatbelt not fastened";
-    static const char msg_7_3[] PROGMEM = "Front passenger seatbelt not fastened";
-    static const char msg_7_4[] PROGMEM = "Driving school pedals indication";
-    static const char msg_7_5[] PROGMEM = "Tyre pressure monitor sensors X missing";
-    static const char msg_7_6[] PROGMEM = "Tyre pressure monitor sensors Y missing";
-    static const char msg_7_7[] PROGMEM = "Tyre pressure monitor sensors Z missing";
+    static const char msg_7_0[] PROGMEM = "  Automatic headlamp lighting deactivated";
+    static const char msg_7_1[] PROGMEM = "  Rear LH passenger seatbelt not fastened";
+    static const char msg_7_2[] PROGMEM = "  Rear RH passenger seatbelt not fastened";
+    static const char msg_7_3[] PROGMEM = "  Front passenger seatbelt not fastened";
+    static const char msg_7_4[] PROGMEM = "  Driving school pedals indication";
+    static const char msg_7_5[] PROGMEM = "! Tyre pressure monitor sensors X missing";
+    static const char msg_7_6[] PROGMEM = "! Tyre pressure monitor sensors Y missing";
+    static const char msg_7_7[] PROGMEM = "! Tyre pressure monitor sensors Z missing";
 
     // Byte 8
-    static const char msg_8_0[] PROGMEM = "Doors locked";
-    static const char msg_8_1[] PROGMEM = "ESP/ASR deactivated";
-    static const char msg_8_2[] PROGMEM = "Child safety activated";
-    static const char msg_8_3[] PROGMEM = "Deadlocking active";
-    static const char msg_8_4[] PROGMEM = "Automatic lighting active";
-    static const char msg_8_5[] PROGMEM = "Automatic wiping active";
-    static const char msg_8_6[] PROGMEM = "Engine immobiliser fault";
-    static const char msg_8_7[] PROGMEM = "Sport suspension mode active";
+    static const char msg_8_0[] PROGMEM = "  Doors locked";
+    static const char msg_8_1[] PROGMEM = "  ESP/ASR deactivated";
+    static const char msg_8_2[] PROGMEM = "  Child safety activated";
+    static const char msg_8_3[] PROGMEM = "  Deadlocking active";
+    static const char msg_8_4[] PROGMEM = "  Automatic lighting active";
+    static const char msg_8_5[] PROGMEM = "  Automatic wiping active";
+    static const char msg_8_6[] PROGMEM = "  Engine immobiliser fault";
+    static const char msg_8_7[] PROGMEM = "  Sport suspension mode active";
 
     // Byte 9 is the index of the current message
 
     // Byte 10
-    static const char msg_10_0[] PROGMEM = "Unknown";
-    static const char msg_10_1[] PROGMEM = "Unknown";
-    static const char msg_10_2[] PROGMEM = "Unknown";
-    static const char msg_10_3[] PROGMEM = "Change of fuel used in progress";
-    static const char msg_10_4[] PROGMEM = "LPG fuel refused";
-    static const char msg_10_5[] PROGMEM = "LPG system faulty";
-    static const char msg_10_6[] PROGMEM = "LPG in use";
-    static const char msg_10_7[] PROGMEM = "Min level LPG";
+    static const char msg_10_0[] PROGMEM = "  Unknown";
+    static const char msg_10_1[] PROGMEM = "  Unknown";
+    static const char msg_10_2[] PROGMEM = "  Unknown";
+    static const char msg_10_3[] PROGMEM = "  Change of fuel used in progress";
+    static const char msg_10_4[] PROGMEM = "  LPG fuel refused";
+    static const char msg_10_5[] PROGMEM = "! LPG system faulty";
+    static const char msg_10_6[] PROGMEM = "  LPG in use";
+    static const char msg_10_7[] PROGMEM = "  Min level LPG";
 
     // Byte 11
-    static const char msg_11_0[] PROGMEM = "ADIN fault";
-    static const char msg_11_1[] PROGMEM = "User stop & start";
-    static const char msg_11_2[] PROGMEM = "Stop & start available";
-    static const char msg_11_3[] PROGMEM = "Stop & start activated";
-    static const char msg_11_4[] PROGMEM = "Stop & start deactivated";
-    static const char msg_11_5[] PROGMEM = "Stop & start deferred";
-    static const char msg_11_6[] PROGMEM = "XSARA DYNALTO";
-    static const char msg_11_7[] PROGMEM = "307 DYNALTO";
+    static const char msg_11_0[] PROGMEM = "! ADIN fault";
+    static const char msg_11_1[] PROGMEM = "  User stop & start";
+    static const char msg_11_2[] PROGMEM = "  Stop & start available";
+    static const char msg_11_3[] PROGMEM = "  Stop & start activated";
+    static const char msg_11_4[] PROGMEM = "  Stop & start deactivated";
+    static const char msg_11_5[] PROGMEM = "  Stop & start deferred";
+    static const char msg_11_6[] PROGMEM = "  XSARA DYNALTO";
+    static const char msg_11_7[] PROGMEM = "  307 DYNALTO";
 
     // Byte 12
-    static const char msg_12_0[] PROGMEM = "Unknown";
-    static const char msg_12_1[] PROGMEM = "Unknown";
-    static const char msg_12_2[] PROGMEM = "Unknown";
-    static const char msg_12_3[] PROGMEM = "Unknown";
-    static const char msg_12_4[] PROGMEM = "Unknown";
-    static const char msg_12_5[] PROGMEM = "Unknown";
-    static const char msg_12_6[] PROGMEM = "Unknown";
-    static const char msg_12_7[] PROGMEM = "Change to neutral";
+    static const char msg_12_0[] PROGMEM = "  Unknown";
+    static const char msg_12_1[] PROGMEM = "  Unknown";
+    static const char msg_12_2[] PROGMEM = "  Unknown";
+    static const char msg_12_3[] PROGMEM = "  Unknown";
+    static const char msg_12_4[] PROGMEM = "  Unknown";
+    static const char msg_12_5[] PROGMEM = "  Unknown";
+    static const char msg_12_6[] PROGMEM = "  Unknown";
+    static const char msg_12_7[] PROGMEM = "  Change to neutral";
 
     // Byte 13
-    static const char msg_13_0[] PROGMEM = "Unknown";
-    static const char msg_13_1[] PROGMEM = "Unknown";
-    static const char msg_13_2[] PROGMEM = "Unknown";
-    static const char msg_13_3[] PROGMEM = "Unknown";
-    static const char msg_13_4[] PROGMEM = "Unknown";
-    static const char msg_13_5[] PROGMEM = "Unknown";
-    static const char msg_13_6[] PROGMEM = "Unknown";
-    static const char msg_13_7[] PROGMEM = "Unknown";
+    static const char msg_13_0[] PROGMEM = "  Unknown";
+    static const char msg_13_1[] PROGMEM = "  Unknown";
+    static const char msg_13_2[] PROGMEM = "  Unknown";
+    static const char msg_13_3[] PROGMEM = "  Unknown";
+    static const char msg_13_4[] PROGMEM = "  Unknown";
+    static const char msg_13_5[] PROGMEM = "  Unknown";
+    static const char msg_13_6[] PROGMEM = "  Unknown";
+    static const char msg_13_7[] PROGMEM = "  Unknown";
 
     // On vehicles made after 2004
 
     // Byte 14
-    static const char msg_14_0[] PROGMEM = "Roof operation complete";
-    static const char msg_14_1[] PROGMEM = "Operation impossible screen not in place";
-    static const char msg_14_2[] PROGMEM = "Roof mechanism not locked!";
-    static const char msg_14_3[] PROGMEM = "Operation impossible boot open";
-    static const char msg_14_4[] PROGMEM = "Operation impossible speed too high";
-    static const char msg_14_5[] PROGMEM = "Operation impossible ext temp too low";
-    static const char msg_14_6[] PROGMEM = "Roof mechanism faulty";
-    static const char msg_14_7[] PROGMEM = "Boot mechanism not locked!";
+    static const char msg_14_0[] PROGMEM = "  Roof operation complete";
+    static const char msg_14_1[] PROGMEM = "  Operation impossible screen not in place";
+    static const char msg_14_2[] PROGMEM = "! Roof mechanism not locked!";
+    static const char msg_14_3[] PROGMEM = "! Operation impossible boot open";
+    static const char msg_14_4[] PROGMEM = "! Operation impossible speed too high";
+    static const char msg_14_5[] PROGMEM = "! Operation impossible ext temp too low";
+    static const char msg_14_6[] PROGMEM = "! Roof mechanism faulty";
+    static const char msg_14_7[] PROGMEM = "! Boot mechanism not locked!";
 
     // Byte 15
-    static const char msg_15_0[] PROGMEM = "Unknown";
-    static const char msg_15_1[] PROGMEM = "Unknown";
-    static const char msg_15_2[] PROGMEM = "Unknown";
-    static const char msg_15_3[] PROGMEM = "Unknown";
-    static const char msg_15_4[] PROGMEM = "Bow fault";
-    static const char msg_15_5[] PROGMEM = "Operation impossible roof not unlocked";
-    static const char msg_15_6[] PROGMEM = "Unknown";
-    static const char msg_15_7[] PROGMEM = "Roof operation incomplete";
+    static const char msg_15_0[] PROGMEM = "  Unknown";
+    static const char msg_15_1[] PROGMEM = "  Unknown";
+    static const char msg_15_2[] PROGMEM = "  Unknown";
+    static const char msg_15_3[] PROGMEM = "  Unknown";
+    static const char msg_15_4[] PROGMEM = "! Bow fault";
+    static const char msg_15_5[] PROGMEM = "  Operation impossible roof not unlocked";
+    static const char msg_15_6[] PROGMEM = "  Unknown";
+    static const char msg_15_7[] PROGMEM = "! Roof operation incomplete";
 
+    // To save precious RAM, we use a PROGMEM array of PROGMEM strings
+    // See also: https://arduino-esp8266.readthedocs.io/en/latest/PROGMEM.html
     static const char *const msgTable[] PROGMEM =
     {
         msg_0_0, msg_0_1, msg_0_2, msg_0_3, msg_0_4, msg_0_5, msg_0_6, msg_0_7,
@@ -1188,34 +1182,10 @@ VanPacketParseResult_t ParseCarStatus2Pkt(const char* idenStr, TVanPacketRxDesc&
 
     at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n]"));
 
-    const static char jsonFormatterPopup[] PROGMEM =
-    ",\n"
-    "\"notification_on_mfd\":\n"
-    "{\n"
-        "\"style\":\n"
-        "{\n"
-            "\"display\": \"%S\"\n"
-        "}\n"
-    "}";
-
     uint8_t currentMsg = data[9];
-    if (currentMsg != 0xFF)
-    {
-        // Set the popup text
-        at += at >= JSON_BUFFER_SIZE ? 0 :
-            snprintf_P(buf, n, PSTR(
-                ",\n\"message_displayed_on_mfd\": \"%S\""), msgTable[currentMsg]);
-
-        // TODO - Set the popup icon
-
-        // Make the popup appear
-        at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, jsonFormatterPopup, PSTR("block"));
-    }
-    else
-    {
-        // Make the popup disappear
-        at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, jsonFormatterPopup, PSTR("none"));
-    } // if
+    at += at >= JSON_BUFFER_SIZE ? 0 :
+        snprintf_P(buf + at, n - at, PSTR(",\n\"message_displayed_on_mfd\": \"%S\""),
+            currentMsg == 0xFF ? emptyStr : msgTable[currentMsg]);
 
     at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}\n"));
 
@@ -1394,13 +1364,13 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
                 "\"event\": \"display\",\n"
                 "\"data\":\n"
                 "{\n"
-                    "\"band\": \"%S\",\n"
+                    "\"tuner_band\": \"%S\",\n"
                     "\"fm_band\": \"%S\",\n"
                     "\"fm_band_1\": \"%S\",\n"
                     "\"fm_band_2\": \"%S\",\n"
                     "\"fm_band_ast\": \"%S\",\n"
                     "\"am_band\": \"%S\",\n"
-                    "\"memory\": \"%S\",\n"
+                    "\"tuner_memory\": \"%S\",\n"
                     "\"frequency\": \"%S\",\n"
                     "\"frequency_h\": \"%S\",\n"
                     "\"frequency_unit\": \"%S\",\n"
@@ -1436,15 +1406,10 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
                 band == TB_AM ? onStr : offStr,  // For retro-type "LED" display
                 band == TB_AM ? offStr : onStr,  // For retro-type "LED" display
 
-                // TODO - check:
-                // - not sure if applicable in AM mode
-                // - signalStrength == 15 always means "not applicable" or "no signal"? Not just while searching?
-                //   In other words: maybe 14 is the highest possible signal strength, and 15 just means: not
-                //   applicable.
-                // signalStrength == 15 && (searchMode == TS_BY_FREQUENCY || searchMode == TS_BY_MATCHING_PTY)
-                    // ? notApplicable2Str
-                    // : signalStrengthBuffer,
-                signalStrength == 15 ? notApplicable2Str : signalStrengthBuffer,
+                // TODO - not sure if applicable in AM mode
+                signalStrength == 15 && (searchMode == TS_BY_FREQUENCY || searchMode == TS_BY_MATCHING_PTY)
+                    ? notApplicable2Str
+                    : signalStrengthBuffer,
 
                 TunerSearchModeStr(searchMode),
 
@@ -1493,7 +1458,7 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
                 // & 0x40: 1 = "Select PTY" dialog visible (long-press "TA" button; press "<<" or ">>" to change)
                 uint8_t selectedPty = data[10] & 0x1F;
                 bool ptyMatch = (data[10] & 0x20) == 0;  // PTY of station matches selected PTY
-                bool ptySelectionMenu = data[10] & 0x40; 
+                bool ptySelectionMenu = data[10] & 0x40;
                 char selectedPtyBuffer[40];
                 sprintf_P(selectedPtyBuffer, PSTR("%S"), PtyStrFull(selectedPty));
 
@@ -1524,7 +1489,7 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
                     "\"rds_selected\": \"%S\",\n"
                     "\"rds_not_available\": \"%S\",\n"
                     "\"rds_text\": \"%s\",\n"
-                    "\"info_trafic\": \"%S\"";
+                    "\"info_traffic\": \"%S\"";
 
                 at += at >= JSON_BUFFER_SIZE ? 0 :
                     snprintf_P(buf + at, n - at, jsonFormatterFmBand,
@@ -1554,7 +1519,7 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
             at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}\n"));
         }
         break;
-        
+
         case INFO_TYPE_TAPE:
         {
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#554_2
@@ -1781,7 +1746,7 @@ VanPacketParseResult_t ParseAudioSettingsPkt(const char* idenStr, TVanPacketRxDe
             "\"power\": \"%S\",\n"
             "\"tape_present\": \"%S\",\n"
             "\"cd_present\": \"%S\",\n"
-            "\"source\": \"%S\",\n"
+            "\"audio_source\": \"%S\",\n"
             "\"ext_mute\": \"%S\",\n"
             "\"mute\": \"%S\",\n"
             "\"volume\": \"%u\",\n"
@@ -1817,9 +1782,9 @@ VanPacketParseResult_t ParseAudioSettingsPkt(const char* idenStr, TVanPacketRxDe
         (data[4] & 0x0F) == 0x00 ? noneStr :  // Source of audio
         (data[4] & 0x0F) == 0x01 ? PSTR("TUNER") :
         (data[4] & 0x0F) == 0x02 ?
-            data[4] & 0x20 ? PSTR("TAPE") : 
-            data[4] & 0x40 ? PSTR("INTERNAL_CD") : 
-            PSTR("INTERNAL_CD_OR_TAPE") :
+            data[4] & 0x20 ? PSTR("TAPE") :
+            data[4] & 0x40 ? PSTR("INTERNAL_CD") :
+            PSTR("INTERNAL_CD_OR_TAPE") :  // Do we ever see this?
         (data[4] & 0x0F) == 0x03 ? PSTR("CD_CHANGER") :
 
         // This is the "default" mode for the head unit, to sit there and listen to the navigation
@@ -1843,7 +1808,7 @@ VanPacketParseResult_t ParseAudioSettingsPkt(const char* idenStr, TVanPacketRxDe
         FloatToStr(floatBuf, (float)volume / MAX_AUDIO_VOLUME, 2),
 
         // Audio menu. Bug: if CD changer is playing, this one is always "OPEN" (even if it isn't).
-        data[1] & 0x20 ? PSTR("OPEN") : PSTR("CLOSED"),
+        data[1] & 0x20 ? openStr : closedStr,
 
         (sint8_t)(data[8] & 0x7F) - 0x3F,  // Bass
         data[8] & 0x80 ? yesStr : noStr,
@@ -1920,14 +1885,14 @@ VanPacketParseResult_t ParseAirCon1Pkt(const char* idenStr, TVanPacketRxDesc& pk
     //
     // 1.) Recirculation = OFF, rear window heater = OFF, A/C = OFF:
     //     Fan icon not visible at all = 0
-    //     Fan icon with all empty blades = 4 
+    //     Fan icon with all empty blades = 4
     //     One blade visible = 4 (same as previous!)
     //     Two blades - low = 6
     //     Two blades - high = 7
     //     Three blades - low = 9
     //     Three blades - high = 10
     //     Four blades = 19
-    //     
+    //
     // 2.) Recirculation = ON, rear window heater = OFF, A/C = OFF:
     //     Fan icon not visible at all = 0
     //     Fan icon with all empty blades = 4
@@ -2245,7 +2210,7 @@ VanPacketParseResult_t ParseSatNavStatus2Pkt(const char* idenStr, TVanPacketRxDe
             "\"satnav_gps_fix\": \"%S\",\n"
             "\"satnav_gps_fix_lost\": \"%S\",\n"
             "\"satnav_gps_scanning\": \"%S\",\n"
-            "\"satnav_gps_speed\": \"%u km/h%S\"\n";
+            "\"satnav_gps_speed\": \"%S%u\"\n";
 
     int at = snprintf_P(buf, n, jsonFormatter,
 
@@ -2267,9 +2232,8 @@ VanPacketParseResult_t ParseSatNavStatus2Pkt(const char* idenStr, TVanPacketRxDe
         data[2] & 0x04 ? yesStr : noStr,
 
         // 0xE0 as boundary for "reverse": just guessing. Do we ever drive faster than 224 km/h?
-        data[16] < 0xE0 ? data[16] : 0xFF - data[16] + 1,
-
-        data[16] >= 0xE0 ? PSTR(" (reverse)") : emptyStr
+        data[16] >= 0xE0 ? PSTR("-") : emptyStr,
+        data[16] < 0xE0 ? data[16] : 0xFF - data[16] + 1
     );
 
     // TODO - what is this?
@@ -2414,9 +2378,15 @@ VanPacketParseResult_t ParseSatNavGuidanceDataPkt(const char* idenStr, TVanPacke
                 "}\n"
             "}\n"
             "\"satnav_heading_to_dest_as_text\": \"%u deg\",\n"
-            "\"satnav_distance_to_dest_via_road\": \"%u %S\",\n"
-            "\"satnav_distance_to_dest_via_straight_line\": \"%u %S\",\n"
-            "\"satnav_turn_at\": \"%u %S\",\n"
+            "\"satnav_distance_to_dest_via_road\": \"%u\",\n"
+            "\"satnav_distance_to_dest_via_road_m\": \"%S\",\n"
+            "\"satnav_distance_to_dest_via_road_km\": \"%S\",\n"
+            "\"satnav_distance_to_dest_via_straight_line\": \"%u\",\n"
+            "\"satnav_distance_to_dest_via_straight_line_m\": \"%S\",\n"
+            "\"satnav_distance_to_dest_via_straight_line_km\": \"%S\",\n"
+            "\"satnav_turn_at\": \"%u\",\n"
+            "\"satnav_turn_at_m\": \"%S\",\n"
+            "\"satnav_turn_at_km\": \"%S\",\n"
             "\"satnav_heading_on_roundabout_as_text\": \"%S deg\",\n"
             "\"satnav_minutes_to_travel\": \"%u\"\n"
         "}\n"
@@ -2430,11 +2400,14 @@ VanPacketParseResult_t ParseSatNavGuidanceDataPkt(const char* idenStr, TVanPacke
         headingToDestination,
         headingToDestination,
         roadDistanceToDestination,
-        data[5] & 0x80 ? PSTR("Km") : PSTR("m") ,
+        data[5] & 0x80 ? offStr : onStr,
+        data[5] & 0x80 ? onStr : offStr,
         gpsDistanceToDestination,
-        data[7] & 0x80 ? PSTR("Km") : PSTR("m") ,
+        data[7] & 0x80 ? offStr : onStr,
+        data[7] & 0x80 ? onStr : offStr,
         distanceToNextTurn,
-        data[9] & 0x80 ? PSTR("Km") : PSTR("m"),
+        data[9] & 0x80 ? offStr : onStr,
+        data[9] & 0x80 ? onStr : offStr,
         headingOnRoundabout == 0x7FFF ? notApplicable3Str : FloatToStr(floatBuf, headingOnRoundabout, 0),
         minutesToTravel
     );
@@ -2614,14 +2587,14 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
 
     const uint8_t* data = pkt.Data();
 
-    static uint8_t request;
+    static uint8_t report;
 
     int offsetInPacket = 1;
     if ((data[0] & 0x7F) <= 7)
     {
         // First packet of a report sequence
 
-        request = data[1];
+        report = data[1];
         offsetInPacket = 2;
         currentRecord = 0;
         currentString = 0;
@@ -2683,155 +2656,141 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
     {
         // Create an 'easily digestable' JSON report
 
-        int at = 0;
+        const static char jsonFormatter[] PROGMEM =
+        "{\n"
+            "\"event\": \"display\",\n"
+            "\"data\":\n"
+            "{\n"
+                "\"satnav_report\": \"%S\"";
 
-        if (request == SR_CURRENT_STREET || request == SR_NEXT_STREET)
+        int at = snprintf_P(buf, n, jsonFormatter, SatNavRequestStr(report));
+
+        if (report == SR_CURRENT_STREET || report == SR_NEXT_STREET)
         {
             const static char jsonFormatter[] PROGMEM =
-            "{\n"
-                "\"event\": \"display\",\n"
-                "\"data\":\n"
-                "{\n"
-                    "\"satnav_%S_street\": \"%s%s (%s%S%s)\"\n"
-                "}\n"
-            "}\n";
+                ",\n"
+                "\"satnav_%S_street\": \"%s%s (%s%S%s)\"";
 
             // Current/next street is in first (and only) record. Copy only city [3], district [4] (if any) and
             // street [5, 6]; skip the other strings.
-            at = snprintf_P(buf, n, jsonFormatter,
-                request == SR_CURRENT_STREET ? PSTR("curr") : PSTR("next"),
+            at += at >= JSON_BUFFER_SIZE ? 0 :
+                snprintf_P(buf + at, n - at, jsonFormatter,
 
-                // Street
-                records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
-                records[0][6].c_str(),
+                    report == SR_CURRENT_STREET ? PSTR("curr") : PSTR("next"),
 
-                // City - District (optional)
-                records[0][3].c_str(),
-                records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
-                records[0][4].c_str()
-            );
+                    // Street
+                    records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
+                    records[0][6].c_str(),
+
+                    // City - District (optional)
+                    records[0][3].c_str(),
+                    records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
+                    records[0][4].c_str()
+                );
         }
-        else if (request == SR_GPS_CHOOSE_DESTINATION || request == SR_GPS_FOR_PLACE_OF_INTEREST)
+        else if (report == SR_GPS_CHOOSE_DESTINATION || report == SR_GPS_FOR_PLACE_OF_INTEREST)
         {
             const static char jsonFormatter[] PROGMEM =
-            "{\n"
-                "\"event\": \"display\",\n"
-                "\"data\":\n"
-                "{\n"
-                    "\"satnav_%S_address\": \"%s%s%s%s (%s%S%s)\"\n"
-                "}\n"
-            "}\n";
+                ",\n"
+                "\"satnav_%S_address\": \"%s%s%s%s (%s%S%s)\"";
 
             // Address is in first (and only) record. Copy only city [3], district [4] (if any), street [5, 6] and
             // house number [7]; skip the other strings.
-            at = snprintf_P(buf, n, jsonFormatter,
-                request == SR_GPS_CHOOSE_DESTINATION ? PSTR("destination") : PSTR("current"),
+            at += at >= JSON_BUFFER_SIZE ? 0 :
+                snprintf_P(buf + at, n - at, jsonFormatter,
 
-                // Street
-                records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
-                records[0][6].c_str(),
+                    report == SR_GPS_CHOOSE_DESTINATION ? PSTR("destination") : PSTR("current"),
 
-                // First string is either "C" or "V"; "C" has GPS coordinates in [7] and [8]; "V" has house number
-                // in [7]. If we see "V", show house number.
-                records[0][0] == "V" ? PSTR(" ") : emptyStr,
-                records[0][0] == "V" ? records[0][7].c_str() : emptyStr,
+                    // Street
+                    records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
+                    records[0][6].c_str(),
 
-                // City - District (optional)
-                records[0][3].c_str(),
-                records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
-                records[0][4].c_str()
-            );
+                    // First string is either "C" or "V"; "C" has GPS coordinates in [7] and [8]; "V" has house number
+                    // in [7]. If we see "V", show house number.
+                    records[0][0] == "V" ? PSTR(" ") : emptyStr,
+                    records[0][0] == "V" ? records[0][7].c_str() : emptyStr,
+
+                    // City - District (optional)
+                    records[0][3].c_str(),
+                    records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
+                    records[0][4].c_str()
+                );
         }
-        else if (request == SR_PRIVATE_ADDRESS || request == SR_BUSINESS_ADDRESS)
+        else if (report == SR_PRIVATE_ADDRESS || report == SR_BUSINESS_ADDRESS)
         {
             const static char jsonFormatter[] PROGMEM =
-            "{\n"
-                "\"event\": \"display\",\n"
-                "\"data\":\n"
-                "{\n"
-                    "\"satnav_%S_entry\": \"%s\",\n"
-                    "\"satnav_%S\": \"%s%s %s (%s%S%s)\"\n"
-                "}\n"
-            "}\n";
+                ",\n"
+                "\"satnav_%S_entry\": \"%s\",\n"
+                "\"satnav_%S\": \"%s%s %s (%s%S%s)\"";
 
             // Chosen address is in first (and only) record. Copy only city [3], district [4] (if any), street [5, 6]
             // house number [7] and entry name [8]; skip the other strings.
-            at = snprintf_P(buf, n, jsonFormatter,
+            at += at >= JSON_BUFFER_SIZE ? 0 :
+                snprintf_P(buf + at, n - at, jsonFormatter,
 
-                request == SR_PRIVATE_ADDRESS ? PSTR("private_address") : PSTR("business_address"),
+                    report == SR_PRIVATE_ADDRESS ? PSTR("private_address") : PSTR("business_address"),
 
-                // Name of the entry
-                records[0][8].c_str(),
+                    // Name of the entry
+                    records[0][8].c_str(),
 
-                request == SR_PRIVATE_ADDRESS ? PSTR("private_address") : PSTR("business_address"),
+                    report == SR_PRIVATE_ADDRESS ? PSTR("private_address") : PSTR("business_address"),
 
-                // Address of the entry
+                    // Address of the entry
 
-                // Street and house number
-                records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
-                records[0][6].c_str(),
-                records[0][7].c_str(),
+                    // Street and house number
+                    records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
+                    records[0][6].c_str(),
+                    records[0][7].c_str(),
 
-                // City - District (optional)
-                records[0][3].c_str(),
-                records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
-                records[0][4].c_str()
-            );
+                    // City - District (optional)
+                    records[0][3].c_str(),
+                    records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
+                    records[0][4].c_str()
+                );
         }
-        else if (request == SR_PLACE_OF_INTEREST_ADDRESS)
+        else if (report == SR_PLACE_OF_INTEREST_ADDRESS)
         {
             const static char jsonFormatter[] PROGMEM =
-            "{\n"
-                "\"event\": \"display\",\n"
-                "\"data\":\n"
-                "{\n"
-                    "\"satnav_place_of_interest_address_entry\": \"%s\",\n"
-                    "\"satnav_place_of_interest_address\": \"%s%s (%s%S%s)\",\n"
-                    "\"satnav_place_of_interest_address_distance\": \"%s\"\n"
-                "}\n"
-            "}\n";
+                ",\n"
+                "\"satnav_place_of_interest_address_entry\": \"%s\",\n"
+                "\"satnav_place_of_interest_address\": \"%s%s (%s%S%s)\",\n"
+                "\"satnav_place_of_interest_address_distance\": \"%s\"";
 
             // Chosen place of interest address is in first (and only) record. Copy only city [3], district [4]
             // (if any), street [5, 6], entry name [9] and distance [11]; skip the other strings.
-            at = snprintf_P(buf, n, jsonFormatter,
+            at += at >= JSON_BUFFER_SIZE ? 0 :
+                snprintf_P(buf + at, n - at, jsonFormatter,
 
-                // Name of the place of interest
-                records[0][9].c_str(),
+                    // Name of the place of interest
+                    records[0][9].c_str(),
 
-                // Address of the place of interest
+                    // Address of the place of interest
 
-                // Street
-                records[0][5].c_str() + 1,  // Skip the fixed first letter ('G' or 'I')
-                records[0][6].c_str(),
+                    // Street
+                    records[0][5].c_str() + 1,  // Skip the fixed first letter ('G' or 'I')
+                    records[0][6].c_str(),
 
-                // City - District (optional)
-                records[0][3].c_str(),
-                records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
-                records[0][4].c_str(),
+                    // City - District (optional)
+                    records[0][3].c_str(),
+                    records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
+                    records[0][4].c_str(),
 
-                // Distance (in meters) to the place of interest. TODO - not sure
-                records[0][11].c_str()
-            );
+                    // Distance (in meters) to the place of interest. TODO - not sure
+                    records[0][11].c_str()
+                );
         }
-        else if (request == SR_ENTER_CITY
-                 || request == SR_ENTER_STREET
-                 || request == SR_PRIVATE_ADDRESS_LIST
-                 || request == SR_BUSINESS_ADDRESS_LIST)
+        else if (report == SR_ENTER_CITY
+                 || report == SR_ENTER_STREET
+                 || report == SR_PRIVATE_ADDRESS_LIST
+                 || report == SR_BUSINESS_ADDRESS_LIST)
         {
             const static char jsonFormatter[] PROGMEM =
-            "{\n"
-                "\"event\": \"display\",\n"
-                "\"data\":\n"
-                "{\n"
-                    "\"satnav_%S_list\":\n"
-                    "[";
+                ",\n"
+                "\"satnav_list\":\n"
+                "[";
 
-            at = snprintf_P(buf, n, jsonFormatter,
-                request == SR_ENTER_CITY ? PSTR("city") :
-                request == SR_ENTER_STREET ? PSTR("street") :
-                request == SR_PRIVATE_ADDRESS_LIST ? PSTR("private_address") :
-                PSTR("business_address")
-            );
+            at += at >= JSON_BUFFER_SIZE ? 0 :
+                snprintf_P(buf + at, n - at, jsonFormatter);
 
             // Each item in the list is a single string in a separate record
             for (int i = 0; i < currentRecord; i++)
@@ -2845,32 +2804,32 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
             } // for
 
             at += at >= JSON_BUFFER_SIZE ? 0 :
-                snprintf_P(buf + at, n - at, PSTR("\n]\n}\n}\n"));
+                snprintf_P(buf + at, n - at, PSTR("\n]"));
         }
-        else if (request == SR_ENTER_HOUSE_NUMBER)
+        else if (report == SR_ENTER_HOUSE_NUMBER)
         {
             const static char jsonFormatter[] PROGMEM =
-            "{\n"
-                "\"event\": \"display\",\n"
-                "\"data\":\n"
-                "{\n"
-                    "\"satnav_house_number_range\": \"%s...%s\"\n"
-                "}\n"
-            "}\n";
+                ",\n"
+                "\"satnav_house_number_range\": \"%s...%s\"";
 
             // Range of "house numbers" is in first (and only) record, the lowest number is in the first string, and
             // highest number is in the second string
-            at = snprintf_P(buf, n, jsonFormatter, records[0][0].c_str(), records[0][1].c_str());
+            at += at >= JSON_BUFFER_SIZE ? 0 :
+                snprintf_P(buf + at, n - at, jsonFormatter,
+
+                    records[0][0].c_str(),
+                    records[0][1].c_str()
+                );
         }
-        else if (request == SR_PLACE_OF_INTEREST_CATEGORY_LIST)
+        else if (report == SR_PLACE_OF_INTEREST_CATEGORY_LIST)
         {
             const static char jsonFormatter[] PROGMEM =
-            "{\n"
-                "\"event\": \"display\",\n"
-                "\"data\":\n"
-                "{\n"
-                    "\"satnav_place_of_interest_category_list\":\n"
-                    "[";
+                ",\n"
+                "\"satnav_place_of_interest_category_list\":\n"
+                "[";
+
+            at += at >= JSON_BUFFER_SIZE ? 0 :
+                snprintf_P(buf + at, n - at, jsonFormatter);
 
             // Each "category" in the list is a single string in a separate record
             for (int i = 0; i < currentRecord; i++)
@@ -2884,17 +2843,17 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
             } // for
 
             at += at >= JSON_BUFFER_SIZE ? 0 :
-                snprintf_P(buf + at, n - at, PSTR("\n]\n}\n}\n"));
+                snprintf_P(buf + at, n - at, PSTR("\n]"));
         } // if
-        else if (request == SR_SOFTWARE_MODULE_VERSIONS)
+        else if (report == SR_SOFTWARE_MODULE_VERSIONS)
         {
             const static char jsonFormatter[] PROGMEM =
-            "{\n"
-                "\"event\": \"display\",\n"
-                "\"data\":\n"
-                "{\n"
-                    "\"satnav_software_modules_list\":\n"
-                    "[";
+                ",\n"
+                "\"satnav_software_modules_list\":\n"
+                "[";
+
+            at += at >= JSON_BUFFER_SIZE ? 0 :
+                snprintf_P(buf + at, n - at, jsonFormatter);
 
             // Each "module" in the list is a triplet of strings ('module_name', then 'version' and 'date' in a rather
             // free format) in a separate record
@@ -2911,8 +2870,10 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
             } // for
 
             at += at >= JSON_BUFFER_SIZE ? 0 :
-                snprintf_P(buf + at, n - at, PSTR("\n]\n}\n}\n"));
+                snprintf_P(buf + at, n - at, PSTR("\n]"));
         } // if
+
+        at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}\n"));
 
         // Warning on Serial output if JSON buffer overflows
         if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
@@ -3284,7 +3245,7 @@ VanPacketParseResult_t ParseMfdToHeadUnitPkt(const char* idenStr, TVanPacketRxDe
             data[1] & 0x10 ? onStr : offStr,
 
             // Bug: if CD changer is playing, this one is always "OPEN"...
-            data[1] & 0x20 ? PSTR("OPEN") : PSTR("CLOSED"),
+            data[1] & 0x20 ? openStr : closedStr,
 
             data[1] & 0x40 ? onStr : offStr,
             data[1] & 0x80 ? onStr : offStr
@@ -3568,7 +3529,7 @@ void PrintJsonText(const char* jsonBuffer)
 } // PrintJsonText
 #endif // PRINT_JSON_BUFFERS_ON_SERIAL
 
-static IdenHandler_t handlers[] = 
+static IdenHandler_t handlers[] =
 {
     // Columns:
     // IDEN value, IDEN string, number of expected bytes (or -1 if varying/unknown), handler function
@@ -3618,9 +3579,6 @@ const char* ParseVanPacketToJson(TVanPacketRxDesc& pkt)
 
     uint16_t iden = pkt.Iden();
     IdenHandler_t* handler = handlers;
-
-    // TODO - remove
-    //if (iden != 0x8C4 /* || pkt.Data()[1] != 0xD3 */) return "";
 
     // Search the correct handler. Relying on short-circuit boolean evaluation.
     while (handler != handlers_end && handler->iden != iden) handler++;
