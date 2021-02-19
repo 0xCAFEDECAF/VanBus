@@ -1346,15 +1346,10 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                                 : FloatToStr(floatBuf, frequency / 20.0 + 50.0, 2),  // FM bands
                         band == TB_AM ? PSTR("KHz") : PSTR("MHz"),
 
-                        // TODO - check:
-                        // - not sure if applicable in AM mode
-                        // - signalStrength == 15 always means "not applicable" or "no signal"? Not just while searching?
-                        //   In other words: maybe 14 is the highest possible signal strength, and 15 just means: not
-                        //   applicable.
-                        // signalStrength == 15 && (searchMode == TS_BY_FREQUENCY || searchMode == TS_BY_MATCHING_PTY)
-                            // ? notApplicable2Str
-                            // : signalStrengthBuffer,
-                        signalStrength == 15 ? notApplicable2Str : signalStrengthBuffer,
+                        // TODO - not sure if applicable in AM mode
+                        signalStrength == 15 && (searchMode == TS_BY_FREQUENCY || searchMode == TS_BY_MATCHING_PTY)
+                            ? notApplicable2Str
+                            : signalStrengthBuffer,
 
                         TunerSearchModeStr(searchMode),
 
