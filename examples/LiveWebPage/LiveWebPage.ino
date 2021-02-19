@@ -343,7 +343,7 @@ char webpage[] PROGMEM = R"=====(
       <p>Power: <b id="power">---</b></p>
       <p>Tape present: <b id="tape_present">---</b></p>
       <p>CD present: <b id="cd_present">---</b></p>
-      <p>Source: <b id="source">---</b></p>
+      <p>Source: <b id="audio_source">---</b></p>
       <p>External mute: <b id="ext_mute">---</b></p>
       <p>Mute: <b id="mute">---</b></p>
 
@@ -376,8 +376,8 @@ char webpage[] PROGMEM = R"=====(
     <hr/>
     <div>
       <p>Radio</p>
-      <p>Band: <b id="band">---</b></p>
-      <p>Memory: <b id="memory">---</b></p>
+      <p>Band: <b id="tuner_band">---</b></p>
+      <p>Memory: <b id="tuner_memory">---</b></p>
       <p>Frequency: <b id="frequency">---</b><b id="frequency_h">-</b> <b id="frequency_unit"></b></p>
       <p>Signal strength: <b id="signal_strength">---</b></p>
       <p>Tuner sensitivity: <b id="search_sensitivity">---</b></p>
@@ -758,7 +758,10 @@ void loop()
         {
             unsigned long start = millis();
             webSocket.broadcastTXT(json);
-            Serial.printf_P(PSTR("Sending JSON via 'webSocket.broadcastTXT' took: %lu msec\n"), millis() - start);
+            Serial.printf_P(
+                PSTR("Sending %zu JSON bytes via 'webSocket.broadcastTXT' took: %lu msec\n"),
+                strlen(json),
+                millis() - start);
         } // if
     } // if
 
