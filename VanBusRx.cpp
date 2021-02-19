@@ -362,6 +362,8 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     TIsrDebugData* debugIsr = isrDebugPacket->samples + isrDebugPacket->at;
 
     // Only write into buffer if there is space
+    // TODO - no, this is incorrect. We should just overwrite the oldest (unread) slot. Then also keep a "Rx Packet
+    // Lost" counter.
     if (state != VAN_RX_DONE && isrDebugPacket->at < VAN_ISR_DEBUG_BUFFER_SIZE)
     {
         debugIsr->pinLevel = pinLevelChangedTo;
