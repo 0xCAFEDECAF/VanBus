@@ -201,7 +201,7 @@ char webpage[] PROGMEM = R"=====(
       <p>Dash light: <b id="dash_light">---</b></p>
       <p>Dash light - actual brightness: <b id="dash_actual_brightness">---</b></p>
       <p>Contact key position: <b id="contact_key_position">---</b></p>
-      <p>Engine: <b id="engine">---</b></p>
+      <p>Engine running: <b id="engine_running">---</b></p>
       <p>Economy mode: <b id="economy_mode">---</b></p>
       <p>In reverse: <b id="in_reverse">---</b></p>
       <p>Trailer: <b id="trailer">---</b></p>
@@ -274,7 +274,11 @@ char webpage[] PROGMEM = R"=====(
     <hr/>
     <div>
       <p>Car status</p>
-      <p>Doors: <b id="doors">---</b></p>
+      <p>Door front right: <b id="door_front_right">---</b></p>
+      <p>Door front left: <b id="door_front_left">---</b></p>
+      <p>Door rear right: <b id="door_rear_right">---</b></p>
+      <p>Door rear left: <b id="door_rear_left">---</b></p>
+      <p>Door boot: <b id="door_boot">---</b></p>
       <p>Right stalk button: <b id="right_stalk_button">---</b></p>
       <p>Trip 1 average speed: <b id="avg_speed_1">---</b> km/h</p>
       <p>Trip 2 average speed: <b id="avg_speed_2">---</b> km/h</p>
@@ -397,7 +401,7 @@ char webpage[] PROGMEM = R"=====(
       <p>TA: <b id="ta_selected">---</b></p>
       <p>RDS: <b id="rds_selected">---</b></p>
       <p>RDS Text: <b id="rds_text">---</b></p>
-      <p>Traffic Info: <b id="info_trafic">---</b></p>
+      <p>Traffic Info: <b id="info_traffic">---</b></p>
     </div>
     <hr/>
     <div>
@@ -510,9 +514,9 @@ char webpage[] PROGMEM = R"=====(
         <path id="satnav_heading_to_dest" style="stroke-width:8;" d="M100 10 l30 100 l-60 0 Z" transform="rotate(22.5)" transform-origin="100 65"/>
       </svg>
 
-      <p>Road distance to destination: <b id="satnav_distance_to_dest_via_road">---</b></p>
-      <p>Straight line to destination: <b id="satnav_distance_to_dest_via_straight_line">---</b></p>
-      <p>Turn at: <b id="satnav_turn_at">---</b></p>
+      <p>Road distance to destination: <b id="satnav_distance_to_dest_via_road">---</b> (unit is meters: <b id="satnav_distance_to_dest_via_road_m">---</b>, (unit is kilometers: <b id="satnav_distance_to_dest_via_road_km">---</b>)</p>
+      <p>Straight line to destination: <b id="satnav_distance_to_dest_via_straight_line">---</b> (unit is meters: <b id="satnav_distance_to_dest_via_straight_line_m">---</b>, (unit is kilometers: <b id="satnav_distance_to_dest_via_straight_line_km">---</b>)</p>
+      <p>Turn at: <b id="satnav_turn_at">---</b> (unit is meters: <b id="satnav_turn_at_m">---</b>, (unit is kilometers: <b id="satnav_turn_at_km">---</b>)</p>
       <p>Heading on roundabout: <b id="satnav_heading_on_roundabout_as_text">---</b></p>
       <p>Minutes to travel (?): <b id="satnav_minutes_to_travel">---</b></p>
     </div>
@@ -524,6 +528,7 @@ char webpage[] PROGMEM = R"=====(
       <p>'Turn around if possible' icon: <b style="display:none;" id="satnav_turn_around_if_possible_icon">VISIBLE</b></p>
       <p>'Follow road' icon: <b style="display:none;" id="satnav_follow_road_icon">VISIBLE</b></p>
       <p>'Not on map' icon: <b style="display:none;" id="satnav_not_on_map_icon">VISIBLE</b></p>
+      <p>Current turn icon direction: <b id="satnav_curr_turn_icon_direction_as_text">---</b></p>
       <p>Current turn icon leg 22.5 : <b id="satnav_curr_turn_icon_leg_22_5">---</b></p>
       <p>Current turn icon leg 45.0 : <b id="satnav_curr_turn_icon_leg_45_0">---</b></p>
       <p>Current turn icon leg 67.5 : <b id="satnav_curr_turn_icon_leg_67_5">---</b></p>
@@ -554,6 +559,7 @@ char webpage[] PROGMEM = R"=====(
       <p>Current turn icon no entry 292.5: <b id="satnav_curr_turn_icon_no_entry_292_5">---</b></p>
       <p>Current turn icon no entry 315.0: <b id="satnav_curr_turn_icon_no_entry_315_0">---</b></p>
       <p>Current turn icon no entry 337.5: <b id="satnav_curr_turn_icon_no_entry_337_5">---</b></p>
+      <p>Next turn icon direction: <b id="satnav_next_turn_icon_direction_as_text">---</b></p>
       <p>Next turn icon leg 22.5 : <b id="satnav_next_turn_icon_leg_22_5">---</b></p>
       <p>Next turn icon leg 45.0 : <b id="satnav_next_turn_icon_leg_45_0">---</b></p>
       <p>Next turn icon leg 67.5 : <b id="satnav_next_turn_icon_leg_67_5">---</b></p>
@@ -594,6 +600,7 @@ char webpage[] PROGMEM = R"=====(
     <hr/>
     <div>
       <p>SatNav report</p>
+      <p>Report: <b id="satnav_report">---</b></p>
       <p>Current street: <b id="satnav_curr_street">---</b></p>
       <p>Next street: <b id="satnav_next_street">---</b></p>
       <p>Destination address: <b id="satnav_destination_address">---</b></p>
@@ -605,14 +612,8 @@ char webpage[] PROGMEM = R"=====(
       <p>Place of interest address entry: <b id="satnav_place_of_interest_address_entry">---</b></p>
       <p>Place of interest address: <b id="satnav_place_of_interest_address">---</b></p>
       <p>Place of interest address distance: <b id="satnav_place_of_interest_address_distance">---</b></p>
-      <p>City list</p>
-      <textarea id="satnav_city_list" rows="5" cols="80"></textarea>
-      <p>Street list</p>
-      <textarea id="satnav_street_list" rows="5" cols="80"></textarea>
-      <p>Private address list</p>
-      <textarea id="satnav_private_address_list" rows="5" cols="80"></textarea>
-      <p>Business address list</p>
-      <textarea id="satnav_business_address_list" rows="5" cols="80"></textarea>
+      <p>Address list</p>
+      <textarea id="satnav_list" rows="5" cols="80"></textarea>
       <p>House number range: <b id="satnav_house_number_range">---</b></p>
       <p>Places of interest category list</p>
       <textarea id="satnav_place_of_interest_category_list" rows="10" cols="80"></textarea>

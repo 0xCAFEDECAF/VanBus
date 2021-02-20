@@ -808,9 +808,6 @@ VanPacketParseResult_t ParseDeviceReportPkt(const char* idenStr, TVanPacketRxDes
         // Button-press announcement?
         if ((data[1] & 0x0F) == 0x02)
         {
-            char buffer[5];
-            sprintf_P(buffer, PSTR("0x%02X"), data[2]);
-
             at += at >= JSON_BUFFER_SIZE ? 0 :
                 snprintf_P(buf + at, n - at,
                     PSTR(",\n\"head_unit_button_pressed\": \"%S%S\""),
@@ -831,7 +828,7 @@ VanPacketParseResult_t ParseDeviceReportPkt(const char* idenStr, TVanPacketRxDes
                     (data[2] & 0x1F) == 0x1C ? PSTR("TAPE") :
                     (data[2] & 0x1F) == 0x1D ? PSTR("INTERNAL_CD") :
                     (data[2] & 0x1F) == 0x1E ? PSTR("CD_CHANGER") :
-                    buffer,
+                    ToHexStr(data[2]),
 
                     (data[2] & 0xC0) == 0xC0 ? PSTR(" (held)") :
                     data[2] & 0x40 ? PSTR(" (released)") :
@@ -2392,7 +2389,6 @@ VanPacketParseResult_t ParseSatNavGuidanceDataPkt(const char* idenStr, TVanPacke
         "}\n"
     "}\n";
 
-
     char floatBuf[MAX_FLOAT_SIZE];
     int at = snprintf_P(buf, n, jsonFormatter,
         currHeading,
@@ -3506,6 +3502,7 @@ void PrintPacketDataDiff(TVanPacketRxDesc& pkt, IdenHandler_t* handler)
 } // PrintPacketDataDiff
 
 #ifdef PRINT_JSON_BUFFERS_ON_SERIAL
+
 // Pretty-print a JSON formatted string, adding indentation
 void PrintJsonText(const char* jsonBuffer)
 {
@@ -3527,6 +3524,7 @@ void PrintJsonText(const char* jsonBuffer)
         if (subString[0] == '{' || subString[0] == '[') indent += PRETTY_PRINT_JSON_INDENT;
     } // while
 } // PrintJsonText
+
 #endif // PRINT_JSON_BUFFERS_ON_SERIAL
 
 static IdenHandler_t handlers[] =
