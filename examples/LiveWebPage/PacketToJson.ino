@@ -848,7 +848,7 @@ VanPacketParseResult_t ParseDeviceReportPkt(const char* idenStr, TVanPacketRxDes
             "\"event\": \"display\",\n"
             "\"data\":\n"
             "{\n"
-                "\"cd_changer\": \"STATUS_UPDATE_ANNOUNCE\""
+                "\"cd_changer_announce\": \"STATUS_UPDATE_ANNOUNCE\""
             "}\n"
         "}\n";
 
@@ -1605,7 +1605,7 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
             if (dataLen < 10) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
             char trackTime[7];
-            sprintf_P(trackTime, PSTR("%X:%02X"), GetBcd(data[5]), GetBcd(data[6]));
+            sprintf_P(trackTime, PSTR("%X:%02X"), data[5], data[6]);
 
             bool searching = data[3] & 0x10;
 
@@ -1622,7 +1622,7 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
                     "\"cd_status_rewind\": \"%S\",\n"
                     "\"cd_status_searching\": \"%S\",\n"
                     "\"cd_track_time\": \"%S\",\n"
-                    "\"cd_current_track\": \"%u\"";
+                    "\"cd_current_track\": \"%X\"";
 
             at = snprintf_P(buf, n, jsonFormatter,
 
@@ -1645,7 +1645,7 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
 
                 searching ? PSTR("--:--") : trackTime,
 
-                GetBcd(data[7])
+                data[7]
             );
 
             if (data[8] != 0xFF)
@@ -2049,6 +2049,17 @@ VanPacketParseResult_t ParseCdChangerPkt(const char* idenStr, TVanPacketRxDesc& 
 
     const uint8_t* data = pkt.Data();
 
+    uint8_t trackTimeMin = data[4];
+    uint8_t trackTimeSec = data[5];
+    bool trackTimeInvalid = trackTimeMin == 0xFF || trackTimeSec == 0xFF;
+    char trackTimeStr[7];
+    if (! trackTimeInvalid) sprintf_P(trackTimeStr, PSTR("%X:%02X"), trackTimeMin, trackTimeSec);
+
+    uint8_t totalTracks = data[8];
+    bool totalTracksInvalid = totalTracks == 0xFF;
+    char totalTracksStr[7];
+    if (! totalTracksInvalid) sprintf_P(totalTracksStr, PSTR("%X"), totalTracks);
+
     const static char jsonFormatter[] PROGMEM =
     "{\n"
         "\"event\": \"display\",\n"
@@ -2064,10 +2075,10 @@ VanPacketParseResult_t ParseCdChangerPkt(const char* idenStr, TVanPacketRxDesc& 
             "\"cd_changer_status_next_track\": \"%S\",\n"
             "\"cd_changer_status_previous_track\": \"%S\",\n"
             "\"cd_changer_cartridge_present\": \"%S\",\n"
-            "\"cd_changer_track_time\": \"%S:%S\",\n"
-            "\"cd_changer_current_track\": \"%u\",\n"
+            "\"cd_changer_track_time\": \"%S\",\n"
+            "\"cd_changer_current_track\": \"%X\",\n"
             "\"cd_changer_total_tracks\": \"%S\",\n"
-            "\"cd_changer_current_cd\": \"%u\",\n"
+            "\"cd_changer_current_cd\": \"%X\",\n"
             "\"cd_changer_disc_1_present\": \"%S\",\n"
             "\"cd_changer_disc_2_present\": \"%S\",\n"
             "\"cd_changer_disc_3_present\": \"%S\",\n"
@@ -2076,14 +2087,6 @@ VanPacketParseResult_t ParseCdChangerPkt(const char* idenStr, TVanPacketRxDesc& 
             "\"cd_changer_disc_6_present\": \"%S\"\n"
         "}\n"
     "}\n";
-
-    char floatBuf[MAX_FLOAT_SIZE];
-
-    const char* trackTimeSec = data[4] == 0xFF ? notApplicable2Str : FloatToStr(floatBuf, GetBcd(data[4]), 0);
-    const char* trackTimeMin = data[5] == 0xFF ? notApplicable2Str : FloatToStr(floatBuf, GetBcd(data[5]), 0);
-
-    uint8_t currentTrack = GetBcd(data[6]);
-    const char* totalTracks = data[8] == 0xFF ? notApplicable2Str : FloatToStr(floatBuf, GetBcd(data[8]), 0);
 
     int at = snprintf_P(buf, n, jsonFormatter,
         data[1] == 0x01 ? onStr : offStr,
@@ -2113,13 +2116,12 @@ VanPacketParseResult_t ParseCdChangerPkt(const char* idenStr, TVanPacketRxDesc& 
         data[3] == 0x06 ? noStr :
         ToHexStr(data[3]),
 
-        trackTimeMin,
-        trackTimeSec,
+        trackTimeInvalid ? PSTR("--:--") : trackTimeStr,
 
-        currentTrack,
-        totalTracks,
+        data[6],
+        totalTracksInvalid ? notApplicable2Str : totalTracksStr,
 
-        GetBcd(data[7]),
+        data[7],
 
         data[10] & 0x01 ? yesStr : noStr,
         data[10] & 0x02 ? yesStr : noStr,
@@ -2207,7 +2209,7 @@ VanPacketParseResult_t ParseSatNavStatus2Pkt(const char* idenStr, TVanPacketRxDe
             "\"satnav_gps_fix\": \"%S\",\n"
             "\"satnav_gps_fix_lost\": \"%S\",\n"
             "\"satnav_gps_scanning\": \"%S\",\n"
-            "\"satnav_gps_speed\": \"%S%u\"\n";
+            "\"satnav_gps_speed\": \"%S%u\"";
 
     int at = snprintf_P(buf, n, jsonFormatter,
 
