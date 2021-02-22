@@ -1346,7 +1346,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                                 : FloatToStr(floatBuf, frequency / 20.0 + 50.0, 2),  // FM bands
                         band == TB_AM ? PSTR("KHz") : PSTR("MHz"),
 
-                        // TODO - not sure if applicable in AM mode
+                        // Also applicable in AM mode
                         signalStrength == 15 && (searchMode == TS_BY_FREQUENCY || searchMode == TS_BY_MATCHING_PTY)
                             ? notApplicable2Str
                             : signalStrengthBuffer,
@@ -2895,7 +2895,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 {
                     SERIAL.printf_P(PSTR(", offset=%u, length=%u"), selectionOrOffset, length);
                 }
-                else if (selectionOrOffset > 0)
+                else //if (selectionOrOffset > 0)
                 {
                     SERIAL.printf_P(PSTR(", selection=%u"), selectionOrOffset);
                 } // if
