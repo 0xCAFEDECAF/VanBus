@@ -12,7 +12,9 @@
 // Note: printing the JSON buffers takes pretty long, so it leads to more Rx queue overruns.
 #define PRINT_JSON_BUFFERS_ON_SERIAL
 
-#define JSON_BUFFER_SIZE 2048
+// TODO - reduce size of large JSON packets like the ones containing guidance instruction icons
+//#define JSON_BUFFER_SIZE 2048
+#define JSON_BUFFER_SIZE 4096
 char jsonBuffer[JSON_BUFFER_SIZE];
 
 enum VanPacketParseResult_t
@@ -23,7 +25,8 @@ enum VanPacketParseResult_t
     VAN_PACKET_PARSE_CRC_ERROR = -1,  // Packet had a CRC error
     VAN_PACKET_PARSE_UNEXPECTED_LENGTH = -2,  // Packet had unexpected length
     VAN_PACKET_PARSE_UNRECOGNIZED_IDEN = -3,  // Packet had unrecognized IDEN field
-    VAN_PACKET_PARSE_TO_BE_DECODED = -4  // IDEN recognized but the correct parsing of this packet is not yet known
+    VAN_PACKET_PARSE_TO_BE_DECODED = -4,  // IDEN recognized but the correct parsing of this packet is not yet known
+    VAN_PACKET_PARSE_JSON_TOO_LONG = -5  // IDEN recognized but the parsing onto JSON overflows 'jsonBuffer'
 }; // enum VanPacketParseResult_t
 
 typedef VanPacketParseResult_t (*TPacketParser)(const char*, TVanPacketRxDesc&, char*, int);
@@ -433,7 +436,7 @@ void GuidanceInstructionIconJson(const char* iconName, const uint8_t data[8], ch
             "{\n"
                 "\"transform\": \"rotate(%u.%udeg)\"\n"
             "}\n"
-        "}\n";
+        "}";
 
     at += at >= JSON_BUFFER_SIZE ? 0 :
         snprintf_P(buf + at, n - at, jsonFormatter,
@@ -476,8 +479,8 @@ VanPacketParseResult_t DefaultPacketParser(const char* idenStr, TVanPacketRxDesc
 
     int at = snprintf_P(buf, n, jsonFormatter, idenStr, PacketRawToStr(pkt));
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // DefaultPacketParser
@@ -500,8 +503,8 @@ VanPacketParseResult_t ParseVinPkt(const char* idenStr, TVanPacketRxDesc& pkt, c
 
     int at = snprintf_P(buf, n, jsonFormatter, pkt.Data());
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseVinPkt
@@ -568,8 +571,8 @@ VanPacketParseResult_t ParseEnginePkt(const char* idenStr, TVanPacketRxDesc& pkt
         FloatToStr(floatBuf[3], (data[6] - 0x50) / 2.0, 1)
     );
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseEnginePkt
@@ -604,8 +607,8 @@ VanPacketParseResult_t ParseHeadUnitStalkPkt(const char* idenStr, TVanPacketRxDe
         data[0] >> 4 & 0x03
     );
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseHeadUnitStalkPkt
@@ -690,6 +693,7 @@ VanPacketParseResult_t ParseLightsStatusPkt(const char* idenStr, TVanPacketRxDes
     at += at >= JSON_BUFFER_SIZE ? 0 :
         snprintf_P(buf + at, n - at, PSTR(",\n\"oil_level_raw\": \"%u\""), data[8]);
 
+    // 0x55 = 85
     #define MAX_OIL_LEVEL (0x55)
     char floatBuf[MAX_FLOAT_SIZE];
     at += at >= JSON_BUFFER_SIZE ? 0 :
@@ -755,8 +759,8 @@ VanPacketParseResult_t ParseLightsStatusPkt(const char* idenStr, TVanPacketRxDes
 
     at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}\n"));
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseLightsStatusPkt
@@ -826,7 +830,7 @@ VanPacketParseResult_t ParseDeviceReportPkt(const char* idenStr, TVanPacketRxDes
                     (data[2] & 0x1F) == 0x17 ? PSTR("MAN") :
                     (data[2] & 0x1F) == 0x1B ? PSTR("TUNER") :
                     (data[2] & 0x1F) == 0x1C ? PSTR("TAPE") :
-                    (data[2] & 0x1F) == 0x1D ? PSTR("INTERNAL_CD") :
+                    (data[2] & 0x1F) == 0x1D ? PSTR("CD") :
                     (data[2] & 0x1F) == 0x1E ? PSTR("CD_CHANGER") :
                     ToHexStr(data[2]),
 
@@ -873,8 +877,8 @@ VanPacketParseResult_t ParseDeviceReportPkt(const char* idenStr, TVanPacketRxDes
         return VAN_PACKET_PARSE_TO_BE_DECODED;
     } // if
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseDeviceReportPkt
@@ -887,10 +891,15 @@ VanPacketParseResult_t ParseCarStatus1Pkt(const char* idenStr, TVanPacketRxDesc&
     const uint8_t* data = pkt.Data();
     int dataLen = pkt.DataLen();
 
+    /*
     // Process only if not duplicate of previous packet; ignore different sequence numbers
+
+    // 2021-02-21 - No, don't skip
+
     static uint8_t packetData[VAN_MAX_DATA_BYTES] = "";  // Previous packet data
     if (memcmp(data + 1, packetData, dataLen - 2) == 0) return VAN_PACKET_DUPLICATE;
     memcpy(packetData, data + 1, dataLen - 2);
+    */
 
     const static char jsonFormatter[] PROGMEM =
     "{\n"
@@ -952,8 +961,8 @@ VanPacketParseResult_t ParseCarStatus1Pkt(const char* idenStr, TVanPacketRxDesc&
         (uint16_t)data[24] << 8 | data[25]
     );
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseCarStatus1Pkt
@@ -1188,8 +1197,8 @@ VanPacketParseResult_t ParseCarStatus2Pkt(const char* idenStr, TVanPacketRxDesc&
 
     // TODO - this packet could become very large and overflow the JSON buffer, causing corrupt JSON data to be sent
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseCarStatus2Pkt
@@ -1221,8 +1230,8 @@ VanPacketParseResult_t ParseDashboardPkt(const char* idenStr, TVanPacketRxDesc& 
             FloatToStr(floatBuf[1], ((uint16_t)data[2] << 8 | data[3]) / 100.0, 2)
     );
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseDashboardPkt
@@ -1280,8 +1289,8 @@ VanPacketParseResult_t ParseDashboardButtonsPkt(const char* idenStr, TVanPacketR
         FloatToStr(floatBuf[2], data[5] / 2.0, 1)
     );
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseDashboardButtonsPkt
@@ -1604,10 +1613,25 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
             // TODO - do we know the fixed numbers? Seems like this can only be 10 or 12.
             if (dataLen < 10) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
-            char trackTime[7];
-            sprintf_P(trackTime, PSTR("%X:%02X"), data[5], data[6]);
+            char trackTimeStr[7];
+            sprintf_P(trackTimeStr, PSTR("%X:%02X"), data[5], data[6]);
 
             bool searching = data[3] & 0x10;
+
+            uint8_t totalTracks = data[8];
+            bool totalTracksInvalid = totalTracks == 0xFF;
+            char totalTracksStr[3];
+            if (! totalTracksInvalid) sprintf_P(totalTracksStr, PSTR("%X"), totalTracks);
+
+            char totalTimeStr[7];
+            bool totalTimeInvalid = dataLen < 12;
+            if (! totalTimeInvalid)
+            {
+                uint8_t totalTimeMin = data[9];
+                uint8_t totalTimeSec = data[10];
+                totalTimeInvalid = totalTimeMin == 0xFF || totalTimeSec == 0xFF;
+                if (! totalTimeInvalid) sprintf_P(totalTimeStr, PSTR("%X:%02X"), totalTimeMin, totalTimeSec);
+            } // if
 
             const static char jsonFormatter[] PROGMEM =
             "{\n"
@@ -1622,7 +1646,11 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
                     "\"cd_status_rewind\": \"%S\",\n"
                     "\"cd_status_searching\": \"%S\",\n"
                     "\"cd_track_time\": \"%S\",\n"
-                    "\"cd_current_track\": \"%X\"";
+                    "\"cd_current_track\": \"%X\",\n"
+                    "\"cd_total_tracks\": \"%S\",\n"
+                    "\"cd_total_time\": \"%S\"\n"
+                "}\n"
+            "}\n";
 
             at = snprintf_P(buf, n, jsonFormatter,
 
@@ -1643,33 +1671,12 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
 
                 searching ? onStr : offStr,
 
-                searching ? PSTR("--:--") : trackTime,
+                searching ? PSTR("--:--") : trackTimeStr,
 
-                data[7]
+                data[7],
+                totalTracksInvalid ? notApplicable2Str : totalTracksStr,
+                totalTimeInvalid ? PSTR("--:--") : totalTimeStr
             );
-
-            if (data[8] != 0xFF)
-            {
-                at += at >= JSON_BUFFER_SIZE ? 0 :
-                    snprintf_P(buf + at, n - at, PSTR(",\n\"cd_total_tracks\": \"%u\""), GetBcd(data[8]));
-
-                if (dataLen >= 12 && data[9] != 0xFF)
-                {
-                    at += at >= JSON_BUFFER_SIZE ? 0 :
-                        snprintf_P(buf + at, n - at,
-                            PSTR(",\n"
-                                "\"cd_total_time\": \"%u:%u\""
-                            ),
-                            GetBcd(data[9]),
-                            GetBcd(data[10])
-                        );
-                } // if
-            } // if
-
-            at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}\n"));
-
-            // Warning on Serial output if JSON buffer overflows
-            if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
         }
         break;
 
@@ -1686,9 +1693,8 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
         break;
     } // switch
 
-
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseHeadUnitPkt
@@ -1720,8 +1726,8 @@ VanPacketParseResult_t ParseTimePkt(const char* idenStr, TVanPacketRxDesc& pkt, 
         data[4]
     );
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseTimePkt
@@ -1780,7 +1786,7 @@ VanPacketParseResult_t ParseAudioSettingsPkt(const char* idenStr, TVanPacketRxDe
         (data[4] & 0x0F) == 0x01 ? PSTR("TUNER") :
         (data[4] & 0x0F) == 0x02 ?
             data[4] & 0x20 ? PSTR("TAPE") :
-            data[4] & 0x40 ? PSTR("INTERNAL_CD") :
+            data[4] & 0x40 ? PSTR("CD") :
             PSTR("INTERNAL_CD_OR_TAPE") :  // Do we ever see this?
         (data[4] & 0x0F) == 0x03 ? PSTR("CD_CHANGER") :
 
@@ -1819,8 +1825,8 @@ VanPacketParseResult_t ParseAudioSettingsPkt(const char* idenStr, TVanPacketRxDe
         data[1] & 0x04 ? onStr : offStr  // Auto volume
     );
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseAudioSettingsPkt
@@ -1853,8 +1859,8 @@ VanPacketParseResult_t ParseMfdStatusPkt(const char* idenStr, TVanPacketRxDesc& 
         ToHexStr(mfdStatus)
     );
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseMfdStatusPkt
@@ -1970,8 +1976,8 @@ VanPacketParseResult_t ParseAirCon1Pkt(const char* idenStr, TVanPacketRxDesc& pk
         setFanSpeed
     );
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseAirCon1Pkt
@@ -2031,8 +2037,8 @@ VanPacketParseResult_t ParseAirCon2Pkt(const char* idenStr, TVanPacketRxDesc& pk
         FloatToStr(floatBuf[1], ((uint16_t)data[3] << 8 | data[4]) / 10.0 - 40.0, 1)
     );
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseAirCon2Pkt
@@ -2057,7 +2063,7 @@ VanPacketParseResult_t ParseCdChangerPkt(const char* idenStr, TVanPacketRxDesc& 
 
     uint8_t totalTracks = data[8];
     bool totalTracksInvalid = totalTracks == 0xFF;
-    char totalTracksStr[7];
+    char totalTracksStr[3];
     if (! totalTracksInvalid) sprintf_P(totalTracksStr, PSTR("%X"), totalTracks);
 
     const static char jsonFormatter[] PROGMEM =
@@ -2131,8 +2137,8 @@ VanPacketParseResult_t ParseCdChangerPkt(const char* idenStr, TVanPacketRxDesc& 
         data[10] & 0x20 ? yesStr : noStr
     );
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseCdChangerPkt
@@ -2186,8 +2192,8 @@ VanPacketParseResult_t ParseSatNavStatus1Pkt(const char* idenStr, TVanPacketRxDe
         emptyStr
     );
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseSatNavStatus1Pkt
@@ -2259,8 +2265,8 @@ VanPacketParseResult_t ParseSatNavStatus2Pkt(const char* idenStr, TVanPacketRxDe
 
     at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}\n"));
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseSatNavStatus2Pkt
@@ -2333,8 +2339,8 @@ VanPacketParseResult_t ParseSatNavStatus3Pkt(const char* idenStr, TVanPacketRxDe
         at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n]\n}\n}\n"));
     } // if
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseSatNavStatus3Pkt
@@ -2367,7 +2373,7 @@ VanPacketParseResult_t ParseSatNavGuidanceDataPkt(const char* idenStr, TVanPacke
                 "{\n"
                     "\"transform\": \"rotate(%udeg)\"\n"
                 "}\n"
-            "}\n"
+            "},\n"
             "\"satnav_curr_heading_as_text\": \"%u deg\",\n"
             "\"satnav_heading_to_dest\":\n"
             "{\n"
@@ -2375,7 +2381,7 @@ VanPacketParseResult_t ParseSatNavGuidanceDataPkt(const char* idenStr, TVanPacke
                 "{\n"
                     "\"transform\": \"rotate(%udeg)\"\n"
                 "}\n"
-            "}\n"
+            "},\n"
             "\"satnav_heading_to_dest_as_text\": \"%u deg\",\n"
             "\"satnav_distance_to_dest_via_road\": \"%u\",\n"
             "\"satnav_distance_to_dest_via_road_m\": \"%S\",\n"
@@ -2410,8 +2416,8 @@ VanPacketParseResult_t ParseSatNavGuidanceDataPkt(const char* idenStr, TVanPacke
         minutesToTravel
     );
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseSatNavGuidanceDataPkt
@@ -2554,8 +2560,8 @@ VanPacketParseResult_t ParseSatNavGuidancePkt(const char* idenStr, TVanPacketRxD
 
     at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}\n"));
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseSatNavGuidancePkt
@@ -2649,233 +2655,232 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
         } // if
     } // while
 
-    // Last packet in report sequence?
-    if (data[0] & 0x80)
-    {
-        // Create an 'easily digestable' JSON report
+    // Not last packet in report sequence?
+    if ((data[0] & 0x80) == 0x00) return VAN_PACKET_NO_CONTENT;
 
-        const static char jsonFormatter[] PROGMEM =
+    // Last packet in sequence: create an 'easily digestable' report in JSON format
+
+    const static char jsonFormatter[] PROGMEM =
+    "{\n"
+        "\"event\": \"display\",\n"
+        "\"data\":\n"
         "{\n"
-            "\"event\": \"display\",\n"
-            "\"data\":\n"
-            "{\n"
-                "\"satnav_report\": \"%S\"";
+            "\"satnav_report\": \"%S\"";
 
-        int at = snprintf_P(buf, n, jsonFormatter, SatNavRequestStr(report));
+    int at = snprintf_P(buf, n, jsonFormatter, SatNavRequestStr(report));
 
-        if (report == SR_CURRENT_STREET || report == SR_NEXT_STREET)
+    if (report == SR_CURRENT_STREET || report == SR_NEXT_STREET)
+    {
+        const static char jsonFormatter[] PROGMEM =
+            ",\n"
+            "\"satnav_%S_street\": \"%s%s (%s%S%s)\"";
+
+        // Current/next street is in first (and only) record. Copy only city [3], district [4] (if any) and
+        // street [5, 6]; skip the other strings.
+        at += at >= JSON_BUFFER_SIZE ? 0 :
+            snprintf_P(buf + at, n - at, jsonFormatter,
+
+                report == SR_CURRENT_STREET ? PSTR("curr") : PSTR("next"),
+
+                // Street
+                records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
+                records[0][6].c_str(),
+
+                // City - District (optional)
+                records[0][3].c_str(),
+                records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
+                records[0][4].c_str()
+            );
+    }
+    else if (report == SR_GPS_CHOOSE_DESTINATION || report == SR_GPS_FOR_PLACE_OF_INTEREST)
+    {
+        const static char jsonFormatter[] PROGMEM =
+            ",\n"
+            "\"satnav_%S_address\": \"%s%s%s%s (%s%S%s)\"";
+
+        // Address is in first (and only) record. Copy only city [3], district [4] (if any), street [5, 6] and
+        // house number [7]; skip the other strings.
+        at += at >= JSON_BUFFER_SIZE ? 0 :
+            snprintf_P(buf + at, n - at, jsonFormatter,
+
+                report == SR_GPS_CHOOSE_DESTINATION ? PSTR("destination") : PSTR("current"),
+
+                // Street
+                records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
+                records[0][6].c_str(),
+
+                // First string is either "C" or "V"; "C" has GPS coordinates in [7] and [8]; "V" has house number
+                // in [7]. If we see "V", show house number.
+                records[0][0] == "V" ? PSTR(" ") : emptyStr,
+                records[0][0] == "V" ? records[0][7].c_str() : emptyStr,
+
+                // City - District (optional)
+                records[0][3].c_str(),
+                records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
+                records[0][4].c_str()
+            );
+    }
+    else if (report == SR_PRIVATE_ADDRESS || report == SR_BUSINESS_ADDRESS)
+    {
+        const static char jsonFormatter[] PROGMEM =
+            ",\n"
+            "\"satnav_%S_entry\": \"%s\",\n"
+            "\"satnav_%S\": \"%s%s %s (%s%S%s)\"";
+
+        // Chosen address is in first (and only) record. Copy only city [3], district [4] (if any), street [5, 6]
+        // house number [7] and entry name [8]; skip the other strings.
+        at += at >= JSON_BUFFER_SIZE ? 0 :
+            snprintf_P(buf + at, n - at, jsonFormatter,
+
+                report == SR_PRIVATE_ADDRESS ? PSTR("private_address") : PSTR("business_address"),
+
+                // Name of the entry
+                records[0][8].c_str(),
+
+                report == SR_PRIVATE_ADDRESS ? PSTR("private_address") : PSTR("business_address"),
+
+                // Address of the entry
+
+                // Street and house number
+                records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
+                records[0][6].c_str(),
+                records[0][7].c_str(),
+
+                // City - District (optional)
+                records[0][3].c_str(),
+                records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
+                records[0][4].c_str()
+            );
+    }
+    else if (report == SR_PLACE_OF_INTEREST_ADDRESS)
+    {
+        const static char jsonFormatter[] PROGMEM =
+            ",\n"
+            "\"satnav_place_of_interest_address_entry\": \"%s\",\n"
+            "\"satnav_place_of_interest_address\": \"%s%s (%s%S%s)\",\n"
+            "\"satnav_place_of_interest_address_distance\": \"%s\"";
+
+        // Chosen place of interest address is in first (and only) record. Copy only city [3], district [4]
+        // (if any), street [5, 6], entry name [9] and distance [11]; skip the other strings.
+        at += at >= JSON_BUFFER_SIZE ? 0 :
+            snprintf_P(buf + at, n - at, jsonFormatter,
+
+                // Name of the place of interest
+                records[0][9].c_str(),
+
+                // Address of the place of interest
+
+                // Street
+                records[0][5].c_str() + 1,  // Skip the fixed first letter ('G' or 'I')
+                records[0][6].c_str(),
+
+                // City - District (optional)
+                records[0][3].c_str(),
+                records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
+                records[0][4].c_str(),
+
+                // Distance (in meters) to the place of interest. TODO - not sure
+                records[0][11].c_str()
+            );
+    }
+    else if (report == SR_ENTER_CITY
+             || report == SR_ENTER_STREET
+             || report == SR_PRIVATE_ADDRESS_LIST
+             || report == SR_BUSINESS_ADDRESS_LIST)
+    {
+        const static char jsonFormatter[] PROGMEM =
+            ",\n"
+            "\"satnav_list\":\n"
+            "[";
+
+        at += at >= JSON_BUFFER_SIZE ? 0 :
+            snprintf_P(buf + at, n - at, jsonFormatter);
+
+        // Each item in the list is a single string in a separate record
+        for (int i = 0; i < currentRecord; i++)
         {
-            const static char jsonFormatter[] PROGMEM =
-                ",\n"
-                "\"satnav_%S_street\": \"%s%s (%s%S%s)\"";
-
-            // Current/next street is in first (and only) record. Copy only city [3], district [4] (if any) and
-            // street [5, 6]; skip the other strings.
             at += at >= JSON_BUFFER_SIZE ? 0 :
-                snprintf_P(buf + at, n - at, jsonFormatter,
-
-                    report == SR_CURRENT_STREET ? PSTR("curr") : PSTR("next"),
-
-                    // Street
-                    records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
-                    records[0][6].c_str(),
-
-                    // City - District (optional)
-                    records[0][3].c_str(),
-                    records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
-                    records[0][4].c_str()
+                snprintf_P(buf + at, n - at,
+                    PSTR("%S\n\"%s\""),
+                    i == 0 ? emptyStr : commaStr,
+                    records[i][0].c_str()
                 );
-        }
-        else if (report == SR_GPS_CHOOSE_DESTINATION || report == SR_GPS_FOR_PLACE_OF_INTEREST)
+        } // for
+
+        at += at >= JSON_BUFFER_SIZE ? 0 :
+            snprintf_P(buf + at, n - at, PSTR("\n]"));
+    }
+    else if (report == SR_ENTER_HOUSE_NUMBER)
+    {
+        const static char jsonFormatter[] PROGMEM =
+            ",\n"
+            "\"satnav_house_number_range\": \"%s...%s\"";
+
+        // Range of "house numbers" is in first (and only) record, the lowest number is in the first string, and
+        // highest number is in the second string
+        at += at >= JSON_BUFFER_SIZE ? 0 :
+            snprintf_P(buf + at, n - at, jsonFormatter,
+
+                records[0][0].c_str(),
+                records[0][1].c_str()
+            );
+    }
+    else if (report == SR_PLACE_OF_INTEREST_CATEGORY_LIST)
+    {
+        const static char jsonFormatter[] PROGMEM =
+            ",\n"
+            "\"satnav_place_of_interest_category_list\":\n"
+            "[";
+
+        at += at >= JSON_BUFFER_SIZE ? 0 :
+            snprintf_P(buf + at, n - at, jsonFormatter);
+
+        // Each "category" in the list is a single string in a separate record
+        for (int i = 0; i < currentRecord; i++)
         {
-            const static char jsonFormatter[] PROGMEM =
-                ",\n"
-                "\"satnav_%S_address\": \"%s%s%s%s (%s%S%s)\"";
-
-            // Address is in first (and only) record. Copy only city [3], district [4] (if any), street [5, 6] and
-            // house number [7]; skip the other strings.
             at += at >= JSON_BUFFER_SIZE ? 0 :
-                snprintf_P(buf + at, n - at, jsonFormatter,
-
-                    report == SR_GPS_CHOOSE_DESTINATION ? PSTR("destination") : PSTR("current"),
-
-                    // Street
-                    records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
-                    records[0][6].c_str(),
-
-                    // First string is either "C" or "V"; "C" has GPS coordinates in [7] and [8]; "V" has house number
-                    // in [7]. If we see "V", show house number.
-                    records[0][0] == "V" ? PSTR(" ") : emptyStr,
-                    records[0][0] == "V" ? records[0][7].c_str() : emptyStr,
-
-                    // City - District (optional)
-                    records[0][3].c_str(),
-                    records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
-                    records[0][4].c_str()
+                snprintf_P(buf + at, n - at,
+                    PSTR("%S\n\"%s\""),
+                    i == 0 ? emptyStr : commaStr,
+                    records[i][0].c_str()
                 );
-        }
-        else if (report == SR_PRIVATE_ADDRESS || report == SR_BUSINESS_ADDRESS)
-        {
-            const static char jsonFormatter[] PROGMEM =
-                ",\n"
-                "\"satnav_%S_entry\": \"%s\",\n"
-                "\"satnav_%S\": \"%s%s %s (%s%S%s)\"";
+        } // for
 
-            // Chosen address is in first (and only) record. Copy only city [3], district [4] (if any), street [5, 6]
-            // house number [7] and entry name [8]; skip the other strings.
-            at += at >= JSON_BUFFER_SIZE ? 0 :
-                snprintf_P(buf + at, n - at, jsonFormatter,
-
-                    report == SR_PRIVATE_ADDRESS ? PSTR("private_address") : PSTR("business_address"),
-
-                    // Name of the entry
-                    records[0][8].c_str(),
-
-                    report == SR_PRIVATE_ADDRESS ? PSTR("private_address") : PSTR("business_address"),
-
-                    // Address of the entry
-
-                    // Street and house number
-                    records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
-                    records[0][6].c_str(),
-                    records[0][7].c_str(),
-
-                    // City - District (optional)
-                    records[0][3].c_str(),
-                    records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
-                    records[0][4].c_str()
-                );
-        }
-        else if (report == SR_PLACE_OF_INTEREST_ADDRESS)
-        {
-            const static char jsonFormatter[] PROGMEM =
-                ",\n"
-                "\"satnav_place_of_interest_address_entry\": \"%s\",\n"
-                "\"satnav_place_of_interest_address\": \"%s%s (%s%S%s)\",\n"
-                "\"satnav_place_of_interest_address_distance\": \"%s\"";
-
-            // Chosen place of interest address is in first (and only) record. Copy only city [3], district [4]
-            // (if any), street [5, 6], entry name [9] and distance [11]; skip the other strings.
-            at += at >= JSON_BUFFER_SIZE ? 0 :
-                snprintf_P(buf + at, n - at, jsonFormatter,
-
-                    // Name of the place of interest
-                    records[0][9].c_str(),
-
-                    // Address of the place of interest
-
-                    // Street
-                    records[0][5].c_str() + 1,  // Skip the fixed first letter ('G' or 'I')
-                    records[0][6].c_str(),
-
-                    // City - District (optional)
-                    records[0][3].c_str(),
-                    records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
-                    records[0][4].c_str(),
-
-                    // Distance (in meters) to the place of interest. TODO - not sure
-                    records[0][11].c_str()
-                );
-        }
-        else if (report == SR_ENTER_CITY
-                 || report == SR_ENTER_STREET
-                 || report == SR_PRIVATE_ADDRESS_LIST
-                 || report == SR_BUSINESS_ADDRESS_LIST)
-        {
-            const static char jsonFormatter[] PROGMEM =
-                ",\n"
-                "\"satnav_list\":\n"
-                "[";
-
-            at += at >= JSON_BUFFER_SIZE ? 0 :
-                snprintf_P(buf + at, n - at, jsonFormatter);
-
-            // Each item in the list is a single string in a separate record
-            for (int i = 0; i < currentRecord; i++)
-            {
-                at += at >= JSON_BUFFER_SIZE ? 0 :
-                    snprintf_P(buf + at, n - at,
-                        PSTR("%S\n\"%s\""),
-                        i == 0 ? emptyStr : commaStr,
-                        records[i][0].c_str()
-                    );
-            } // for
-
-            at += at >= JSON_BUFFER_SIZE ? 0 :
-                snprintf_P(buf + at, n - at, PSTR("\n]"));
-        }
-        else if (report == SR_ENTER_HOUSE_NUMBER)
-        {
-            const static char jsonFormatter[] PROGMEM =
-                ",\n"
-                "\"satnav_house_number_range\": \"%s...%s\"";
-
-            // Range of "house numbers" is in first (and only) record, the lowest number is in the first string, and
-            // highest number is in the second string
-            at += at >= JSON_BUFFER_SIZE ? 0 :
-                snprintf_P(buf + at, n - at, jsonFormatter,
-
-                    records[0][0].c_str(),
-                    records[0][1].c_str()
-                );
-        }
-        else if (report == SR_PLACE_OF_INTEREST_CATEGORY_LIST)
-        {
-            const static char jsonFormatter[] PROGMEM =
-                ",\n"
-                "\"satnav_place_of_interest_category_list\":\n"
-                "[";
-
-            at += at >= JSON_BUFFER_SIZE ? 0 :
-                snprintf_P(buf + at, n - at, jsonFormatter);
-
-            // Each "category" in the list is a single string in a separate record
-            for (int i = 0; i < currentRecord; i++)
-            {
-                at += at >= JSON_BUFFER_SIZE ? 0 :
-                    snprintf_P(buf + at, n - at,
-                        PSTR("%S\n\"%s\""),
-                        i == 0 ? emptyStr : commaStr,
-                        records[i][0].c_str()
-                    );
-            } // for
-
-            at += at >= JSON_BUFFER_SIZE ? 0 :
-                snprintf_P(buf + at, n - at, PSTR("\n]"));
-        } // if
-        else if (report == SR_SOFTWARE_MODULE_VERSIONS)
-        {
-            const static char jsonFormatter[] PROGMEM =
-                ",\n"
-                "\"satnav_software_modules_list\":\n"
-                "[";
-
-            at += at >= JSON_BUFFER_SIZE ? 0 :
-                snprintf_P(buf + at, n - at, jsonFormatter);
-
-            // Each "module" in the list is a triplet of strings ('module_name', then 'version' and 'date' in a rather
-            // free format) in a separate record
-            for (int i = 0; i < currentRecord; i++)
-            {
-                at += at >= JSON_BUFFER_SIZE ? 0 :
-                    snprintf_P(buf + at, n - at,
-                        PSTR("%S\n\"%s - %s - %s\""),
-                        i == 0 ? emptyStr : commaStr,
-                        records[i][0].c_str(),
-                        records[i][1].c_str(),
-                        records[i][2].c_str()
-                    );
-            } // for
-
-            at += at >= JSON_BUFFER_SIZE ? 0 :
-                snprintf_P(buf + at, n - at, PSTR("\n]"));
-        } // if
-
-        at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}\n"));
-
-        // Warning on Serial output if JSON buffer overflows
-        if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+        at += at >= JSON_BUFFER_SIZE ? 0 :
+            snprintf_P(buf + at, n - at, PSTR("\n]"));
     } // if
+    else if (report == SR_SOFTWARE_MODULE_VERSIONS)
+    {
+        const static char jsonFormatter[] PROGMEM =
+            ",\n"
+            "\"satnav_software_modules_list\":\n"
+            "[";
+
+        at += at >= JSON_BUFFER_SIZE ? 0 :
+            snprintf_P(buf + at, n - at, jsonFormatter);
+
+        // Each "module" in the list is a triplet of strings ('module_name', then 'version' and 'date' in a rather
+        // free format) in a separate record
+        for (int i = 0; i < currentRecord; i++)
+        {
+            at += at >= JSON_BUFFER_SIZE ? 0 :
+                snprintf_P(buf + at, n - at,
+                    PSTR("%S\n\"%s - %s - %s\""),
+                    i == 0 ? emptyStr : commaStr,
+                    records[i][0].c_str(),
+                    records[i][1].c_str(),
+                    records[i][2].c_str()
+                );
+        } // for
+
+        at += at >= JSON_BUFFER_SIZE ? 0 :
+            snprintf_P(buf + at, n - at, PSTR("\n]"));
+    } // if
+
+    at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}\n"));
+
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseSatNavReportPkt
@@ -2889,6 +2894,8 @@ VanPacketParseResult_t ParseMfdToSatNavPkt(const char* idenStr, TVanPacketRxDesc
     if (dataLen != 4 && dataLen != 9 && dataLen != 11) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
     const uint8_t* data = pkt.Data();
+    uint8_t request = data[0];
+    uint8_t parameter = data[1];
     uint8_t type = data[2];
 
     const static char jsonFormatter[] PROGMEM =
@@ -2897,10 +2904,15 @@ VanPacketParseResult_t ParseMfdToSatNavPkt(const char* idenStr, TVanPacketRxDesc
         "\"data\":\n"
         "{\n"
             "\"mfd_to_satnav_request\": \"%S\",\n"
+            "\"mfd_to_satnav_extended_request\": \"%S\",\n"
             "\"mfd_to_satnav_request_type\": \"%S\"";
 
     int at = snprintf_P(buf, n, jsonFormatter,
-        SatNavRequestStr(data[0]),
+        SatNavRequestStr(request),
+
+        // "Special" combinations
+        request == SR_PLACE_OF_INTEREST_CATEGORY_LIST && parameter == 0xFF && dataLen == 4 ? PSTR("START_SATNAV") :
+            emptyStr,
 
         type == 0x00 ? PSTR("REQ_LIST_LENGTH") :
         type == 0x01 ? PSTR("REQ_LIST") :
@@ -2945,7 +2957,7 @@ VanPacketParseResult_t ParseMfdToSatNavPkt(const char* idenStr, TVanPacketRxDesc
                     length
                 );
         }
-        else if (selectionOrOffset > 0)
+        else //if (selectionOrOffset > 0)
         {
             at += at >= JSON_BUFFER_SIZE ? 0 :
                 snprintf_P(buf + at, n - at, PSTR
@@ -2961,8 +2973,8 @@ VanPacketParseResult_t ParseMfdToSatNavPkt(const char* idenStr, TVanPacketRxDesc
     at += at >= JSON_BUFFER_SIZE ? 0 :
         snprintf_P(buf + at, n - at, PSTR("\n}\n}\n"));
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseMfdToSatNavPkt
@@ -3022,8 +3034,8 @@ VanPacketParseResult_t ParseSatNavToMfdPkt(const char* idenStr, TVanPacketRxDesc
     at += at >= JSON_BUFFER_SIZE ? 0 :
         snprintf_P(buf + at, n - at, PSTR("\"\n}\n}\n"));
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseSatNavToMfdPkt
@@ -3055,8 +3067,8 @@ VanPacketParseResult_t ParseWheelSpeedPkt(const char* idenStr, TVanPacketRxDesc&
         (uint16_t)data[6] << 8 | data[7]
     );
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseWheelSpeedPkt
@@ -3083,8 +3095,8 @@ VanPacketParseResult_t ParseOdometerPkt(const char* idenStr, TVanPacketRxDesc& p
         FloatToStr(floatBuf, ((uint32_t)data[1] << 16 | (uint32_t)data[2] << 8 | data[3]) / 10.0, 1)
     );
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseOdometerPkt
@@ -3161,8 +3173,8 @@ VanPacketParseResult_t ParseCom2000Pkt(const char* idenStr, TVanPacketRxDesc& pk
         (sint8_t)data[6]
     );
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseCom2000Pkt
@@ -3202,8 +3214,8 @@ VanPacketParseResult_t ParseCdChangerCmdPkt(const char* idenStr, TVanPacketRxDes
         ToHexStr(cdcCommand)
     );
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseCdChangerCmdPkt
@@ -3459,8 +3471,8 @@ VanPacketParseResult_t ParseMfdToHeadUnitPkt(const char* idenStr, TVanPacketRxDe
         return VAN_PACKET_PARSE_TO_BE_DECODED;
     } // if
 
-    // Warning on Serial output if JSON buffer overflows
-    if (at >= JSON_BUFFER_SIZE) Serial.print(FPSTR(warningPrintBufferOverflow));
+    // JSON buffer overflow?
+    if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
     return VAN_PACKET_PARSE_OK;
 } // ParseMfdToHeadUnitPkt
@@ -3604,7 +3616,12 @@ const char* ParseVanPacketToJson(TVanPacketRxDesc& pkt)
 
         int result = handler->parser(handler->idenStr, pkt, jsonBuffer, JSON_BUFFER_SIZE);
 
-        if (result == VAN_PACKET_PARSE_OK)
+        if (result == VAN_PACKET_PARSE_JSON_TOO_LONG)
+        {
+            Serial.print(FPSTR(warningPrintBufferOverflow));
+            // No use to return the JSON buffer; it is invalid
+        }
+        else if (result == VAN_PACKET_PARSE_OK)
         {
             #ifdef PRINT_JSON_BUFFERS_ON_SERIAL
             Serial.print(F("Parsed to JSON object:\n"));
@@ -3615,5 +3632,5 @@ const char* ParseVanPacketToJson(TVanPacketRxDesc& pkt)
         } // if
     } // if
 
-    return ""; // Unrecognized IDEN value
+    return ""; // Unrecognized IDEN value or result != VAN_PACKET_PARSE_OK
 } // ParseVanPacketToJson
