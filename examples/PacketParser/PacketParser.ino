@@ -117,10 +117,15 @@ static const char PROGMEM notApplicable3Str[] = "---";
 static const char PROGMEM toBeDecodedStr[] = "[to be decoded]";
 static const char PROGMEM unexpectedPacketLengthStr[] = "[unexpected packet length]";
 
-inline uint8_t GetBcd(uint8_t bcd)
+// Uses statically allocated buffer, so don't call twice within the same printf invocation 
+char* ToStr(uint8_t data)
 {
-    return (bcd >> 4 & 0x0F) * 10 + (bcd & 0x0F);
-} // GetBcd
+    #define MAX_UINT8_STR_SIZE 4
+    static char buffer[MAX_UINT8_STR_SIZE];
+    sprintf_P(buffer, PSTR("%u"), data);
+
+    return buffer;
+} // ToStr
 
 // Uses statically allocated buffer, so don't call twice within the same printf invocation 
 char* ToHexStr(uint8_t data)
@@ -300,23 +305,23 @@ enum SatNavRequest_t
 {
     SR_ENTER_COUNTRY = 0x00,  // Never seen, just guessing
     SR_ENTER_PROVINCE = 0x01,  // Never seen, just guessing
-    SR_ENTER_CITY = 0x02,  // Or: list of cities?
+    SR_ENTER_CITY = 0x02,
     SR_ENTER_DISTRICT = 0x03,  // Never seen, just guessing
     SR_ENTER_NEIGHBORHOOD = 0x04,  // Never seen, just guessing
-    SR_ENTER_STREET = 0x05,  // Or: list of streets?
+    SR_ENTER_STREET = 0x05,
     SR_ENTER_HOUSE_NUMBER = 0x06,  // Range of house numbers to choose from
     SR_ENTER_HOUSE_NUMBER_LETTER = 0x07,  // Never seen, just guessing
-    SR_PLACE_OF_INTEREST_CATEGORY_LIST = 0x08,
-    SR_PLACE_OF_INTEREST_ADDRESS = 0x09,
-    SR_GPS_FOR_PLACE_OF_INTEREST = 0x0E,  // Or: current address?
-    SR_NEXT_STREET = 0x0F,  // Shown during navigation in the (solid line) top box
-    SR_CURRENT_STREET = 0x10,  // Shown during navigation in the (dashed line) bottom box
+    SR_PLACE_OF_INTEREST_CATEGORY = 0x08,
+    SR_PLACE_OF_INTEREST = 0x09,
+    SR_LAST_DESTINATION = 0x0E,
+    SR_NEXT_STREET = 0x0F,  // Shown during SatNav guidance in the (solid line) top box
+    SR_CURRENT_STREET = 0x10,  // Shown during SatNav guidance in the (dashed line) bottom box
     SR_PRIVATE_ADDRESS = 0x11,
     SR_BUSINESS_ADDRESS = 0x12,
     SR_SOFTWARE_MODULE_VERSIONS = 0x13,
     SR_PRIVATE_ADDRESS_LIST = 0x1B,
     SR_BUSINESS_ADDRESS_LIST = 0x1C,
-    SR_GPS_CHOOSE_DESTINATION = 0x1D  // Or: current or last destination?
+    SR_DESTINATION = 0x1D
 }; // enum SatNavRequest_t
 
 // Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
@@ -331,9 +336,9 @@ const char* SatNavRequestStr(uint8_t data)
         data == SR_ENTER_STREET ? PSTR("ENTER_STREET") :
         data == SR_ENTER_HOUSE_NUMBER ? PSTR("ENTER_HOUSE_NUMBER") :
         data == SR_ENTER_HOUSE_NUMBER_LETTER ? PSTR("ENTER_HOUSE_NUMBER_LETTER") :
-        data == SR_PLACE_OF_INTEREST_CATEGORY_LIST ? PSTR("PLACE_OF_INTEREST_CATEGORY_LIST") :
-        data == SR_PLACE_OF_INTEREST_ADDRESS ? PSTR("PLACE_OF_INTEREST_ADDRESS") :
-        data == SR_GPS_FOR_PLACE_OF_INTEREST ? PSTR("GPS_FOR_PLACE_OF_INTEREST") :
+        data == SR_PLACE_OF_INTEREST_CATEGORY ? PSTR("PLACE_OF_INTEREST_CATEGORY") :
+        data == SR_PLACE_OF_INTEREST ? PSTR("PLACE_OF_INTEREST") :
+        data == SR_LAST_DESTINATION ? PSTR("LAST_DESTINATION") :
         data == SR_NEXT_STREET ? PSTR("NEXT_STREET") :
         data == SR_CURRENT_STREET ? PSTR("CURRENT_STREET") :
         data == SR_PRIVATE_ADDRESS ? PSTR("PRIVATE_ADDRESS") :
@@ -341,7 +346,7 @@ const char* SatNavRequestStr(uint8_t data)
         data == SR_SOFTWARE_MODULE_VERSIONS ? PSTR("SOFTWARE_MODULE_VERSIONS") :
         data == SR_PRIVATE_ADDRESS_LIST ? PSTR("PRIVATE_ADDRESS_LIST") :
         data == SR_BUSINESS_ADDRESS_LIST ? PSTR("BUSINESS_ADDRESS_LIST") :
-        data == SR_GPS_CHOOSE_DESTINATION ? PSTR("GPS_CHOOSE_DESTINATION") :
+        data == SR_DESTINATION ? PSTR("DESTINATION") :
         ToHexStr(data);
 } // SatNavRequestStr
 
@@ -1516,21 +1521,21 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                         ToHexStr(data[3])
                     );
 
-                    SERIAL.printf_P(PSTR(" - %um:%us in track %u"),
-                        GetBcd(data[5]),
-                        GetBcd(data[6]),
-                        GetBcd(data[7])
+                    SERIAL.printf_P(PSTR(" - %X:%02X in track %X"),
+                        data[5],
+                        data[6],
+                        data[7]
                     );
 
                     if (data[8] != 0xFF)
                     {
-                        SERIAL.printf_P(PSTR("/%u"), GetBcd(data[8]));
+                        SERIAL.printf_P(PSTR("/%X"), data[8]);
 
                         if (dataLen >= 12 && data[9] != 0xFF)
                         {
-                            SERIAL.printf_P(PSTR(" (total: %um:%us)"),
-                                GetBcd(data[9]),
-                                GetBcd(data[10])
+                            SERIAL.printf_P(PSTR(" (total: %X:%02X)"),
+                                data[9],
+                                data[10]
                             );
                         } // if
                     } // if
@@ -1921,8 +1926,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             SERIAL.printf_P(
                 PSTR(
-                    "random=%S; state=%S; cartridge=%S; %Sm:%Ss in track %u/%S on CD %u; "
-                    "presence=%S-%S-%S-%S-%S-%S\n"
+                    "random=%S; state=%S"
                 ),
                 data[1] == 0x01 ? onStr : offStr,
 
@@ -1932,17 +1936,33 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 data[2] == 0xC3 ? PSTR("PLAYING") :
                 data[2] == 0xC4 ? PSTR("FAST_FORWARD") :
                 data[2] == 0xC5 ? PSTR("REWIND") :
-                ToHexStr(data[2]),
+                ToHexStr(data[2])
+            );
 
+            uint8_t trackTimeMin = data[4];
+            uint8_t trackTimeSec = data[5];
+            bool trackTimeInvalid = trackTimeMin == 0xFF || trackTimeSec == 0xFF;
+            char trackTimeStr[7];
+            if (! trackTimeInvalid) sprintf_P(trackTimeStr, PSTR("%X:%02X"), trackTimeMin, trackTimeSec);
+
+            uint8_t totalTracks = data[8];
+            bool totalTracksInvalid = totalTracks == 0xFF;
+            char totalTracksStr[3];
+            if (! totalTracksInvalid) sprintf_P(totalTracksStr, PSTR("%X"), totalTracks);
+
+            SERIAL.printf_P(
+                PSTR(
+                    "; cartridge=%S; %S in track %X/%S on CD %X; "
+                    "presence=%S-%S-%S-%S-%S-%S\n"
+                ),
                 data[3] == 0x16 ? PSTR("IN") :
                 data[3] == 0x06 ? PSTR("OUT") :
                 ToHexStr(data[3]),
 
-                data[4] == 0xFF ? notApplicable2Str : FloatToStr(floatBuf[0], GetBcd(data[4]), 0),
-                data[5] == 0xFF ? notApplicable2Str : FloatToStr(floatBuf[1], GetBcd(data[5]), 0),
-                GetBcd(data[6]),
-                data[8] == 0xFF ? notApplicable2Str : FloatToStr(floatBuf[2], GetBcd(data[8]), 0),
-                GetBcd(data[7]),
+                trackTimeInvalid ? PSTR("--:--") : trackTimeStr,
+                data[6],
+                totalTracksInvalid ? notApplicable2Str : totalTracksStr,
+                data[7],
 
                 data[10] & 0x01 ? PSTR("1") : PSTR(" "),
                 data[10] & 0x02 ? PSTR("2") : PSTR(" "),
@@ -2800,34 +2820,232 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             // Possible meanings of data:
             //
-            // data[0]: request code
+            // -----
+            // dataLen is 4, 9 or 11:
             //
-            // data[1]:
-            // - 0x0D: user is selecting an option
-            // - 0x0E: user is selecting an option
-            // - 0x1D: user is entering data (city, street, house number, ...)
-            // - 0xFF: user or MFD is requesting a list or data item
+            // * data[0]: request code
             //
-            // data[2]: Type
-            // - 0x00: request length of list
-            // - 0x01: request list, starting at data[5] << 8 | data[6], length in data[7] << 8 | data[8]
-            // - 0x02: select item as indicated in data[5] << 8 | data[6]
+            // * data[1]: parameter
+            //   - 0x0D: user is selecting an entry from a list
+            //   - 0x0E: user is selecting an entry from a list
+            //   - 0x1D: user is entering data (city, street, house number, ...)
+            //   - 0xFF: user or MFD is requesting a list or data item
             //
-            // data[3]: Selected letter, digit or character (A..Z, 0..9, '). 0 if not applicable.
+            // * data[2]: type
+            //   - 0x00: request length of list
+            //   - 0x01: request list, data[5] << 8 | data[6] is offset, data[7] << 8 | data[8] is number of items
+            //   - 0x02: select item as indicated in data[5] << 8 | data[6]
             //
-            // data[4]:
+            // data[3]: selected letter, digit or character (A..Z 0..9 ' <space> <Esc>); 0 if not applicable
             //
-            // data[5] << 8 | data[6]: selected item or offset, or 0 if not applicable.
+            // -----
+            // dataLen is 9 or 11:
             //
-            // data[7] << 8 | data[8]: number of items or length, or 0 if not applicable.
+            // * data[4]: always 0
             //
-            uint16_t request = (uint16_t)data[0] << 8 | data[1];
+            // * data[5] << 8 | data[6]: selected item or offset (0-based)
+            //
+            // * data[7] << 8 | data[8]: number of items or length; 0 if not applicable
+            //
+            // -----
+            // dataLen 11:
+            //
+            // * data[9]: always 0
+            //
+            // * data[10]: always 0
+            //
+            uint8_t request = data[0];
+            uint8_t param = data[1];
             uint8_t type = data[2];
 
             SERIAL.printf_P(
-                PSTR("request=%S (%S), type=%S"),
+                PSTR("request=%S, param=%S, type=%S, effective_command=%S"),
 
-                SatNavRequestStr(data[0]),
+                SatNavRequestStr(request),
+
+                ToHexStr(param),  // TODO - provide descriptive string
+
+                type == 0 ? PSTR("REQ_LIST_LENGTH") :
+                type == 1 ? PSTR("REQ_LIST") :
+                type == 2 ? PSTR("SELECT") :
+                ToStr(type),
+
+                // Combinations:
+                //
+                // * request == 0x02 ("ENTER_CITY"), 0x05 ("ENTER_STREET"),
+                //   param == 0x1D:
+                //   - type = 0 (dataLen = 4): request (remaining) list length
+                //     -- data[3]: (next) character to narrow down selection with. 0x00 if none.
+                //   - type = 1 (dataLen = 9): request list 
+                //     -- data[5] << 8 | data[6]: offset in list (0-based)
+                //     -- data[7] << 8 | data[8]: number of items to retrieve
+                //   - type = 2 (dataLen = 11): select entry
+                //     -- data[5] << 8 | data[6]: selected entry (0-based)
+
+                request == SR_ENTER_CITY && param == 0x1D && type == 0 ? "ENTER_CITY_BY_LETTER" :
+                request == SR_ENTER_CITY && param == 0x1D && type == 1 ? "ENTER_CITY_GET_LIST" :
+                request == SR_ENTER_CITY && param == 0x1D && type == 2 ? "ENTER_CITY_SELECT" :
+
+                request == SR_ENTER_STREET && param == 0x1D && type == 0 ? "ENTER_STREET_BY_LETTER" :
+                request == SR_ENTER_STREET && param == 0x1D && type == 1 ? "ENTER_STREET_GET_LIST" :
+                request == SR_ENTER_STREET && param == 0x1D && type == 2 ? "ENTER_STREET_SELECT" :
+
+                // * request == 0x06 ("ENTER_HOUSE_NUMBER"),
+                //   param == 0x1D:
+                //   - type = 1 (dataLen = 9): request range of house numbers
+                //     -- data[7] << 8 | data[8]: always 1
+                //   - type = 2 (dataLen = 11): enter house number
+                //     -- data[5] << 8 | data[6]: entered house number. 0 if not applicable.
+
+                request == SR_ENTER_HOUSE_NUMBER && param == 0x1D && type == 1 ? "ENTER_HOUSE_NUMBER_GET_RANGE" :
+                request == SR_ENTER_HOUSE_NUMBER && param == 0x1D && type == 2 ? "ENTER_HOUSE_NUMBER_SELECT" :
+
+                // * request == 0x08 ("PLACE_OF_INTEREST_CATEGORY"),
+                //   param == 0x0D:
+                //   - type = 0 (dataLen = 4): request list length. Satnav will respond with 38 and no
+                //              letters or number to choose from.
+                //   - type = 2 (dataLen = 11): select entry from list
+                //     -- data[5] << 8 | data[6]: selected entry (0-based)
+
+                request == SR_PLACE_OF_INTEREST_CATEGORY && param == 0x0D && type == 0 ? "PLACE_OF_INTEREST_CATEGORY_GET_LIST_LENGTH" :
+                request == SR_PLACE_OF_INTEREST_CATEGORY && param == 0x0D && type == 2 ? "PLACE_OF_INTEREST_CATEGORY_SELECT" :
+
+                // * request == 0x08 ("PLACE_OF_INTEREST_CATEGORY"),
+                //   param == 0xFF:
+                //   - type = 0 (dataLen = 4): present nag screen. Satnav response is PLACE_OF_INTEREST_CATEGORY_LIST
+                //              with list_size=38, but the MFD ignores that.
+                //   - type = 1 (dataLen = 9): request list 
+                //     -- data[5] << 8 | data[6]: offset in list (always 0)
+                //     -- data[7] << 8 | data[8]: number of items to retrieve (always 38)
+
+                request == SR_PLACE_OF_INTEREST_CATEGORY && param == 0xFF && type == 0 ? "START_SATNAV_SESSION" :
+                request == SR_PLACE_OF_INTEREST_CATEGORY && param == 0xFF && type == 1 ? "PLACE_OF_INTEREST_CATEGORY_GET_LIST" :
+
+                // * request == 0x09 ("PLACE_OF_INTEREST"),
+                //   param == 0x0D:
+                //   - type = 0 (dataLen = 4): request list length
+                //   - type = 1 (dataLen = 9): request list 
+                //     -- data[5] << 8 | data[6]: offset in list (always 0)
+                //     -- data[7] << 8 | data[8]: number of items to retrieve (always 1: MFD browses address by address)
+
+                request == SR_PLACE_OF_INTEREST && param == 0x0D && type == 0 ? "PLACE_OF_INTEREST_GET_LIST_LENGTH" :
+                request == SR_PLACE_OF_INTEREST && param == 0x0D && type == 1 ? "PLACE_OF_INTEREST_GET_LIST" :
+
+                // * request == 0x09 ("PLACE_OF_INTEREST"),
+                //   param == 0x0E:
+                //   - type = 2 (dataLen = 11): select entry from list
+                //     -- data[5] << 8 | data[6]: selected entry (0-based)
+
+                request == SR_PLACE_OF_INTEREST && param == 0x0E && type == 2 ? "SELECT_PLACE_OF_INTEREST_ENTRY" :
+
+                // * request == 0x0E ("LAST_DESTINATION"),
+                //   param == 0x0D:
+                //   - type = 2 (dataLen = 11):
+                //     -- no further data
+
+                request == SR_LAST_DESTINATION && param == 0x0D && type == 2 ? "SELECT_LAST_DESTINATION" :
+
+                // * request == 0x0E ("LAST_DESTINATION"),
+                //   param == 0xFF:
+                //   - type = 1 (dataLen = 9):
+                //     -- data[5] << 8 | data[6]: offset in list (always 0)
+                //     -- data[7] << 8 | data[8]: number of items to retrieve (always 1)
+
+                request == SR_LAST_DESTINATION && param == 0xFF && type == 1 ? "GET_LAST_DESTINATION" :
+
+                // * request == 0x0F ("NEXT_STREET"),
+                //   param == 0xFF:
+                //   - type = 1 (dataLen = 9):
+                //     -- data[5] << 8 | data[6]: offset in list (always 0)
+                //     -- data[7] << 8 | data[8]: number of items to retrieve (always 1)
+
+                request == SR_NEXT_STREET && param == 0xFF && type == 1 ? "GET_NEXT_STREET" :
+
+                // * request == 0x10 ("CURRENT_STREET"),
+                //   param == 0x0D:
+                //   - type = 2 (dataLen = 11): select current location for e.g. places of interest
+                //     -- no further data
+
+                request == SR_CURRENT_STREET && param == 0x0D && type == 2 ? "SELECT_CURRENT_STREET" :
+
+                // * request == 0x10 ("CURRENT_STREET"),
+                //   param == 0xFF:
+                //   - type = 1 (dataLen = 9): get current location during sat nav guidance
+                //     -- data[5] << 8 | data[6]: offset in list (always 0)
+                //     -- data[7] << 8 | data[8]: number of items to retrieve (always 1)
+
+                request == SR_CURRENT_STREET && param == 0xFF && type == 1 ? "GET_CURRENT_STREET" :
+
+                // * request == 0x11 ("PRIVATE_ADDRESS"),
+                //   param == 0x0E:
+                //   - type = 2 (dataLen = 11): select entry from list
+                //     -- data[5] << 8 | data[6]: selected entry (0-based)
+
+                request == SR_PRIVATE_ADDRESS && param == 0x0E && type == 2 ? "SELECT_PRIVATE_ADDRESS_ENTRY" :
+
+                // * request == 0x11 ("PRIVATE_ADDRESS"),
+                //   param == 0xFF:
+                //   - type = 1 (dataLen = 9): get entry
+                //     -- data[5] << 8 | data[6]: selected entry (0-based)
+
+                request == SR_PRIVATE_ADDRESS && param == 0xFF && type == 1 ? "RETRIEVE_PRIVATE_ADDRESS" :
+
+                // * request == 0x12 ("BUSINESS_ADDRESS"),
+                //   param == 0x0E:
+                //   - type = 2 (dataLen = 11): select entry from list
+                //     -- data[5] << 8 | data[6]: selected entry (0-based)
+
+                request == SR_BUSINESS_ADDRESS && param == 0x0E && type == 2 ? "SELECT_BUSINESS_ADDRESS_ENTRY" :
+
+                // * request == 0x12 ("BUSINESS_ADDRESS"),
+                //   param == 0xFF:
+                //   - type = 1 (dataLen = 9): get entry
+                //     -- data[5] << 8 | data[6]: selected entry (0-based)
+
+                request == SR_BUSINESS_ADDRESS && param == 0xFF && type == 1 ? "RETRIEVE_BUSINESS_ADDRESS" :
+
+                // * request == 0x1B ("PRIVATE_ADDRESS_LIST"),
+                //   param == 0xFF:
+                //   - type = 0 (dataLen = 4): request list length
+                //   - type = 1 (dataLen = 9): request list 
+                //     -- data[5] << 8 | data[6]: offset in list
+                //     -- data[7] << 8 | data[8]: number of items to retrieve
+
+                request == SR_PRIVATE_ADDRESS_LIST && param == 0xFF && type == 0 ? "PRIVATE_ADDRESS_GET_LIST_LENGTH" :
+                request == SR_PRIVATE_ADDRESS_LIST && param == 0xFF && type == 1 ? "PRIVATE_ADDRESS_GET_LIST" :
+
+                // * request == 0x1C ("BUSINESS_ADDRESS_LIST"),
+                //   param == 0xFF:
+                //   - type = 0 (dataLen = 4): request list length
+                //   - type = 1 (dataLen = 9): request list 
+                //     -- data[5] << 8 | data[6]: offset in list
+                //     -- data[7] << 8 | data[8]: number of items to retrieve
+
+                request == SR_BUSINESS_ADDRESS_LIST && param == 0xFF && type == 0 ? "BUSINESS_ADDRESS_GET_LIST_LENGTH" :
+                request == SR_BUSINESS_ADDRESS_LIST && param == 0xFF && type == 1 ? "BUSINESS_ADDRESS_GET_LIST" :
+
+                // * request == 0x1D ("DESTINATION"),
+                //   param == 0x0E:
+                //   - type = 2 (dataLen = 11): select fastest route
+                //     -- no further data
+                //
+                // TODO - run a session in which something else than fastest route is selected
+
+                request == SR_DESTINATION && param == 0x0E && type == 2 ? "SELECT_FASTEST_ROUTE" :
+
+                // * request == 0x1D ("DESTINATION"),
+                //   param == 0xFF:
+                //   - type = 1 (dataLen = 9): get current destination. Satnav replies (IDEN 0x6CE) with the last
+                //     destination, a city center with GPS coordinate (if no street has been entered yet), or a
+                //     full address
+                //     -- data[5] << 8 | data[6]: offset in list (always 0)
+                //     -- data[7] << 8 | data[8]: number of items to retrieve (always 1)
+
+                request == SR_DESTINATION && param == 0xFF && type == 1 ? "GET_CURRENT_DESTINATION" :
+
+                ToHexStr(param, type)
+/*
+                Old list
 
                 request == 0x021D ? PSTR("ENTER_CITY") : // 4, 9 or 11 bytes
                 request == 0x051D ? PSTR("ENTER_STREET") : // 4, 9 or 11 bytes
@@ -2837,10 +3055,12 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
                 // Strange: when starting a SatNav session, the MFD always starts off by asking the number of
                 // items in the list of categories. It gets the correct answer (38) but just ignores that.
+                // MFD shows the nag screen.
                 request == 0x08FF && dataLen == 4 ? PSTR("START_SATNAV") :
 
                 request == 0x08FF && dataLen == 9 ? PSTR("REQUEST_LIST_OF_CATEGORIES") :
-                request == 0x090D ? PSTR("CHOOSE_CATEGORY") :
+                request == 0x090D ? PSTR("PLACE_OF_INTEREST_ADDRESS") :
+                request == 0x090E ? PSTR("CHOOSE_PLACE_OF_INTEREST") :
                 request == 0x0E0D ? PSTR("CHOOSE_ADDRESS_FOR_PLACES_OF_INTEREST") :
                 request == 0x0EFF ? PSTR("REQUEST_ADDRESS_FOR_PLACES_OF_INTEREST") :
                 request == 0x0FFF ? PSTR("REQUEST_NEXT_STREET") :
@@ -2857,20 +3077,8 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 request == 0x1CFF && dataLen == 9 ? PSTR("REQUEST_BUSINESS_ADDRESSES") :
                 request == 0x1D0E ? PSTR("SELECT_FASTEST_ROUTE?") :
                 request == 0x1DFF ? PSTR("CHOOSE_DESTINATION_SHOW_CURRENT_ADDRESS") :
-                ToHexStr(request),
-
-                // Possible meanings:
-                // * request == 0x021D:
-                //   - type = 1: request list starting at data[5] << 8 | data[6], length in data[7] << 8 | data[8]
-                //   - type = 2: choose line in data[5] << 8 | data[6]
-                // * request == 0x080D:
-                //   - type = 2: choose line in data[5] << 8 | data[6]
-                // * request == 0x08FF:
-                //   - type = 1: request list starting at data[5] << 8 | data[6], length in data[7] << 8 | data[8]
-                type == 0x00 ? PSTR("REQ_LIST_LENGTH") :
-                type == 0x01 ? PSTR("REQ_LIST") :
-                type == 0x02 ? PSTR("CHOOSE") :
-                ToHexStr(type)
+                ToHexStr(request)
+*/
             );
 
             if (data[3] != 0x00)
@@ -2891,11 +3099,13 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 uint16_t selectionOrOffset = (uint16_t)data[5] << 8 | data[6];
                 uint16_t length = (uint16_t)data[7] << 8 | data[8];
 
-                if (selectionOrOffset > 0 && length > 0)
+                //if (selectionOrOffset > 0 && length > 0)
+                if (length > 0)
                 {
                     SERIAL.printf_P(PSTR(", offset=%u, length=%u"), selectionOrOffset, length);
                 }
-                else //if (selectionOrOffset > 0)
+                //else if (selectionOrOffset > 0)
+                else
                 {
                     SERIAL.printf_P(PSTR(", selection=%u"), selectionOrOffset);
                 } // if
