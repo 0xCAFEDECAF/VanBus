@@ -97,4 +97,6 @@ void loop()
         lastUpdate = millis();
         VanBusRx.DumpStats(Serial);
     } // if
+
+    delay(1);
 } // loop
