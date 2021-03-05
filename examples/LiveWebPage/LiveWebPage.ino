@@ -16,9 +16,9 @@
  * Details
  *
  * This sketch will host a web page, showing all data that has been received and parsed from the VAN bus. The web
- * page is updated continuously ("live") using a web socket (on port 81). Data is broadcast by the VAN bus receiver, in
- * JSON format, which is then picked up on the client side by a JavaScript dispatcher script (served by the same web
- * page). The script uses jQuery to place the incoming data on the correct spot in the DOM.
+ * page is updated continuously ("live") using a web socket (on port 81). Data from the VAN bus is broadcast to the
+ * web socket in JSON format, which is then picked up on the client side by a JavaScript dispatcher script (served
+ * in the same web page). The script uses jQuery to place the incoming data on the correct spot in the DOM.
  *
  * The result is a web page that runs remarkably light-weight, able to quickly handle updates (I've been able to
  * easily see 10 updates per second without queues running full).
@@ -33,13 +33,22 @@
  * (Arduino IDE --> Menu 'Sketch' --> 'Include Library' --> 'Manage Libraries...')
  *
  * - "WebSockets" by Markus Sattler (https://github.com/Links2004/arduinoWebSockets) 
- *   --> Tested with version 2.2.0 and 2.3.3 .
+ *   --> Tested with version 2.2.0, 2.3.3 and 2.3.4 .
  *
  * The web site itself, as served by this sketch, uses jQuery, which it downloads from:
  * https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js
  * If you don't like Google tracking your surfing, you could use Firefox and install the 'LocalCDN' extension (see
  * https://addons.mozilla.org/nl/firefox/addon/localcdn-fork-of-decentraleyes ).
  */
+
+// Uncomment to see the JSON buffers printed on the Serial port.
+// Note: printing the JSON buffers takes pretty long, so it leads to more Rx queue overruns.
+#define PRINT_JSON_BUFFERS_ON_SERIAL
+
+// Having #define VAN_RX_QUEUE_SIZE set to 15 (see VanBusRx.h) seems too little given the current setup
+// where JSON buffers are printed on the Serial port (#define PRINT_JSON_BUFFERS_ON_SERIAL); seeing quite some
+// "VAN PACKET QUEUE OVERRUN!" lines. Looks like it should be set to at least 100.
+#define VAN_RX_QUEUE_SIZE 100
 
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
@@ -194,6 +203,17 @@ char webpage[] PROGMEM = R"=====(
 
     </script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <style>
+      .listbox
+      {
+        border:1px solid;
+        width:700px;
+        height:200px;
+        overflow:scroll;
+        overflow-x:hidden;
+        white-space:nowrap;
+      }
+    </style>
   </head>
   <body>
     <div>
@@ -302,10 +322,8 @@ char webpage[] PROGMEM = R"=====(
     <div>
       <p>Warnings and notifications</p>
       <p>Active list</p>
-      <textarea id="alarm_list" rows="10" cols="80"></textarea>
-      <div id="notification_on_mfd" style="display:none">
-        <p>Message shown on multi-function display: <b id="message_displayed_on_mfd">---</b></p>
-      </div>
+      <div id="alarm_list" class="listbox"></div>
+      <p>Message shown on multi-function display: <b id="message_displayed_on_mfd">---</b></p>
     </div>
     <hr/>
     <div>
@@ -489,7 +507,9 @@ char webpage[] PROGMEM = R"=====(
       <p>Disc: <b id="satnav_disc_present">---</b></p>
       <p>Disc status: <b id="satnav_disc_status">---</b></p>
       <p>System ID</p>
-      <textarea id="satnav_system_id" rows="5" cols="80"></textarea>
+      <div id="satnav_system_id" style="border:1px solid; width:700px; height:200px; overflow:scroll; overflow-x:hidden; white-space:nowrap;">
+      </div>
+      <p>MFD to sat nav: <b id="mfd_to_satnav_instruction">---</b></p>
       <p>GPS fix: <b id="satnav_gps_fix">---</b></p>
       <p>GPS fix list: <b id="satnav_gps_fix_lost">---</b></p>
       <p>GPS scanning: <b id="satnav_gps_scanning">---</b></p>
@@ -500,23 +520,24 @@ char webpage[] PROGMEM = R"=====(
     <div>
       <p>SatNav guidance data</p>
 
-      <p>Current heading: <b id="satnav_curr_heading_as_text">---</b></p>
-
       <!-- Rotating round an abstract transform-origin like 'center' is better supported for a <div> than an <svg> element -->
-      <div id="satnav_curr_heading" style="width:80px; height:120px; transform:rotate(65deg); transform-origin:center;">
+      <div id="satnav_curr_heading" style="width:120px; height:120px; transform:rotate(65deg); transform-origin:center;">
         <svg>
-          <path style="stroke-width:8;" d="M40 15 l30 100 l-60 0 Z"/>
+          <path style="stroke-width:8;" d="M60 15 l30 100 l-60 0 Z"></path>
         </svg>
       </div>
+      <p>Current heading: <b id="satnav_curr_heading_as_text">---</b></p>
 
+      <div id="satnav_heading_to_dest" style="width:120px; height:120px; transform:rotate(22.5deg); transform-origin:center;">
+        <svg>
+          <path style="stroke-width:8;" d="M60 10 l30 100 l-60 0 Z"></path>
+        </svg>
+      </div>
       <p>Heading to destination: <b id="satnav_heading_to_dest_as_text">---</b></p>
-      <svg>
-        <path id="satnav_heading_to_dest" style="stroke-width:8;" d="M100 10 l30 100 l-60 0 Z" transform="rotate(22.5)" transform-origin="100 65"/>
-      </svg>
 
-      <p>Road distance to destination: <b id="satnav_distance_to_dest_via_road">---</b> (unit is meters: <b id="satnav_distance_to_dest_via_road_m">---</b>, (unit is kilometers: <b id="satnav_distance_to_dest_via_road_km">---</b>)</p>
-      <p>Straight line to destination: <b id="satnav_distance_to_dest_via_straight_line">---</b> (unit is meters: <b id="satnav_distance_to_dest_via_straight_line_m">---</b>, (unit is kilometers: <b id="satnav_distance_to_dest_via_straight_line_km">---</b>)</p>
-      <p>Turn at: <b id="satnav_turn_at">---</b> (unit is meters: <b id="satnav_turn_at_m">---</b>, (unit is kilometers: <b id="satnav_turn_at_km">---</b>)</p>
+      <p>Road distance to destination: <b id="satnav_distance_to_dest_via_road">---</b> (unit is meters: <b id="satnav_distance_to_dest_via_road_m">---</b>, unit is kilometers: <b id="satnav_distance_to_dest_via_road_km">---</b>)</p>
+      <p>Straight line to destination: <b id="satnav_distance_to_dest_via_straight_line">---</b> (unit is meters: <b id="satnav_distance_to_dest_via_straight_line_m">---</b>, unit is kilometers: <b id="satnav_distance_to_dest_via_straight_line_km">---</b>)</p>
+      <p>Turn at: <b id="satnav_turn_at">---</b> (unit is meters: <b id="satnav_turn_at_m">---</b>, unit is kilometers: <b id="satnav_turn_at_km">---</b>)</p>
       <p>Heading on roundabout: <b id="satnav_heading_on_roundabout_as_text">---</b></p>
       <p>Minutes to travel (?): <b id="satnav_minutes_to_travel">---</b></p>
     </div>
@@ -528,7 +549,14 @@ char webpage[] PROGMEM = R"=====(
       <p>'Turn around if possible' icon: <b style="display:none;" id="satnav_turn_around_if_possible_icon">VISIBLE</b></p>
       <p>'Follow road' icon: <b style="display:none;" id="satnav_follow_road_icon">VISIBLE</b></p>
       <p>'Not on map' icon: <b style="display:none;" id="satnav_not_on_map_icon">VISIBLE</b></p>
+
+      <div id="satnav_curr_turn_icon_direction" style="width:120px; height:120px; transform:rotate(0deg); transform-origin:center;">
+        <svg>
+          <path style="stroke-width:8;" d="M60 10 l30 100 l-60 0 Z"></path>
+        </svg>
+      </div>
       <p>Current turn icon direction: <b id="satnav_curr_turn_icon_direction_as_text">---</b></p>
+
       <p>Current turn icon leg 22.5 : <b id="satnav_curr_turn_icon_leg_22_5">---</b></p>
       <p>Current turn icon leg 45.0 : <b id="satnav_curr_turn_icon_leg_45_0">---</b></p>
       <p>Current turn icon leg 67.5 : <b id="satnav_curr_turn_icon_leg_67_5">---</b></p>
@@ -559,7 +587,14 @@ char webpage[] PROGMEM = R"=====(
       <p>Current turn icon no entry 292.5: <b id="satnav_curr_turn_icon_no_entry_292_5">---</b></p>
       <p>Current turn icon no entry 315.0: <b id="satnav_curr_turn_icon_no_entry_315_0">---</b></p>
       <p>Current turn icon no entry 337.5: <b id="satnav_curr_turn_icon_no_entry_337_5">---</b></p>
+
+      <div id="satnav_next_turn_icon_direction" style="width:120px; height:120px; transform:rotate(0deg); transform-origin:center;">
+        <svg>
+          <path style="stroke-width:8;" d="M60 10 l30 100 l-60 0 Z"></path>
+        </svg>
+      </div>
       <p>Next turn icon direction: <b id="satnav_next_turn_icon_direction_as_text">---</b></p>
+
       <p>Next turn icon leg 22.5 : <b id="satnav_next_turn_icon_leg_22_5">---</b></p>
       <p>Next turn icon leg 45.0 : <b id="satnav_next_turn_icon_leg_45_0">---</b></p>
       <p>Next turn icon leg 67.5 : <b id="satnav_next_turn_icon_leg_67_5">---</b></p>
@@ -595,7 +630,14 @@ char webpage[] PROGMEM = R"=====(
       <p>'Fork' icon - take left exit: <b id="satnav_fork_icon_take_left_exit">---</b></p>
       <p>'Fork' icon - keep left: <b id="satnav_fork_icon_keep_left">---</b></p>
       <p>'Follow road' icon - next instruction: <b id="satnav_follow_road_next_instruction">---</b></p>
-      <p>'Not on map' icon - follow heading: <b id="satnav_not_on_map_follow_heading">---</b></p>
+
+      <div id="satnav_not_on_map_follow_heading" style="width:120px; height:120px; transform:rotate(0deg); transform-origin:center;">
+        <svg>
+          <path style="stroke-width:8;" d="M60 10 l30 100 l-60 0 Z"></path>
+        </svg>
+      </div>
+      <p>'Not on map' icon - follow heading: <b id="satnav_not_on_map_follow_heading_as_text">---</b></p>
+
     </div>
     <hr/>
     <div>
@@ -603,29 +645,50 @@ char webpage[] PROGMEM = R"=====(
       <p>Report: <b id="satnav_report">---</b></p>
       <p>Current street: <b id="satnav_curr_street">---</b></p>
       <p>Next street: <b id="satnav_next_street">---</b></p>
-      <p>Destination address: <b id="satnav_destination_address">---</b></p>
-      <p>Current address: <b id="satnav_current_address">---</b></p>
-      <p>Private address entry: <b id="satnav_private_address_entry">---</b></p>
-      <p>Private address: <b id="satnav_private_address">---</b></p>
-      <p>Business address entry: <b id="satnav_business_address_entry">---</b></p>
-      <p>Business address: <b id="satnav_business_address">---</b></p>
-      <p>Place of interest address entry: <b id="satnav_place_of_interest_address_entry">---</b></p>
-      <p>Place of interest address: <b id="satnav_place_of_interest_address">---</b></p>
+      <p>Current destination - country: <b id="satnav_current_destination_country">---</b></p>
+      <p>Current destination - province: <b id="satnav_current_destination_province">---</b></p>
+      <p>Current destination - city: <b id="satnav_current_destination_city">---</b></p>
+      <p>Current destination - street: <b id="satnav_current_destination_street">---</b></p>
+      <p>Current destination - house number: <b id="satnav_current_destination_house_number">---</b></p>
+      <p>Last destination - country: <b id="satnav_last_destination_country">---</b></p>
+      <p>Last destination - province: <b id="satnav_last_destination_province">---</b></p>
+      <p>Last destination - city: <b id="satnav_last_destination_city">---</b></p>
+      <p>Last destination - street: <b id="satnav_last_destination_street">---</b></p>
+      <p>Last destination - house number: <b id="satnav_last_destination_house_number">---</b></p>
+      <p>Private address - entry: <b id="satnav_private_address_entry">---</b></p>
+      <p>Private address - country: <b id="satnav_private_address_country">---</b></p>
+      <p>Private address - province: <b id="satnav_private_address_province">---</b></p>
+      <p>Private address - city: <b id="satnav_private_address_city">---</b></p>
+      <p>Private address - street: <b id="satnav_private_address_street">---</b></p>
+      <p>Private address - house number: <b id="satnav_private_address_house_number">---</b></p>
+      <p>Business address - entry: <b id="satnav_business_address_entry">---</b></p>
+      <p>Business address - country: <b id="satnav_business_address_country">---</b></p>
+      <p>Business address - province: <b id="satnav_business_address_province">---</b></p>
+      <p>Business address - city: <b id="satnav_business_address_city">---</b></p>
+      <p>Business address - street: <b id="satnav_business_address_street">---</b></p>
+      <p>Business address - house number: <b id="satnav_business_address_house_number">---</b></p>
+      <p>Place of interest address - entry: <b id="satnav_place_of_interest_address_entry">---</b></p>
+      <p>Place of interest address - country: <b id="satnav_place_of_interest_address_country">---</b></p>
+      <p>Place of interest address - province: <b id="satnav_place_of_interest_address_province">---</b></p>
+      <p>Place of interest address - city: <b id="satnav_place_of_interest_address_city">---</b></p>
+      <p>Place of interest address - street: <b id="satnav_place_of_interest_address_street">---</b></p>
+      <p>Place of interest address - house number: <b id="satnav_place_of_interest_address_house_number">---</b></p>
       <p>Place of interest address distance: <b id="satnav_place_of_interest_address_distance">---</b></p>
       <p>Address list</p>
-      <textarea id="satnav_list" rows="5" cols="80"></textarea>
+      <div id="satnav_list" class="listbox"></div>
       <p>House number range: <b id="satnav_house_number_range">---</b></p>
       <p>Places of interest category list</p>
-      <textarea id="satnav_place_of_interest_category_list" rows="10" cols="80"></textarea>
+      <div id="satnav_place_of_interest_category_list" class="listbox"></div>
       <p>Software module list</p>
-      <textarea id="satnav_software_modules_list" rows="5" cols="80"></textarea>
+      <div id="satnav_software_modules_list" class="listbox"></div>
     </div>
     <hr/>
     <div>
       <p>Multi-function display to satnav</p>
       <p>Request: <b id="mfd_to_satnav_request">---</b></p>
       <p>Request type: <b id="mfd_to_satnav_request_type">---</b></p>
-      <p>Character: <b id="mfd_to_satnav_character">---</b></p>
+      <p>Go to screen: <b id="mfd_to_satnav_go_to_screen">---</b></p>
+      <p>Entered character: <b id="mfd_to_satnav_enter_character">---</b></p>
       <p>List offset: <b id="mfd_to_satnav_offset">---</b></p>
       <p>List length: <b id="mfd_to_satnav_length">---</b></p>
       <p>List selection: <b id="mfd_to_satnav_selection">---</b></p>
@@ -716,6 +779,46 @@ char webpage[] PROGMEM = R"=====(
 </html>
 )=====";
 
+uint16_t serialDumpFilter;
+
+// Set a simple filter on the dumping of packet + JSON data on Serial.
+// Surf to e.g. http://car.lan/dumpOnly?iden=8c4 to have only packets with IDEN 0x8C4 dumped on serial.
+// Surf to http://car.lan/dumpOnly?iden=0 to dump all packets.
+void handleDumpFilter()
+{
+    Serial.print(F("Web server received request from "));
+    String ip = webServer.client().remoteIP().toString();
+    Serial.print(ip);
+    Serial.print(webServer.method() == HTTP_GET ? F(": GET - '") : F(": POST - '"));
+    Serial.print(webServer.uri());
+    bool found = false;
+    if (webServer.args() > 0)
+    {
+        Serial.print("?");
+        for (uint8_t i = 0; i < webServer.args(); i++)
+        {
+            if (! found && webServer.argName(i) == "iden" && webServer.arg(i).length() <= 3)
+            {
+                // Invalid conversion results in 0, which is ok: it corresponds to "dump all packets"
+                serialDumpFilter = strtol(webServer.arg(i).c_str(), NULL, 16);
+                found = true;
+            } // if
+
+            Serial.print(webServer.argName(i));
+            Serial.print(F("="));
+            Serial.print(webServer.arg(i));
+            if (i < webServer.args() - 1) Serial.print('&');
+        } // for
+    } // if
+    Serial.println(F("'"));
+
+    webServer.send(200, F("text/plain"),
+        ! found ? F("NOT OK!") :
+            serialDumpFilter == 0 ?
+            F("OK: dumping all JSON data") :
+            F("OK: filtering JSON data"));
+} // handleDumpFilter
+
 // Defined in Wifi.ino
 void setupWifi();
 
@@ -732,6 +835,9 @@ void setup()
         webServer.send_P(200, "text/html", webpage);  
         Serial.printf_P(PSTR("Sending HTML took: %lu msec\n"), millis() - start);
     });
+
+    webServer.on("/dumpOnly", handleDumpFilter);
+
     webServer.begin();
     webSocket.begin();
 
@@ -739,6 +845,7 @@ void setup()
     Serial.println(WiFi.localIP());
 
     VanBusRx.Setup(RX_PIN);
+    Serial.printf_P(PSTR("VanBusRx queue of size %d is set up\n"), VanBusRx.GetQueueSize());
 } // setup
 
 // Defined in PacketToJson.ino
@@ -766,7 +873,7 @@ void loop()
         } // if
     } // if
 
-    if (isQueueOverrun) Serial.print(F("QUEUE OVERRUN!\n"));
+    if (isQueueOverrun) Serial.print(F("VAN PACKET QUEUE OVERRUN!\n"));
 
     delay(1); // Give some time to system to process other things?
 } // loop
