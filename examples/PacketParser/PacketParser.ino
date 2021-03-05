@@ -2259,7 +2259,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     status == 0x0C02 ? PSTR("POWERING_OFF") :
                     status == 0x0140 ? PSTR("GPS_POS_FOUND") :
                     status == 0x0120 ? PSTR("ACCEPTED_TERMS_AND_CONDITIONS") :
-                    status == 0x0108 ? PSTR("NAVIGATION_MENU_ENTERED") :
+
+                    // This starts when the nag screen is accepted and is seen repeatedly when selecting a destination
+                    // and during guidance. It stops after a "STOPPING_NAVIGATION" status message.
+                    status == 0x0108 ? PSTR("SATNAV_IN_OPERATION") :  // NAVIGATION_MENU_ENTERED
+
                     ToHexStr(status)
                 );
             }
@@ -2832,9 +2836,12 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             //   - 0xFF: user or MFD is requesting a list or data item
             //
             // * data[2]: type
-            //   - 0x00: request length of list
-            //   - 0x01: request list, data[5] << 8 | data[6] is offset, data[7] << 8 | data[8] is number of items
-            //   - 0x02: select item as indicated in data[5] << 8 | data[6]
+            //   - 0 (dataLen = 4): request length of list
+            //   - 1 (dataLen = 9): request list
+            //       -- data[5] << 8 | data[6]: offset (0-based)
+            //       -- data[7] << 8 | data[8]: number of items requested
+            //   - 2 (dataLen = 11): select item
+            //       -- data[5] << 8 | data[6]: selected item (0-based)
             //
             // data[3]: selected letter, digit or character (A..Z 0..9 ' <space> <Esc>); 0 if not applicable
             //
@@ -2868,6 +2875,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 type == 0 ? PSTR("REQ_LIST_LENGTH") :
                 type == 1 ? PSTR("REQ_LIST") :
                 type == 2 ? PSTR("SELECT") :
+                type == 3 ? PSTR("CITY_CENTER") :  // TODO - not sure
                 ToStr(type),
 
                 // Combinations:
@@ -3701,7 +3709,7 @@ void loop()
 
         // Filter on specific IDENs
         uint16_t iden = pkt.Iden();
-        if (! isPacketSelected(iden, VAN_PACKETS_HEAD_UNIT)) continue;
+        if (! isPacketSelected(iden, VAN_PACKETS_ALL_EXCEPT)) continue;
 
         // Show packet as parsed by ISR
         VanPacketParseResult_t parseResult = ParseVanPacket(&pkt);
