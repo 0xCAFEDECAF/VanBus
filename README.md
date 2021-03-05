@@ -2,7 +2,7 @@
 
 ---
 
-<p align="center">Reading and writing packets from/to PSA vehicles' VAN bus.<br></p>
+<p align="center">Reading and writing packets from/to PSA vehicles' VAN bus.</p>
 
 ## 📝 Table of Contents
 - [Description](#description)
@@ -10,9 +10,11 @@
 - [Usage](#usage)
   - [General](#general)
   - [Functions](#functions)
+- [Limitations, Caveats](#limits)
+- [Work to be Done](#todo)
 - [License](#license)
 
-## 🎈 Description <a name = "description"></a>
+## 🎈 Description<a name = "description"></a>
 
 This module allows you to receive and transmit packets on the "VAN" bus of your Peugeot or Citroen vehicle.
 
@@ -25,7 +27,7 @@ in their newer cars with the CAN bus protocol, however some models had VAN bus i
 Only ESP8266 / ESP8285 is supported. ESP32 is NOT supported by this library; for boards with those MCUs there is this
 excellent library: [ESP32 RMT peripheral Vehicle Area Network (VAN bus) reader].
 
-## 🔌 Schematics <a name = "schematics"></a>
+## 🔌 Schematics<a name = "schematics"></a>
 
 You can usually find the VAN bus on pins 2 and 3 of ISO block "A" of your head unit (car radio). See 
 https://en.wikipedia.org/wiki/Connectors_for_car_audio and https://github.com/morcibacsi/esp32_rmt_van_rx#schematics .
@@ -33,28 +35,31 @@ https://en.wikipedia.org/wiki/Connectors_for_car_audio and https://github.com/mo
 There are various possibilities to hook up a ESP8266 based board to your vehicle's VAN bus:
 
 1. Use a [MCP2551] transceiver, connected with its CANH and CANL pins to the vehicle's VAN bus.
-   As the MCP2551 has 5V logic, a 5V ↔️ 3.3V [level converter] is needed to connect the CRX / RXD / R pin of the
+   As the MCP2551 has 5V logic, a 5V ↔ 3.3V [level converter] is needed to connect the CRX / RXD / R pin of the
    transceiver, via the level converter, to a GPIO pin of your ESP8266 board. For transmitting packets, also connect
    the CTX / TXD / D pins of the transceiver, via the level converter, to a GPIO pin of your ESP8266 board.
-   ![schema](extras/schematics/Schematic%20using%20MCP2551_bb.png)
+
+![schema](extras/schematics/Schematic%20using%20MCP2551_bb.png)
 
 2. Use a [SN65HVD230] transceiver, connected with its CANH and CANL pins to the vehicle's VAN bus.
    The SN65HVD230 transceiver already has 3.3V logic, so it is possible to directly connect the CRX / RXD / R pin of
    the transceiver to a GPIO pin of your ESP8266 board. For transmitting packets, also connect the CTX / TXD / D pins
    of the transceiver to a GPIO pin of your ESP8266 board.
-   ![schema](extras/schematics/Schematic%20using%20SN65HVD230_bb.png)
+
+![schema](extras/schematics/Schematic%20using%20SN65HVD230_bb.png)
    
 3. The simplest schematic is not to use a transceiver at all, but connect the VAN DATA line to GrouND using
    two 4.7 kOhm resistors. Connect the GPIO pin of your ESP8266 board to the 1:2 [voltage divider] that is thus
    formed by the two resistors. This is only for receiving packets, not for transmitting. Results may vary.
-   ![schema](extras/schematics/Schematic%20using%20voltage%20divider_bb.png)
+
+![schema](extras/schematics/Schematic%20using%20voltage%20divider_bb.png)
    
    👉 Note: I used this schematic during many long debugging hours, but I cannot guarantee that it won't ultimately
       cause your car to explode! (or anything less catastrofic)
 
 ## 🚀 Usage<a name = "usage"></a>
 
-### General <a name = "general"></a>
+### General<a name = "general"></a>
 
 Add the following line to your ```.ino``` sketch:
 ```
@@ -275,18 +280,25 @@ Returns the ACK field of the VAN packet as a string, either "ACK" or "NO_ACK".
 
 Returns the RESULT field of the VAN packet as a string, either "OK" or a string starting with "ERROR_".
 
-## ⚠️ Limitations, Caveats
+## ⚠️ Limitations, Caveats<a name = "limits"></a>
 
-The library times the incoming bits using an interrupt service routine (ISR) that triggers on pin "change" events (see the internal function ```RxPinChangeIsr``` in [VanBusRx.cpp](https://github.com/0xCAFEDECAF/VanBus/blob/master/VanBusRx.cpp#L326)). It seems that the invocation of the ISR is often quite late (or maybe the bits are wobbly on the line already).
+The library times the incoming bits using an interrupt service routine (ISR) that triggers on pin "change"
+events (see the internal function ```RxPinChangeIsr``` in
+[VanBusRx.cpp](https://github.com/0xCAFEDECAF/VanBus/blob/master/VanBusRx.cpp#L326)). It seems that the
+invocation of the ISR is often quite late (or maybe the bits are wobbly on the line already).
 
-I had to do a bit of tweaking to be able to reconstruct the real bits from the number of CPU cycles that have elapsed between the ISR invocations. Still, not all packets are received error-free. Even after trying to "repair" a packet (see function [```bool CheckCrcAndRepair()```](#CheckCrcAndRepair)), the long-term average packet loss is around 0.01% ... 0.015% (between 1 in 10,000 and 1 in 6,666), which is ok(-ish). I am investigating how to improve on this.
+I had to do a bit of tweaking to be able to reconstruct the real bits from the number of CPU cycles that have
+elapsed between the ISR invocations. Still, not all packets are received error-free. Even after trying to
+"repair" a packet (see function [```bool CheckCrcAndRepair()```](#CheckCrcAndRepair)), the long-term average
+packet loss is around 0.01% ... 0.015% (between 1 in 10,000 and 1 in 6,666), which is ok(-ish). I am
+investigating how to improve on this.
 
-## 👷 Work to be done
+## 👷 Work to be Done<a name = "todo"></a>
 
 ### Near future
 
-Currently the library supports only 125 kbit/s VAN bus. Need to add support for different rate, like 62.5 kbit/s, which can be
-passed as an optional parameter to ```VanBusRx.Setup(...)```.
+Currently the library supports only 125 kbit/s VAN bus. Need to add support for different rate, like 62.5 kbit/s,
+which can be passed as an optional parameter to ```VanBusRx.Setup(...)```.
 
 ### Looking forward
 
@@ -295,7 +307,7 @@ updates on a "virtual dashboard" web page that is served by the ESP8266 based bo
 can draw a nice skin for this "virtual dashboard" 😁. Inspiration? Have a look e.g. at
 https://realdash.net/gallery.php.
 
-## 📖 License <a name = "license"></a>
+## 📖 License<a name = "license"></a>
 
 This library is open-source and licensed under the [MIT license](http://opensource.org/licenses/MIT).
 
