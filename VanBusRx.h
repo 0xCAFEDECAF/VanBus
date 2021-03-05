@@ -218,7 +218,9 @@ class TVanPacketRxQueue
 {
   public:
 
+    #ifndef VAN_RX_QUEUE_SIZE
     #define VAN_RX_QUEUE_SIZE 15
+    #endif
 
     // Constructor
     TVanPacketRxQueue()
@@ -230,7 +232,8 @@ class TVanPacketRxQueue
         , txTimerIsr(NULL)
         , txTimerTicks(0)
         , lastMediaAccessAt(0)
-        , count(0)
+        , _count(0)
+        , _overruns(0)
         , nCorrupt(0)
         , nRepaired(0)
     { }
@@ -238,8 +241,10 @@ class TVanPacketRxQueue
     void Setup(uint8_t rxPin);
     bool Available() const { ISR_SAFE_GET(bool, tail->state == VAN_RX_DONE); }
     bool Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun = NULL);
-    uint32_t GetCount() const { ISR_SAFE_GET(uint32_t, count); }
+    uint32_t GetCount() const { ISR_SAFE_GET(uint32_t, _count); }
+    uint32_t GetOverruns() const { ISR_SAFE_GET(uint32_t, _overruns); }
     void DumpStats(Stream& s) const;
+    int GetQueueSize() const { return VAN_RX_QUEUE_SIZE; }
 
   private:
 
@@ -254,7 +259,8 @@ class TVanPacketRxQueue
     volatile uint32_t lastMediaAccessAt;  // For carrier sense: CPU cycle counter value when last sensed
 
     // Some statistics. Numbers can roll over.
-    uint32_t count;
+    uint32_t _count;
+    uint32_t _overruns;
     uint32_t nCorrupt;
     uint32_t nRepaired;
 
@@ -271,7 +277,7 @@ class TVanPacketRxQueue
     void ICACHE_RAM_ATTR _AdvanceHead()
     {
         _head->state = VAN_RX_DONE;
-        _head->seqNo = count++;
+        _head->seqNo = _count++;
         if (++_head == end) _head = pool;  // roll over if needed
     } // _AdvanceHead
 

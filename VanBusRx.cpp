@@ -200,8 +200,9 @@ void TVanPacketRxQueue::DumpStats(Stream& s) const
 
     // Using shared buffer floatBuf, so only one invocation per printf
     s.printf_P(
-        PSTR("received pkts: %lu, corrupt: %lu (%s%%)"),
+        PSTR("received pkts: %lu, overruns: %lu, corrupt: %lu (%s%%)"),
         pktCount,
+        GetOverruns(),
         nCorrupt,
         pktCount == 0
             ? "-.---"
@@ -362,9 +363,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     TIsrDebugData* debugIsr = isrDebugPacket->samples + isrDebugPacket->at;
 
     // Only write into buffer if there is space
-    // TODO - no, this is incorrect. We should just overwrite the oldest (unread) slot. Then also keep a "Rx Packet
-    // Lost" counter.
-    if (state != VAN_RX_DONE && isrDebugPacket->at < VAN_ISR_DEBUG_BUFFER_SIZE)
+    if (isrDebugPacket->at < VAN_ISR_DEBUG_BUFFER_SIZE)
     {
         debugIsr->pinLevel = pinLevelChangedTo;
         debugIsr->nCycles = nCycles;
@@ -374,7 +373,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     // Just before returning from this ISR, record some data for debugging
     #define return \
     { \
-        if (state != VAN_RX_DONE && isrDebugPacket->at < VAN_ISR_DEBUG_BUFFER_SIZE) \
+        if (isrDebugPacket->at < VAN_ISR_DEBUG_BUFFER_SIZE) \
         { \
             debugIsr->pinLevelAtReturnFromIsr = GPIP(VanBusRx.pin); \
             debugIsr->nCyclesProcessing = ESP.getCycleCount() - curr; \
@@ -387,11 +386,19 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     static unsigned int atBit = 0;
     static uint16_t readBits = 0;
 
-    if (state == VAN_RX_VACANT)
+    if (state == VAN_RX_VACANT || state == VAN_RX_DONE)
     {
         // Wait until we've seen a series of VAN_LOGICAL_HIGH bits
         if (pinLevelChangedTo == VAN_LOGICAL_LOW)
         {
+            // If the current head packet is already VAN_RX_DONE, the circular buffer is completely full.
+            // Just overwrite the oldest (unread) slot
+            if (state == VAN_RX_DONE)
+            {
+                VanBusRx._overrun = true;
+                VanBusRx._overruns++;  //  Keep a "Rx Queue Overrun" counter
+            } // if
+
             rxDesc->state = VAN_RX_SEARCHING;
             rxDesc->ack = VAN_NO_ACK;
             atBit = 0;
@@ -411,14 +418,6 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         // The timer ISR 'WaitAckIsr' will do this
         //VanBusRx._AdvanceHead();
 
-        return;
-    } // if
-
-    // If the current head packet is already VAN_RX_DONE, the circular buffer is completely full
-    if (state != VAN_RX_SEARCHING && state != VAN_RX_LOADING)
-    {
-        VanBusRx._overrun = true;
-        //SetTxBitTimer();
         return;
     } // if
 
