@@ -65,6 +65,26 @@ char* ToStr(uint8_t data)
     return buffer;
 } // ToStr
 
+// Uses statically allocated buffer, so don't call twice within the same printf invocation 
+char* ToStr(uint16_t data)
+{
+    #define MAX_UINT16_STR_SIZE 6
+    static char buffer[MAX_UINT16_STR_SIZE];
+    sprintf_P(buffer, PSTR("%u"), data);
+
+    return buffer;
+} // ToStr
+
+// Uses statically allocated buffer, so don't call twice within the same printf invocation 
+char* ToStr(sint16_t data)
+{
+    #define MAX_SINT16_STR_SIZE 7
+    static char buffer[MAX_SINT16_STR_SIZE];
+    sprintf_P(buffer, PSTR("%d"), data);
+
+    return buffer;
+} // ToStr
+
 // Uses statically allocated buffer, so don't call twice within the same printf invocation
 char* ToHexStr(uint8_t data)
 {
@@ -618,7 +638,11 @@ VanPacketParseResult_t ParseHeadUnitStalkPkt(const char* idenStr, TVanPacketRxDe
         "\"event\": \"display\",\n"
         "\"data\":\n"
         "{\n"
-            "\"head_unit_stalk_buttons\": \"%S %S %S %S %S\",\n"
+            "\"head_unit_stalk_button_next\": \"%S\",\n"
+            "\"head_unit_stalk_button_prev\": \"%S\",\n"
+            "\"head_unit_stalk_button_volume_up\": \"%S\",\n"
+            "\"head_unit_stalk_button_volume_down\": \"%S\",\n"
+            "\"head_unit_stalk_button_source\": \"%S\",\n"
             "\"head_unit_stalk_wheel\": \"%d\",\n"
             "\"head_unit_stalk_wheel_rollover\": \"%u\"\n"
         "}\n"
@@ -626,11 +650,11 @@ VanPacketParseResult_t ParseHeadUnitStalkPkt(const char* idenStr, TVanPacketRxDe
 
     int at = snprintf_P(buf, n, jsonFormatter,
 
-        data[0] & 0x80 ? PSTR("NEXT") : emptyStr,
-        data[0] & 0x40 ? PSTR("PREV") : emptyStr,
-        data[0] & 0x08 ? PSTR("VOL_UP") : emptyStr,
-        data[0] & 0x04 ? PSTR("VOL_DOWN") : emptyStr,
-        data[0] & 0x02 ? PSTR("SOURCE") : emptyStr,
+        data[0] & 0x80 ? onStr : offStr,
+        data[0] & 0x40 ? onStr : offStr,
+        data[0] & 0x08 ? onStr : offStr,
+        data[0] & 0x04 ? onStr : offStr,
+        data[0] & 0x02 ? onStr : offStr,
 
         data[1] - 0x80,
         data[0] >> 4 & 0x03
@@ -1014,7 +1038,7 @@ VanPacketParseResult_t ParseCarStatus1Pkt(const char* idenStr, TVanPacketRxDesc&
     memcpy(packetData, data + 1, dataLen - 2);
     */
 
-    const static char jsonFormatter[] PROGMEM =
+    const static char jsonFormatter1[] PROGMEM =
     "{\n"
         "\"event\": \"display\",\n"
         "\"data\":\n"
@@ -1025,17 +1049,12 @@ VanPacketParseResult_t ParseCarStatus1Pkt(const char* idenStr, TVanPacketRxDesc&
             "\"door_rear_left\": \"%S\",\n"
             "\"door_boot\": \"%S\",\n"
             "\"right_stalk_button\": \"%S\",\n"
-            "\"avg_speed_1\": \"%u\",\n"
-            "\"avg_speed_2\": \"%u\",\n"
             "\"exp_moving_avg_speed\": \"%u\",\n"
-            "\"distance_1\": \"%S\",\n"
-            "\"avg_consumption_lt_100_1\": \"%S\",\n"
-            "\"distance_2\": \"%S\",\n"
-            "\"avg_consumption_lt_100_2\": \"%S\",\n"
             "\"inst_consumption_lt_100\": \"%S\",\n"
-            "\"distance_to_empty\": \"%u\"\n"
-        "}\n"
-    "}\n";
+            "\"distance_to_empty\": \"%u\",\n"
+            "\"avg_speed_1\": \"%u\",\n"
+            "\"distance_1\": \"%S\",\n"
+            "\"avg_consumption_lt_100_1\": \"%S\"";
 
     uint8_t avgSpeedTrip1 = data[11];
     uint8_t avgSpeedTrip2 = data[12];
@@ -1045,16 +1064,14 @@ VanPacketParseResult_t ParseCarStatus1Pkt(const char* idenStr, TVanPacketRxDesc&
     uint16_t avgConsumptionLt100Trip2 = (uint16_t)data[20] << 8 | data[21];
     uint16_t instConsumptionLt100 = (uint16_t)data[22] << 8 | data[23];
 
-    char floatBuf[3][MAX_FLOAT_SIZE];
-    int at = snprintf_P(buf, n, jsonFormatter,
+    char floatBuf[2][MAX_FLOAT_SIZE];
+    int at = snprintf_P(buf, n, jsonFormatter1,
         data[7] & 0x80 ? openStr : closedStr,
         data[7] & 0x40 ? openStr : closedStr,
         data[7] & 0x20 ? openStr : closedStr,
         data[7] & 0x10 ? openStr : closedStr,
         data[7] & 0x08 ? openStr : closedStr,
         data[10] & 0x01 ? PSTR("PRESSED") : PSTR("RELEASED"),
-        avgSpeedTrip1,
-        avgSpeedTrip2,
 
         // When engine running but stopped (actual vehicle speed is 0), this value counts down by 1 every
         // 10 - 20 seconds or so. When driving, this goes up and down slowly toward the current speed.
@@ -1070,13 +1087,27 @@ VanPacketParseResult_t ParseCarStatus1Pkt(const char* idenStr, TVanPacketRxDesc&
         //
         data[13],
 
+        instConsumptionLt100 == 0xFFFF ? PSTR("--.-") : FloatToStr(floatBuf[0], (float)instConsumptionLt100 / 10.0, 1),
+        (uint16_t)data[24] << 8 | data[25],
+        avgSpeedTrip1,
         distanceTrip1 == 0xFFFF ? notApplicable2Str : ToStr(distanceTrip1),
-        avgConsumptionLt100Trip1 == 0xFFFF ? PSTR("--.-") : FloatToStr(floatBuf[0], (float)avgConsumptionLt100Trip1 / 10.0, 1),
-        distanceTrip2 == 0xFFFF ? notApplicable2Str : ToStr(distanceTrip2),
-        avgConsumptionLt100Trip2 == 0xFFFF ? PSTR("--.-") : FloatToStr(floatBuf[1], (float)avgConsumptionLt100Trip2 / 10.0, 1),
-        instConsumptionLt100 == 0xFFFF ? PSTR("--.-") : FloatToStr(floatBuf[2], (float)instConsumptionLt100 / 10.0, 1),
-        (uint16_t)data[24] << 8 | data[25]
+        avgConsumptionLt100Trip1 == 0xFFFF ? PSTR("--.-") : FloatToStr(floatBuf[1], (float)avgConsumptionLt100Trip1 / 10.0, 1)
     );
+
+    const static char jsonFormatter2[] PROGMEM =
+            ",\n"
+            "\"avg_speed_2\": \"%u\",\n"
+            "\"distance_2\": \"%S\",\n"
+            "\"avg_consumption_lt_100_2\": \"%S\"\n"
+        "}\n"
+    "}\n";
+
+    at += at >= JSON_BUFFER_SIZE ? 0 :
+        snprintf_P(buf + at, n - at, jsonFormatter2,
+            avgSpeedTrip2,
+            distanceTrip2 == 0xFFFF ? notApplicable2Str : ToStr(distanceTrip2),
+            avgConsumptionLt100Trip2 == 0xFFFF ? PSTR("--.-") : FloatToStr(floatBuf[0], (float)avgConsumptionLt100Trip2 / 10.0, 1)
+        );
 
     // JSON buffer overflow?
     if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
@@ -2752,7 +2783,7 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
 
     const uint8_t* data = pkt.Data();
 
-    static uint8_t report;
+    static uint8_t report = 0xFF;
 
     int offsetInPacket = 1;
     if ((data[0] & 0x7F) <= 7)
@@ -2850,7 +2881,9 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
     // Not last packet in report sequence?
     if ((data[0] & 0x80) == 0x00) return VAN_PACKET_NO_CONTENT;
 
-    // Last packet in sequence: create an 'easily digestable' report in JSON format
+    // Last packet in sequence
+
+    // Create an 'easily digestable' report in JSON format
 
     const static char jsonFormatter[] PROGMEM =
     "{\n"
@@ -2861,287 +2894,317 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
 
     int at = snprintf_P(buf, n, jsonFormatter, SatNavRequestStr(report));
 
-    if (report == SR_CURRENT_STREET || report == SR_NEXT_STREET)
+    switch(report)
     {
-        const static char jsonFormatter[] PROGMEM =
-            ",\n"
-            "\"%S\": \"%s%s (%s%S%s)\"";
-
-        // Current/next street is in first (and only) record. Copy only city [3], district [4] (if any) and
-        // street [5, 6]; skip the other strings.
-        at += at >= JSON_BUFFER_SIZE ? 0 :
-            snprintf_P(buf + at, n - at, jsonFormatter,
-
-                report == SR_CURRENT_STREET ? PSTR("satnav_curr_street") : PSTR("satnav_next_street"),
-
-                // Street
-                records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
-                records[0][6].c_str(),
-
-                // City + optional district
-                records[0][3].c_str(),
-                records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
-                records[0][4].c_str()
-            );
-    }
-    else if (report == SR_DESTINATION || report == SR_LAST_DESTINATION)
-    {
-        const static char jsonFormatter[] PROGMEM =
-            ",\n"
-            "\"%S\": \"%s\",\n"
-            "\"%S\": \"%s\",\n"
-            "\"%S\": \"%s%S%s\",\n"
-            "\"%S\": \"%s%s\",\n"
-            "\"%S\": \"%S\"";
-
-        // Address is in first (and only) record. Copy at least only city [3], district [4] (if any), street [5, 6] and
-        // house number [7]; skip the other strings.
-        at += at >= JSON_BUFFER_SIZE ? 0 :
-            snprintf_P(buf + at, n - at, jsonFormatter,
-
-                report == SR_DESTINATION ?
-                    PSTR("satnav_current_destination_country") :
-                    PSTR("satnav_last_destination_country"),
-
-                // Country
-                records[0][1].c_str(),
-
-                report == SR_DESTINATION ?
-                    PSTR("satnav_current_destination_province") :
-                    PSTR("satnav_last_destination_province"),
-
-                // Province
-                records[0][2].c_str(),
-
-                report == SR_DESTINATION ?
-                    PSTR("satnav_current_destination_city") :
-                    PSTR("satnav_last_destination_city"),
-
-                // City + optional district
-                records[0][3].c_str(),
-                records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
-                records[0][4].c_str(),
-
-                report == SR_DESTINATION ?
-                    PSTR("satnav_current_destination_street") :
-                    PSTR("satnav_last_destination_street"),
-
-                // Street
-                records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
-                records[0][6].c_str(),
-
-                report == SR_DESTINATION ?
-                    PSTR("satnav_current_destination_house_number") :
-                    PSTR("satnav_last_destination_house_number"),
-
-                // First string is either "C" or "V"; "C" has GPS coordinates in [7] and [8]; "V" has house number
-                // in [7]. If we see "V", show house number
-                records[0][0] != "V" ? emptyStr:
-                records[0][7] == "0" ? PSTR("No number") :
-                records[0][7].c_str()
-            );
-
-        // TODO - different format if the street is empty: it means "City center"
-    }
-    else if (report == SR_PRIVATE_ADDRESS || report == SR_BUSINESS_ADDRESS)
-    {
-        const static char jsonFormatter[] PROGMEM =
-            ",\n"
-            "\"%S\": \"%s\",\n"
-            "\"%S\": \"%s\",\n"
-            "\"%S\": \"%s\",\n"
-            "\"%S\": \"%s%S%s\",\n"
-            "\"%S\": \"%s%s\",\n"
-            "\"%S\": \"%s\"";
-
-        // Chosen address is in first (and only) record. Copy at least city [3], district [4] (if any), street [5, 6]
-        // house number [7] and entry name [8]; skip the other strings.
-        at += at >= JSON_BUFFER_SIZE ? 0 :
-            snprintf_P(buf + at, n - at, jsonFormatter,
-
-                report == SR_PRIVATE_ADDRESS ? PSTR("satnav_private_address_entry") : PSTR("satnav_business_address_entry"),
-
-                // Name of the entry
-                records[0][8].c_str(),
-
-                // Address
-
-                report == SR_PRIVATE_ADDRESS ?
-                    PSTR("satnav_private_address_country") :
-                    PSTR("satnav_business_address_country"),
-
-                // Country
-                records[0][1].c_str(),
-
-                report == SR_PRIVATE_ADDRESS ?
-                    PSTR("satnav_private_address_province") :
-                    PSTR("satnav_business_address_province"),
-
-                // Province
-                records[0][2].c_str(),
-
-                report == SR_PRIVATE_ADDRESS ?
-                    PSTR("satnav_private_address_city") :
-                    PSTR("satnav_business_address_city"),
-
-                // City + optional district
-                records[0][3].c_str(),
-                records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
-                records[0][4].c_str(),
-
-                report == SR_PRIVATE_ADDRESS ?
-                    PSTR("satnav_private_address_street") :
-                    PSTR("satnav_business_address_street"),
-
-                // Street
-                records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
-                records[0][6].c_str(),
-
-                report == SR_PRIVATE_ADDRESS ?
-                    PSTR("satnav_private_address_house_number") :
-                    PSTR("satnav_business_address_house_number"),
-
-                // House number
-                records[0][7] == "0" ? PSTR("No number") : records[0][7].c_str()
-            );
-    }
-    else if (report == SR_PLACE_OF_INTEREST)
-    {
-        const static char jsonFormatter[] PROGMEM =
-            ",\n"
-            "\"satnav_place_of_interest_address_entry\": \"%s\",\n"
-            "\"satnav_place_of_interest_address_country\": \"%s\",\n"
-            "\"satnav_place_of_interest_address_province\": \"%s\",\n"
-            "\"satnav_place_of_interest_address_city\": \"%s%S%s\",\n"
-            "\"satnav_place_of_interest_address_street\": \"%s%s\",\n"
-            "\"satnav_place_of_interest_address_distance\": \"%s\"";
-
-        // Chosen place of interest address is in first (and only) record. Copy at least city [3], district [4]
-        // (if any), street [5, 6], entry name [9] and distance [11]; skip the other strings.
-        at += at >= JSON_BUFFER_SIZE ? 0 :
-            snprintf_P(buf + at, n - at, jsonFormatter,
-
-                // Name of the place of interest
-                records[0][9].c_str(),
-
-                // Address of the place of interest
-
-                // Country
-                records[0][1].c_str(),
-
-                // Province
-                records[0][2].c_str(),
-
-                // City + optional district
-                records[0][3].c_str(),
-                records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
-                records[0][4].c_str(),
-
-                // Street
-                records[0][5].c_str() + 1,  // Skip the fixed first letter ('G' or 'I')
-                records[0][6].c_str(),
-
-                // Distance (in meters) to the place of interest
-                records[0][11].c_str()
-            );
-    }
-    else if (report == SR_ENTER_CITY
-             || report == SR_ENTER_STREET
-             || report == SR_PRIVATE_ADDRESS_LIST
-             || report == SR_BUSINESS_ADDRESS_LIST)
-    {
-        const static char jsonFormatter[] PROGMEM =
-            ",\n"
-            "\"satnav_list\":\n"
-            "[";
-
-        at += at >= JSON_BUFFER_SIZE ? 0 :
-            snprintf_P(buf + at, n - at, jsonFormatter);
-
-        // Each item in the list is a single string in a separate record
-        for (int i = 0; i < currentRecord; i++)
+        case SR_CURRENT_STREET:
+        case SR_NEXT_STREET:
         {
+            const static char jsonFormatter[] PROGMEM =
+                ",\n"
+                "\"%S\": \"%s%s (%s%S%s)\"";
+
+            // Current/next street is in first (and only) record. Copy only city [3], district [4] (if any) and
+            // street [5, 6]; skip the other strings.
             at += at >= JSON_BUFFER_SIZE ? 0 :
-                snprintf_P(buf + at, n - at,
-                    PSTR("%S\n\"%s\""),
-                    i == 0 ? emptyStr : commaStr,
-                    records[i][0].c_str()
+                snprintf_P(buf + at, n - at, jsonFormatter,
+
+                    report == SR_CURRENT_STREET ? PSTR("satnav_curr_street") : PSTR("satnav_next_street"),
+
+                    // Street
+                    records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
+                    records[0][6].c_str(),
+
+                    // City + optional district
+                    records[0][3].c_str(),
+                    records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
+                    records[0][4].c_str()
                 );
-        } // for
+        }
+        break;
 
-        at += at >= JSON_BUFFER_SIZE ? 0 :
-            snprintf_P(buf + at, n - at, PSTR("\n]"));
-    }
-    else if (report == SR_ENTER_HOUSE_NUMBER)
-    {
-        const static char jsonFormatter[] PROGMEM =
-            ",\n"
-            "\"satnav_house_number_range\": \"%s...%s\"";
-
-        // Range of "house numbers" is in first (and only) record, the lowest number is in the first string, and
-        // highest number is in the second string.
-        // Note: "0...0" means: not applicable. MFD will follow through directly to showing the address (without a
-        //   house number).
-        at += at >= JSON_BUFFER_SIZE ? 0 :
-            snprintf_P(buf + at, n - at, jsonFormatter,
-
-                records[0][0].c_str(),
-                records[0][1].c_str()
-            );
-    }
-    else if (report == SR_PLACE_OF_INTEREST_CATEGORY)
-    {
-        const static char jsonFormatter[] PROGMEM =
-            ",\n"
-            "\"satnav_list\":\n"
-            "[";
-
-        at += at >= JSON_BUFFER_SIZE ? 0 :
-            snprintf_P(buf + at, n - at, jsonFormatter);
-
-        // Each "category" in the list is a single string in a separate record
-        for (int i = 0; i < currentRecord; i++)
+        case SR_DESTINATION:
+        case SR_LAST_DESTINATION:
         {
+            const static char jsonFormatter[] PROGMEM =
+                ",\n"
+                "\"%S\": \"%s\",\n"
+                "\"%S\": \"%s\",\n"
+                "\"%S\": \"%s%S%s\",\n"
+                "\"%S\": \"%s%s\",\n"
+                "\"%S\": \"%S\"";
+
+            // Address is in first (and only) record. Copy at least only city [3], district [4] (if any), street [5, 6] and
+            // house number [7]; skip the other strings.
             at += at >= JSON_BUFFER_SIZE ? 0 :
-                snprintf_P(buf + at, n - at,
-                    PSTR("%S\n\"%s\""),
-                    i == 0 ? emptyStr : commaStr,
-                    records[i][0].c_str()
+                snprintf_P(buf + at, n - at, jsonFormatter,
+
+                    report == SR_DESTINATION ?
+                        PSTR("satnav_current_destination_country") :
+                        PSTR("satnav_last_destination_country"),
+
+                    // Country
+                    records[0][1].c_str(),
+
+                    report == SR_DESTINATION ?
+                        PSTR("satnav_current_destination_province") :
+                        PSTR("satnav_last_destination_province"),
+
+                    // Province
+                    records[0][2].c_str(),
+
+                    report == SR_DESTINATION ?
+                        PSTR("satnav_current_destination_city") :
+                        PSTR("satnav_last_destination_city"),
+
+                    // City + optional district
+                    records[0][3].c_str(),
+                    records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
+                    records[0][4].c_str(),
+
+                    report == SR_DESTINATION ?
+                        PSTR("satnav_current_destination_street") :
+                        PSTR("satnav_last_destination_street"),
+
+                    // Street
+                    // TODO - if the street is empty: it means "City center"
+                    records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
+                    records[0][6].c_str(),
+
+                    report == SR_DESTINATION ?
+                        PSTR("satnav_current_destination_house_number") :
+                        PSTR("satnav_last_destination_house_number"),
+
+                    // First string is either "C" or "V"; "C" has GPS coordinates in [7] and [8]; "V" has house number
+                    // in [7]. If we see "V", show house number
+                    records[0][0] != "V" ? emptyStr:
+                    records[0][7] == "0" ? PSTR("No number") :
+                    records[0][7].c_str()
                 );
-        } // for
+        }
+        break;
 
-        at += at >= JSON_BUFFER_SIZE ? 0 :
-            snprintf_P(buf + at, n - at, PSTR("\n]"));
-    } // if
-    else if (report == SR_SOFTWARE_MODULE_VERSIONS)
-    {
-        const static char jsonFormatter[] PROGMEM =
-            ",\n"
-            "\"satnav_software_modules_list\":\n"
-            "[";
-
-        at += at >= JSON_BUFFER_SIZE ? 0 :
-            snprintf_P(buf + at, n - at, jsonFormatter);
-
-        // Each "module" in the list is a triplet of strings ('module_name', then 'version' and 'date' in a rather
-        // free format) in a separate record
-        for (int i = 0; i < currentRecord; i++)
+        case SR_PRIVATE_ADDRESS:
+        case SR_BUSINESS_ADDRESS:
         {
-            at += at >= JSON_BUFFER_SIZE ? 0 :
-                snprintf_P(buf + at, n - at,
-                    PSTR("%S\n\"%s - %s - %s\""),
-                    i == 0 ? emptyStr : commaStr,
-                    records[i][0].c_str(),
-                    records[i][1].c_str(),
-                    records[i][2].c_str()
-                );
-        } // for
+            const static char jsonFormatter[] PROGMEM =
+                ",\n"
+                "\"%S\": \"%s\",\n"
+                "\"%S\": \"%s\",\n"
+                "\"%S\": \"%s\",\n"
+                "\"%S\": \"%s%S%s\",\n"
+                "\"%S\": \"%s%s\",\n"
+                "\"%S\": \"%s\"";
 
-        at += at >= JSON_BUFFER_SIZE ? 0 :
-            snprintf_P(buf + at, n - at, PSTR("\n]"));
-    } // if
+            // Chosen address is in first (and only) record. Copy at least city [3], district [4] (if any), street [5, 6]
+            // house number [7] and entry name [8]; skip the other strings.
+            at += at >= JSON_BUFFER_SIZE ? 0 :
+                snprintf_P(buf + at, n - at, jsonFormatter,
+
+                    report == SR_PRIVATE_ADDRESS ?
+                        PSTR("satnav_private_address_entry") :
+                        PSTR("satnav_business_address_entry"),
+
+                    // Name of the entry
+                    records[0][8].c_str(),
+
+                    // Address
+
+                    report == SR_PRIVATE_ADDRESS ?
+                        PSTR("satnav_private_address_country") :
+                        PSTR("satnav_business_address_country"),
+
+                    // Country
+                    records[0][1].c_str(),
+
+                    report == SR_PRIVATE_ADDRESS ?
+                        PSTR("satnav_private_address_province") :
+                        PSTR("satnav_business_address_province"),
+
+                    // Province
+                    records[0][2].c_str(),
+
+                    report == SR_PRIVATE_ADDRESS ?
+                        PSTR("satnav_private_address_city") :
+                        PSTR("satnav_business_address_city"),
+
+                    // City + optional district
+                    records[0][3].c_str(),
+                    records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
+                    records[0][4].c_str(),
+
+                    report == SR_PRIVATE_ADDRESS ?
+                        PSTR("satnav_private_address_street") :
+                        PSTR("satnav_business_address_street"),
+
+                    // Street
+                    records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
+                    records[0][6].c_str(),
+
+                    report == SR_PRIVATE_ADDRESS ?
+                        PSTR("satnav_private_address_house_number") :
+                        PSTR("satnav_business_address_house_number"),
+
+                    // House number
+                    records[0][7] == "0" ? PSTR("No number") : records[0][7].c_str()
+                );
+        }
+        break;
+
+        case SR_PLACE_OF_INTEREST:
+        {
+            const static char jsonFormatter[] PROGMEM =
+                ",\n"
+                "\"satnav_place_of_interest_address_entry\": \"%s\",\n"
+                "\"satnav_place_of_interest_address_country\": \"%s\",\n"
+                "\"satnav_place_of_interest_address_province\": \"%s\",\n"
+                "\"satnav_place_of_interest_address_city\": \"%s%S%s\",\n"
+                "\"satnav_place_of_interest_address_street\": \"%s%s\",\n"
+                "\"satnav_place_of_interest_address_distance\": \"%s\"";
+
+            // Chosen place of interest address is in first (and only) record. Copy at least city [3], district [4]
+            // (if any), street [5, 6], entry name [9] and distance [11]; skip the other strings.
+            at += at >= JSON_BUFFER_SIZE ? 0 :
+                snprintf_P(buf + at, n - at, jsonFormatter,
+
+                    // Name of the place of interest
+                    records[0][9].c_str(),
+
+                    // Address of the place of interest
+
+                    // Country
+                    records[0][1].c_str(),
+
+                    // Province
+                    records[0][2].c_str(),
+
+                    // City + optional district
+                    records[0][3].c_str(),
+                    records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
+                    records[0][4].c_str(),
+
+                    // Street
+                    records[0][5].c_str() + 1,  // Skip the fixed first letter ('G' or 'I')
+                    records[0][6].c_str(),
+
+                    // Distance (in meters) to the place of interest
+                    records[0][11].c_str()
+                );
+        }
+        break;
+
+        case SR_ENTER_CITY:
+        case SR_ENTER_STREET:
+        case SR_PRIVATE_ADDRESS_LIST:
+        case SR_BUSINESS_ADDRESS_LIST:
+        {
+            const static char jsonFormatter[] PROGMEM =
+                ",\n"
+                "\"satnav_list\":\n"
+                "[";
+
+            at += at >= JSON_BUFFER_SIZE ? 0 :
+                snprintf_P(buf + at, n - at, jsonFormatter);
+
+            // Each item in the list is a single string in a separate record
+            for (int i = 0; i < currentRecord; i++)
+            {
+                at += at >= JSON_BUFFER_SIZE ? 0 :
+                    snprintf_P(buf + at, n - at,
+                        PSTR("%S\n\"%s\""),
+                        i == 0 ? emptyStr : commaStr,
+                        records[i][0].c_str()
+                    );
+            } // for
+
+            at += at >= JSON_BUFFER_SIZE ? 0 :
+                snprintf_P(buf + at, n - at, PSTR("\n]"));
+        }
+        break;
+
+        case SR_ENTER_HOUSE_NUMBER:
+        {
+            const static char jsonFormatter[] PROGMEM =
+                ",\n"
+                "\"satnav_house_number_range\": \"%s...%s\"";
+
+            // Range of "house numbers" is in first (and only) record, the lowest number is in the first string, and
+            // highest number is in the second string.
+            // Note: "0...0" means: not applicable. MFD will follow through directly to showing the address (without a
+            //   house number).
+            at += at >= JSON_BUFFER_SIZE ? 0 :
+                snprintf_P(buf + at, n - at, jsonFormatter,
+
+                    records[0][0].c_str(),
+                    records[0][1].c_str()
+                );
+        }
+        break;
+
+        case SR_PLACE_OF_INTEREST_CATEGORY:
+        {
+            const static char jsonFormatter[] PROGMEM =
+                ",\n"
+                "\"satnav_list\":\n"
+                "[";
+
+            at += at >= JSON_BUFFER_SIZE ? 0 :
+                snprintf_P(buf + at, n - at, jsonFormatter);
+
+            // Each "category" in the list is a single string in a separate record
+            for (int i = 0; i < currentRecord; i++)
+            {
+                at += at >= JSON_BUFFER_SIZE ? 0 :
+                    snprintf_P(buf + at, n - at,
+                        PSTR("%S\n\"%s\""),
+                        i == 0 ? emptyStr : commaStr,
+                        records[i][0].c_str()
+                    );
+            } // for
+
+            at += at >= JSON_BUFFER_SIZE ? 0 :
+                snprintf_P(buf + at, n - at, PSTR("\n]"));
+        }
+        break;
+
+        case SR_SOFTWARE_MODULE_VERSIONS:
+        {
+            const static char jsonFormatter[] PROGMEM =
+                ",\n"
+                "\"satnav_software_modules_list\":\n"
+                "[";
+
+            at += at >= JSON_BUFFER_SIZE ? 0 :
+                snprintf_P(buf + at, n - at, jsonFormatter);
+
+            // Each "module" in the list is a triplet of strings ('module_name', then 'version' and 'date' in a rather
+            // free format) in a separate record
+            for (int i = 0; i < currentRecord; i++)
+            {
+                at += at >= JSON_BUFFER_SIZE ? 0 :
+                    snprintf_P(buf + at, n - at,
+                        PSTR("%S\n\"%s - %s - %s\""),
+                        i == 0 ? emptyStr : commaStr,
+                        records[i][0].c_str(),
+                        records[i][1].c_str(),
+                        records[i][2].c_str()
+                    );
+            } // for
+
+            at += at >= JSON_BUFFER_SIZE ? 0 :
+                snprintf_P(buf + at, n - at, PSTR("\n]"));
+        } // if
+        break;
+
+    } // switch
 
     at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}\n"));
+
+    // Reset report ID and array indexes. Otherwise, if the first packet of the next report sequence is missed, the
+    // data will continue to pile up after the current records.
+    report = 0xFF;
+    currentRecord = 0;
+    currentString = 0;
+    offsetInBuffer = 0;
 
     // JSON buffer overflow?
     if (at >= JSON_BUFFER_SIZE) return VAN_PACKET_PARSE_JSON_TOO_LONG;
@@ -4035,6 +4098,12 @@ const char* ParseVanPacketToJson(TVanPacketRxDesc& pkt)
     if (! pkt.CheckCrcAndRepair())
     {
         Serial.print(F("VAN PACKET CRC ERROR!\n"));
+
+        #ifdef VAN_RX_ISR_DEBUGGING
+        // Fully dump bit timings for packets that have CRC ERROR, for further analysis
+        pkt.getIsrDebugPacket().Dump(Serial);
+        #endif // VAN_RX_ISR_DEBUGGING
+
         return ""; // CRC error
     } // if
 

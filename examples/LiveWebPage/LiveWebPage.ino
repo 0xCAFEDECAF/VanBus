@@ -32,27 +32,54 @@
  * In order to compile this sketch, you need to additionally install the following libraries:
  * (Arduino IDE --> Menu 'Sketch' --> 'Include Library' --> 'Manage Libraries...')
  *
- * - "WebSockets" by Markus Sattler (https://github.com/Links2004/arduinoWebSockets) 
- *   --> Tested with version 2.2.0, 2.3.3 and 2.3.4 .
+ * - A WebSockets library; choose either:
+ *   * "WebSockets" by Markus Sattler (https://github.com/Links2004/arduinoWebSockets) 
+ *     --> Tested with version 2.2.0, 2.3.3 and 2.3.4 .
+ *   * "WebSockets_Generic" by Markus Sattler and Khoi Hoang (https://github.com/khoih-prog/WebSockets_Generic)
+ *     --> Tested with version 2.4.0 .
+ *
+ *   Note: using:
+ *       #define WEBSOCKETS_NETWORK_TYPE NETWORK_ESP8266_ASYNC
+ *     in 'WebSockets.h' appears to be very unstable, leading to TCP hiccups and even reboots. Use the default:
+ *       #define WEBSOCKETS_NETWORK_TYPE NETWORK_ESP8266
+ *     instead.
  *
  * The web site itself, as served by this sketch, uses jQuery, which it downloads from:
  * https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js
  * If you don't like Google tracking your surfing, you could use Firefox and install the 'LocalCDN' extension (see
  * https://addons.mozilla.org/nl/firefox/addon/localcdn-fork-of-decentraleyes ).
+ *
+ * -----
+ * Building
+ *
+ * - Wi-Fi/TCP communication seems to be best when setting "build.sdk=NONOSDK22x_191122" in the "platform.txt" file
+ *   (see "c:\Users\<user_id>\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\2.X.Y\".
+ *   Keeping the default setting "build.sdk=NONOSDK22x_190703" seems to give a lot more communication hiccups.
+ *   Note that the line "build.sdk=NONOSDK22x_191122" is not listed in the "platform.txt" file; you will have to
+ *   add it yourself.
+ *
+ * - Make sure to select a "Higher Bandwidth" variant of the embedded IP stack "lwIP": Arduino IDE --> Tools -->
+ *   lwIP variant: "v2 Higher Bandwidth" or "v2 Higher Bandwidth (no features)". The "Lower Memory" variants seem
+ *   to have hiccups in the TCP traffic, ultimately causing the VAN Rx bus to overrun.
+ *
+ * - Having #define VAN_RX_QUEUE_SIZE set to 15 (see VanBusRx.h) seems too little given the current setup
+ *   where JSON buffers are printed on the Serial port (#define PRINT_JSON_BUFFERS_ON_SERIAL); seeing quite some
+ *   "VAN PACKET QUEUE OVERRUN!" lines. Looks like it should be set to at least 200.
  */
 
 // Uncomment to see the JSON buffers printed on the Serial port.
 // Note: printing the JSON buffers takes pretty long, so it leads to more Rx queue overruns.
 #define PRINT_JSON_BUFFERS_ON_SERIAL
 
-// Having #define VAN_RX_QUEUE_SIZE set to 15 (see VanBusRx.h) seems too little given the current setup
-// where JSON buffers are printed on the Serial port (#define PRINT_JSON_BUFFERS_ON_SERIAL); seeing quite some
-// "VAN PACKET QUEUE OVERRUN!" lines. Looks like it should be set to at least 100.
-#define VAN_RX_QUEUE_SIZE 100
-
 #include <ESP8266WiFi.h>
-#include <ESP8266WebServer.h>
+
+// Either this for "WebSockets" (https://github.com/Links2004/arduinoWebSockets):
 #include <WebSocketsServer.h>
+
+// Or this for "WebSockets_Generic" (https://github.com/khoih-prog/WebSockets_Generic):
+//#include <WebSocketsServer_Generic.h>
+
+#include <ESP8266WebServer.h>
 #include <VanBusRx.h>
 
 #if defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
@@ -819,6 +846,25 @@ void handleDumpFilter()
             F("OK: filtering JSON data"));
 } // handleDumpFilter
 
+void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length)
+{
+    switch(type)
+    {
+        case WStype_DISCONNECTED:
+        {
+            Serial.printf("Websocket [%u] Disconnected!\n", num);
+        }
+        break;
+
+        case WStype_CONNECTED:
+        {
+            IPAddress ip = webSocket.remoteIP(num);
+            Serial.printf("Websocket [%u] Connected from %d.%d.%d.%d url: %s\n", num, ip[0], ip[1], ip[2], ip[3], payload);
+        }
+        break;
+    } // switch
+} // webSocketEvent
+
 // Defined in Wifi.ino
 void setupWifi();
 
@@ -835,21 +881,25 @@ void setup()
         webServer.send_P(200, "text/html", webpage);  
         Serial.printf_P(PSTR("Sending HTML took: %lu msec\n"), millis() - start);
     });
-
     webServer.on("/dumpOnly", handleDumpFilter);
-
     webServer.begin();
+
     webSocket.begin();
+    webSocket.onEvent(webSocketEvent);
 
     Serial.print(F("Please surf to: http://"));
     Serial.println(WiFi.localIP());
 
     VanBusRx.Setup(RX_PIN);
-    Serial.printf_P(PSTR("VanBusRx queue of size %d is set up\n"), VanBusRx.GetQueueSize());
+    Serial.printf_P(PSTR("VanBusRx queue of size %d is set up\n"), VAN_RX_QUEUE_SIZE);
 } // setup
 
 // Defined in PacketToJson.ino
 const char* ParseVanPacketToJson(TVanPacketRxDesc& pkt);
+
+#ifdef PRINT_JSON_BUFFERS_ON_SERIAL
+void PrintJsonText(const char* jsonBuffer);
+#endif // PRINT_JSON_BUFFERS_ON_SERIAL
 
 void loop()
 {
@@ -865,11 +915,24 @@ void loop()
         if (strlen(json) > 0)
         {
             unsigned long start = millis();
+
             webSocket.broadcastTXT(json);
-            Serial.printf_P(
-                PSTR("Sending %zu JSON bytes via 'webSocket.broadcastTXT' took: %lu msec\n"),
-                strlen(json),
-                millis() - start);
+
+            // Print a message if the websocket broadcast took outrageously long (normally it takes around 1-2 msec).
+            // If it takes really long (seconds or more), the VAN bus Rx queue will overrun.
+            unsigned long duration = millis() - start;
+            if (duration > 100)
+            {
+                Serial.printf_P(
+                    PSTR("Sending %zu JSON bytes via 'webSocket.broadcastTXT' took: %lu msec\n"),
+                    strlen(json),
+                    duration);
+
+                #ifdef PRINT_JSON_BUFFERS_ON_SERIAL
+                Serial.print(F("JSON object:\n"));
+                PrintJsonText(json);
+                #endif // PRINT_JSON_BUFFERS_ON_SERIAL
+            } // if
         } // if
     } // if
 
