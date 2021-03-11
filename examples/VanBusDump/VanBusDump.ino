@@ -86,8 +86,10 @@ void loop()
         // Show byte content of packet
         pkt.DumpRaw(Serial);
 
+        #ifdef VAN_RX_ISR_DEBUGGING
         // Fully dump bit timings for packets that have CRC ERROR, for further analysis
         if (! crcOk) pkt.getIsrDebugPacket().Dump(Serial);
+        #endif // VAN_RX_ISR_DEBUGGING
     } // if
 
     // Print some boring statistics every minute or so
