@@ -3,8 +3,6 @@
  *
  * Written by Erik Tromp
  *
- * Version 0.0.2 - December, 2020
- *
  * MIT license, all text above must be included in any redistribution.
  */
 
@@ -53,7 +51,6 @@ static const char PROGMEM noneStr[] = "NONE";
 static const char PROGMEM updatedStr[] = "(UPD)";
 static const char PROGMEM notApplicable2Str[] = "--";
 static const char PROGMEM notApplicable3Str[] = "---";
-static const char PROGMEM warningPrintBufferOverflow[] = "--> WARNING: JSON BUFFER OVERFLOW!\n";
 
 // Uses statically allocated buffer, so don't call twice within the same printf invocation 
 char* ToStr(uint8_t data)
@@ -4144,7 +4141,7 @@ const char* ParseVanPacketToJson(TVanPacketRxDesc& pkt)
 
         if (result == VAN_PACKET_PARSE_JSON_TOO_LONG)
         {
-            Serial.print(FPSTR(warningPrintBufferOverflow));
+            Serial.print(F("--> WARNING: JSON BUFFER OVERFLOW!\n"));
             // No use to return the JSON buffer; it is invalid
         }
         else if (result == VAN_PACKET_PARSE_OK)
