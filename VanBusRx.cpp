@@ -3,7 +3,7 @@
  *
  * Written by Erik Tromp
  *
- * Version 0.2.0 - November, 2020
+ * Version 0.2.0 - March, 2021
  *
  * MIT license, all text above must be included in any redistribution.
  */
@@ -584,7 +584,7 @@ void TIsrDebugPacket::Dump(Stream& s) const
         uint8_t slot = isrData->slot + 1;
         if (i == 0)
         {
-            s.printf_P(PSTR("%sSlot # CPU nCycles -> nBits pinLVLs data\n"), slot >= 10 ? " " : "");
+            s.printf_P(PSTR("%sSlot # CPU nCycles -> nBits(*) pinLVLs data\n"), slot >= 10 ? " " : "");
         } // if
 
         if (i <= 1) reset();
@@ -639,6 +639,10 @@ void TIsrDebugPacket::Dump(Stream& s) const
             nBits--;
             jitter = 500;
             s.printf("*%u ", nBits);
+        }
+        else
+        {
+            s.print("   ");
         } // if
 
         unsigned char pinLevelChangedTo = isrData->pinLevel;
