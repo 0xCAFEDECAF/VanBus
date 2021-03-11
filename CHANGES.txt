@@ -4,12 +4,17 @@
     * New class 'TVanBus' with single instance 'VanBus'.
     * New class 'TVanPacketTxQueue' with single instance 'VanBusTx'.
     * Renamed existing class instance 'VanBus' to 'VanBusRx'.
-
     Still lots of TODOs: see code. Also:
     * Transmitting an in-frame response
     * Transmitting a "read" packet then receiving the in-frame response
 
-    Various small improvements.
+    Added 'DisplayNotifications.ino' example - send all MFD warnings, one by one.
+
+    Added 'SendPacket.ino' example - show all received information from the VAN bus on a "live" web page.
+
+    Added 'LiveWebPage.ino' example - send a packet on the VAN bus.
+
+    Many improvements and documentation updates.
 
 0.1.2
     Added 'PacketParser.ino' example sketch, showing all packets that I could decode from my vehicle.
