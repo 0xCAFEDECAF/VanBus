@@ -67,9 +67,9 @@
  *   "VAN PACKET QUEUE OVERRUN!" lines. Looks like it should be set to at least 200.
  */
 
-// Uncomment to see the JSON buffers printed on the Serial port.
+// Uncomment to see *all* JSON buffers printed on the Serial port.
 // Note: printing the JSON buffers takes pretty long, so it leads to more Rx queue overruns.
-#define PRINT_JSON_BUFFERS_ON_SERIAL
+//#define PRINT_JSON_BUFFERS_ON_SERIAL
 
 #include <ESP8266WiFi.h>
 
@@ -87,7 +87,11 @@
 #define D2 (2)
 #endif
 
-int RX_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
+// Set to GPIO pin connected to VAN bus transceiver output
+int RX_PIN = D2;  // GPIO4 - often used as SDA (I2C)
+//int RX_PIN = D3;  // GPIO0 - pulled up - Boot fails
+//int RX_PIN = D4;  // GPIO2 - pulled up
+//int RX_PIN = D8;  // GPIO15 - pulled to GND - Boot fails
 
 ESP8266WebServer webServer;
 WebSocketsServer webSocket = WebSocketsServer(81);
@@ -865,6 +869,28 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
     } // switch
 } // webSocketEvent
 
+void printSystemSpecs()
+{
+    Serial.printf_P(PSTR("CPU Speed: %u MHz\n"), system_get_cpu_freq());
+    Serial.printf_P(PSTR("SDK: %s\n"), system_get_sdk_version());
+
+    uint32_t realSize = ESP.getFlashChipRealSize();
+    uint32_t ideSize = ESP.getFlashChipSize();
+
+    char floatBuf[MAX_FLOAT_SIZE];
+    Serial.printf_P(PSTR("Flash real size: %s MBytes\n"), FloatToStr(floatBuf, realSize/1024.0/1024.0, 2));
+    Serial.printf_P(PSTR("Flash ide size: %s MBytes\n"), FloatToStr(floatBuf, ideSize/1024.0/1024.0, 2));
+    Serial.printf_P(PSTR("Flash ide speed: %s MHz\n"), FloatToStr(floatBuf, ESP.getFlashChipSpeed()/1000000.0, 2));
+    FlashMode_t ideMode = ESP.getFlashChipMode();
+    Serial.printf_P(PSTR("Flash ide mode: %S\n"),
+        ideMode == FM_QIO ? PSTR("QIO") :
+        ideMode == FM_QOUT ? PSTR("QOUT") :
+        ideMode == FM_DIO ? PSTR("DIO") :
+        ideMode == FM_DOUT ? PSTR("DOUT") :
+        PSTR("UNKNOWN"));
+    Serial.printf_P(PSTR("Flash chip configuration %S\n"), ideSize != realSize ? PSTR("wrong!") : PSTR("ok."));
+} // printSystemSpecs
+
 // Defined in Wifi.ino
 void setupWifi();
 
@@ -873,6 +899,8 @@ void setup()
     delay(1000);
     Serial.begin(115200);
     Serial.println(F("Starting VAN bus live web page server"));
+
+    printSystemSpecs();
 
     setupWifi();
 
@@ -897,9 +925,7 @@ void setup()
 // Defined in PacketToJson.ino
 const char* ParseVanPacketToJson(TVanPacketRxDesc& pkt);
 
-#ifdef PRINT_JSON_BUFFERS_ON_SERIAL
 void PrintJsonText(const char* jsonBuffer);
-#endif // PRINT_JSON_BUFFERS_ON_SERIAL
 
 void loop()
 {
@@ -914,12 +940,14 @@ void loop()
         const char* json = ParseVanPacketToJson(pkt);
         if (strlen(json) > 0)
         {
+            delay(10); // Give some time to system to process other things?
+
             unsigned long start = millis();
 
             webSocket.broadcastTXT(json);
 
             // Print a message if the websocket broadcast took outrageously long (normally it takes around 1-2 msec).
-            // If it takes really long (seconds or more), the VAN bus Rx queue will overrun.
+            // If that takes really long (seconds or more), the VAN bus Rx queue will overrun.
             unsigned long duration = millis() - start;
             if (duration > 100)
             {
@@ -928,15 +956,19 @@ void loop()
                     strlen(json),
                     duration);
 
-                #ifdef PRINT_JSON_BUFFERS_ON_SERIAL
                 Serial.print(F("JSON object:\n"));
                 PrintJsonText(json);
-                #endif // PRINT_JSON_BUFFERS_ON_SERIAL
             } // if
         } // if
     } // if
 
     if (isQueueOverrun) Serial.print(F("VAN PACKET QUEUE OVERRUN!\n"));
 
-    delay(1); // Give some time to system to process other things?
+    // Print statistics every 5 seconds
+    static unsigned long lastUpdate = 0;
+    if (millis() - lastUpdate >= 5000UL) // Arithmetic has safe roll-over
+    {
+        lastUpdate = millis();
+        VanBusRx.DumpStats(Serial);
+    } // if
 } // loop

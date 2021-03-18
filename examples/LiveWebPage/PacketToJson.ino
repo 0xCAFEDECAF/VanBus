@@ -561,7 +561,7 @@ VanPacketParseResult_t ParseEnginePkt(const char* idenStr, TVanPacketRxDesc& pkt
     uint8_t waterTempRaw = data[2];
     if (waterTempRaw != 0xFF) lastValidWaterTempRaw = waterTempRaw;  // Copy only if packet value is valid
     bool isWaterTempValid = lastValidWaterTempRaw != 0xFF;
-    sint16_t waterTemp = (uint16_t)lastValidWaterTempRaw - 39;  // TODO - or: lastValidWaterTempRaw / 2
+    sint16_t waterTemp = (uint16_t)lastValidWaterTempRaw - 39;
 
     const static char jsonFormatter[] PROGMEM =
     "{\n"
@@ -4023,8 +4023,6 @@ void PrintPacketDataDiff(TVanPacketRxDesc& pkt, IdenHandler_t* handler)
     Serial.println();
 } // PrintPacketDataDiff
 
-#ifdef PRINT_JSON_BUFFERS_ON_SERIAL
-
 // Pretty-print a JSON formatted string, adding indentation
 void PrintJsonText(const char* jsonBuffer)
 {
@@ -4046,8 +4044,6 @@ void PrintJsonText(const char* jsonBuffer)
         if (subString[0] == '{' || subString[0] == '[') indent += PRETTY_PRINT_JSON_INDENT;
     } // while
 } // PrintJsonText
-
-#endif // PRINT_JSON_BUFFERS_ON_SERIAL
 
 static IdenHandler_t handlers[] =
 {
@@ -4096,6 +4092,9 @@ const char* ParseVanPacketToJson(TVanPacketRxDesc& pkt)
     {
         Serial.print(F("VAN PACKET CRC ERROR!\n"));
 
+        // Show byte content of packet
+        pkt.DumpRaw(Serial);
+
         #ifdef VAN_RX_ISR_DEBUGGING
         // Fully dump bit timings for packets that have CRC ERROR, for further analysis
         pkt.getIsrDebugPacket().Dump(Serial);
@@ -4131,7 +4130,7 @@ const char* ParseVanPacketToJson(TVanPacketRxDesc& pkt)
         // serialDumpFilter != 0 means: print only the packet + JSON data for the specified IDEN
         if (serialDumpFilter == 0 || iden == serialDumpFilter)
         {
-            Serial.printf_P(PSTR("---> Received: %s packet (0x%03X)\n"), handler->idenStr, iden);
+            //Serial.printf_P(PSTR("---> Received: %s packet (0x%03X)\n"), handler->idenStr, iden);
 
             // Print the new packet on Serial, highlighting the bytes that differ
             PrintPacketDataDiff(pkt, handler);

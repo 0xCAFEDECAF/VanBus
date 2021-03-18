@@ -1,7 +1,8 @@
 
-// TODO - use AP mode?
-char* ssid = "MyCar"; // Choose yours
-char* password = "MyCar"; // Fill in yours
+#include "Config.h"
+
+char* ssid = WIFI_SSID;
+char* password = WIFI_PASSWORD;
 
 const char* getHostname()
 {
@@ -10,23 +11,48 @@ const char* getHostname()
 
 void setupWifi()
 {
-    Serial.printf_P(PSTR("Connecting to Wifi SSID '%s' "), ssid);
+    Serial.printf_P(PSTR("Connecting to Wi-Fi SSID '%s' "), ssid);
 
-    // TODO - move to after WiFi.status() == WL_CONNECTED ?
-    WiFi.hostname(getHostname());
+    // // TODO - move to after WiFi.status() == WL_CONNECTED ?
+    // WiFi.hostname(getHostname());
 
+    WifiConfig();
+
+    // TODO - does this decrease the jitter on the bit timings?
+    wifi_set_sleep_type(NONE_SLEEP_T);
+
+    // TODO - use AP mode?
     WiFi.mode(WIFI_STA);  // Otherwise it may be in WIFI_AP_STA mode, broadcasting an SSID like AI_THINKER_XXXXXX
     WiFi.disconnect();  // After reset via HW button sometimes cannot seem to reconnect without this
     WiFi.persistent(false);
     WiFi.setAutoConnect(true);
 
+    WiFi.setPhyMode(WIFI_PHY_MODE_11N);
+    WiFi.setOutputPower(20.5);
+
+    // TODO - using Wi-Fi has a detrimental effect on the packet CRC error rate. It will rise from around
+    // 0.006% up to 1% or more. Not sure what is the underlying cause; it can be either:
+    // - cross-talk on the wiring (Wi-Fi packets have effect on the quality of the signal that comes in
+    //   on the Rx GPIO pin),
+    // - timing failures due to Wi-Fi causing varying interrupt latency, or
+    // - both
+    //
+    // Not sure how to tackle this.
     WiFi.begin(ssid, password);
     while (WiFi.status() != WL_CONNECTED)
     {
         Serial.print(".");
         delay(500);
-    }
+    } // while
     Serial.println(F(" OK"));
 
-    Serial.printf_P(PSTR("Wifi signal strength (RSSI): %ld dB\n"), WiFi.RSSI());
+    WiFi.hostname(getHostname());
+
+    Serial.printf_P(PSTR("Wi-Fi signal strength (RSSI): %ld dB\n"), WiFi.RSSI());
+
+    // Might decrease number of packet CRC errors in case the board was previously using Wi-Fi (Wi-Fi settings are
+    // persistent?)
+    wifi_set_sleep_type(NONE_SLEEP_T);
+
+    delay(1);
 } // wifiSetup
