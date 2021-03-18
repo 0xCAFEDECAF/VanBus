@@ -60,6 +60,7 @@
  *         +--- Packet sequence number (modulo 10000)
  */
 
+#include <ESP8266WiFi.h>
 #include <VanBusRx.h>
 
 #if defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
@@ -73,6 +74,16 @@ void setup()
     delay(1000);
     Serial.begin(115200);
     Serial.println("Starting VAN bus receiver");
+
+    // Disable WIFI altogether to get rid of long and variable interrupt latency, causing packet CRC errors
+    // From: https://esp8266hints.wordpress.com/2017/06/29/save-power-by-reliably-switching-the-esp-wifi-on-and-off/
+    WiFi.disconnect(true);
+    delay(1); 
+    WiFi.mode(WIFI_OFF);
+    delay(1);
+    WiFi.forceSleepBegin();
+    delay(1);
+
     VanBusRx.Setup(RX_PIN);
 } // setup
 
@@ -99,6 +110,4 @@ void loop()
         lastUpdate = millis();
         VanBusRx.DumpStats(Serial);
     } // if
-
-    delay(1);
 } // loop
