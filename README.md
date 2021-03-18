@@ -284,13 +284,16 @@ Returns the RESULT field of the VAN packet as a string, either "OK" or a string 
 
 The library times the incoming bits using an interrupt service routine (ISR) that triggers on pin "change"
 events (see the internal function ```RxPinChangeIsr``` in
-[VanBusRx.cpp](https://github.com/0xCAFEDECAF/VanBus/blob/master/VanBusRx.cpp#L326)). It seems that the
-invocation of the ISR is often quite late (or maybe the bits are wobbly on the line already).
+[VanBusRx.cpp](https://github.com/0xCAFEDECAF/VanBus/blob/master/VanBusRx.cpp#L326)).
 
-I had to do a bit of tweaking to be able to reconstruct the real bits from the number of CPU cycles that have
-elapsed between the ISR invocations. Still, not all packets are received error-free. Even after trying to
-"repair" a packet (see function [```bool CheckCrcAndRepair()```](#CheckCrcAndRepair)), the long-term average
-packet loss is around 0.01% ... 0.015% (between 1 in 10,000 and 1 in 6,666), which is ok(-ish). I am
+When Wi-Fi is enabled, the invocation of the ISR is often quite late (even if there is no Wi-Fi connection active).
+It turns out that disabling Wi-Fi altogether is the way to get a completely error-free packet reception, like this:
+
+    15:10:26.335 -> received pkts: 104883, corrupt: 0 (0.000%), repaired: 0 (---%), overall: 0 (0.000%)
+
+With Wi-Fi enabled, not all VAN bus packets are received error-free. Even after trying to "repair" a packet
+(see function [```bool CheckCrcAndRepair()```](#CheckCrcAndRepair)), the long-term average packet loss is around
+0.01% ... 0.015% (between 1 in 10,000 and 1 in 6,666), which is pretty workable for most applications. I am
 investigating how to improve on this.
 
 ## 👷 Work to be Done<a name = "todo"></a>
