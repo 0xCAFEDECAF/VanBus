@@ -3,7 +3,7 @@
  *
  * Written by Erik Tromp
  *
- * Version 0.2.0 - March, 2021
+ * Version 0.2.1 - March, 2021
  *
  * MIT license, all text above must be included in any redistribution.
  *
@@ -32,6 +32,7 @@
  *   sense media access from other devices on the bus, so that bus arbitration can be performed.
  */
 
+#include <ESP8266WiFi.h>
 #include <VanBus.h>
 
 const int TX_PIN = D3; // Set to GPIO pin connected to VAN bus transceiver input
@@ -39,11 +40,20 @@ const int RX_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver outpu
 
 void setup()
 {
-    VanBus.Setup(RX_PIN, TX_PIN);
-
     delay(1000);
     Serial.begin(115200);
     Serial.println("Starting to send all MFD notifications, one by one");
+
+    // Disable WIFI altogether to get rid of long and variable interrupt latency, causing packet CRC errors
+    // From: https://esp8266hints.wordpress.com/2017/06/29/save-power-by-reliably-switching-the-esp-wifi-on-and-off/
+    WiFi.disconnect(true);
+    delay(1); 
+    WiFi.mode(WIFI_OFF);
+    delay(1);
+    WiFi.forceSleepBegin();
+    delay(1);
+
+    VanBus.Setup(RX_PIN, TX_PIN);
 } // setup
 
 void loop()
