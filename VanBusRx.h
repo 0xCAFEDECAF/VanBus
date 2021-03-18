@@ -3,7 +3,7 @@
  *
  * Written by Erik Tromp
  *
- * Version 0.2.0 - March, 2021
+ * Version 0.2.1 - March, 2021
  *
  * MIT license, all text above must be included in any redistribution.
  */
@@ -69,12 +69,13 @@ uint16_t _crc(const uint8_t bytes[], int size);
 // In theory, there can be 33 * 8 = 264 ISR invocations, but in practice 128 is enough for the vast majority of cases
 struct TIsrDebugData
 {
-    uint32_t nCycles;
-    uint32_t nCyclesProcessing;
-    uint8_t pinLevel;
-    uint8_t pinLevelAtReturnFromIsr;
-    uint8_t slot;  // in RxQueue
-}; // struct TIsrDebugData
+    uint32_t nCycles:16;
+    uint32_t nCyclesProcessing:16;
+    uint32_t jitter:16;
+    uint16_t nBits:8;
+    uint8_t pinLevel:4;
+    uint8_t pinLevelAtReturnFromIsr:4;
+} __attribute__((packed)); // struct TIsrDebugData
 
 // Buffer of ISR invocation data
 class TIsrDebugPacket
@@ -90,6 +91,7 @@ class TIsrDebugPacket
     #define VAN_ISR_DEBUG_BUFFER_SIZE 128
     TIsrDebugData samples[VAN_ISR_DEBUG_BUFFER_SIZE];
     int at;  // Index of next sample to write into
+    uint16_t slot;  // in RxQueue
 
     friend void RxPinChangeIsr();
     friend class TVanPacketRxDesc;
@@ -178,7 +180,7 @@ class TVanPacketRxDesc
 #endif // VAN_RX_ISR_DEBUGGING
 
     uint32_t seqNo;
-    uint8_t slot;  // in RxQueue
+    uint16_t slot;  // in RxQueue
 
     void Init()
     {

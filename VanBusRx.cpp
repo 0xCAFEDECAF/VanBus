@@ -3,7 +3,7 @@
  *
  * Written by Erik Tromp
  *
- * Version 0.2.0 - March, 2021
+ * Version 0.2.1 - March, 2021
  *
  * MIT license, all text above must be included in any redistribution.
  */
@@ -111,12 +111,60 @@ bool TVanPacketRxDesc::CheckCrcAndRepair()
         {
             uint8_t mask = 1 << atBit;
             bytes[atByte] ^= mask;  // Flip
+
+            // Is there a way to quickly re-calculate the CRC value when bit is flipped?
             if (CheckCrc())
             {
                 VanBusRx.nRepaired++;
                 return true;
             } // if
-            bytes[atByte] ^= mask;  // Flip back            
+
+            if (atBit != 7)
+            {
+                // Try also to flip the next bit
+                uint8_t mask2 = 1 << (atBit + 1);
+                bytes[atByte] ^= mask2;  // Flip
+                if (CheckCrc())
+                {
+                    VanBusRx.nRepaired++;
+                    return true;
+                } // if
+
+                bytes[atByte] ^= mask2;  // Flip back
+            } // if
+
+            bytes[atByte] ^= mask;  // Flip back
+        } // for
+    } // for
+
+    // Flip two bits - is this pushing it? Maybe limit the following to the shorter packets, e.g. up to say 15 bytes?
+    for (int atByte1 = 0; atByte1 < size; atByte1++)
+    {
+        // This may take really long...
+        wdt_reset();
+ 
+        for (int atBit1 = 0; atBit1 < 8; atBit1++)
+        {
+            uint8_t mask1 = 1 << atBit1;
+            bytes[atByte1] ^= mask1;  // Flip
+
+            for (int atByte2 = 0; atByte2 < size; atByte2++)
+            {
+                for (int atBit2 = 0; atBit2 < 8; atBit2++)
+                {
+                    uint8_t mask2 = 1 << atBit2;
+                    bytes[atByte2] ^= mask2;  // Flip
+                    if (CheckCrc())
+                    {
+                        VanBusRx.nRepaired++;
+                        return true;
+                    } // if
+
+                    bytes[atByte2] ^= mask2;  // Flip back
+                } // for
+            } // for
+
+            bytes[atByte1] ^= mask1;  // Flip back
         } // for
     } // for
 
@@ -287,12 +335,8 @@ inline unsigned int ICACHE_RAM_ATTR nBitsFromCycles(uint32_t nCycles, uint32_t& 
     } // if
 
     // We hardly ever get here. And if we do, the "number of bits" is not so important.
-    //unsigned int nBits = (nCycles + 347) / 694;
-    //unsigned int nBits = (nCycles + 335) / 640; // ( 305...944==1; 945...1584==2; 1585...2224==3; 2225...2864==4, ...
-    //unsigned int nBits = (nCycles + 347) / 660;
-    //unsigned int nBits = (nCycles + 250) / 640;
-    //unsigned int nBits = (nCycles + 300 * CPU_F_FACTOR) / 640 * CPU_F_FACTOR;
-    unsigned int nBits = (nCycles + 300 * CPU_F_FACTOR) / 650 * CPU_F_FACTOR;
+    //unsigned int nBits = (nCycles + 300 * CPU_F_FACTOR) / (650 * CPU_F_FACTOR);
+    unsigned int nBits = (nCycles + 200 * CPU_F_FACTOR) / (667 * CPU_F_FACTOR);
 
     return nBits;
 } // nBitsFromCycles
@@ -334,6 +378,12 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     static uint32_t prev = 0;
     uint32_t curr = ESP.getCycleCount();  // Store CPU cycle counter value as soon as possible
 
+    static uint32_t jitter = 0;
+
+    // Return quickly when it is a spurious interrupt (shorter than a single bit time)
+    uint32_t nCycles = curr - prev;  // Arithmetic has safe roll-over
+    if (nCycles + jitter < 400 * CPU_F_FACTOR) return;
+
     // Return quickly when it is a spurious interrupt (pin level not changed).
     if (pinLevelChangedTo == prevPinLevelChangedTo) return;
     prevPinLevelChangedTo = pinLevelChangedTo;
@@ -345,12 +395,8 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         VanBusRx.lastMediaAccessAt = curr;
     } // if
 
-    uint32_t nCycles = curr - prev;  // Arithmetic has safe roll-over
     prev = curr;
 
-    static uint32_t jitter = 0;
-    unsigned int nBits = nBitsFromCycles(nCycles, jitter);
- 
     TVanPacketRxDesc* rxDesc = VanBusRx._head;
     PacketReadState_t state = rxDesc->state;
     rxDesc->slot = rxDesc - VanBusRx.pool;
@@ -359,20 +405,23 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     // Record some data to be used for debugging outside this ISR
 
     TIsrDebugPacket* isrDebugPacket = &rxDesc->isrDebugPacket;
-    TIsrDebugData* debugIsr = isrDebugPacket->samples + isrDebugPacket->at;
+    isrDebugPacket->slot = rxDesc->slot;
+    TIsrDebugData* debugIsr =
+        isrDebugPacket->at < VAN_ISR_DEBUG_BUFFER_SIZE ?
+            isrDebugPacket->samples + isrDebugPacket->at :
+            NULL;
 
     // Only write into buffer if there is space
-    if (state != VAN_RX_DONE && isrDebugPacket->at < VAN_ISR_DEBUG_BUFFER_SIZE)
+    if (debugIsr != NULL)
     {
         debugIsr->pinLevel = pinLevelChangedTo;
         debugIsr->nCycles = nCycles;
-        debugIsr->slot = rxDesc->slot;
     } // if
 
     // Just before returning from this ISR, record some data for debugging
     #define return \
     { \
-        if (state != VAN_RX_DONE && isrDebugPacket->at < VAN_ISR_DEBUG_BUFFER_SIZE) \
+        if (debugIsr != NULL) \
         { \
             debugIsr->pinLevelAtReturnFromIsr = GPIP(VanBusRx.pin); \
             debugIsr->nCyclesProcessing = ESP.getCycleCount() - curr; \
@@ -395,6 +444,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             atBit = 0;
             readBits = 0;
             rxDesc->size = 0;
+            jitter = 0;
 
             //timer1_disable(); // TODO - necessary?
         } // if
@@ -404,6 +454,16 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
     if (state == VAN_RX_WAITING_ACK)
     {
+        // If the "ACK" came too soon, it might have been a late manchester bit: continue
+        if (nCycles < 500 * CPU_F_FACTOR)
+        {
+            atBit = 0;
+            readBits = 0;
+            rxDesc->state = VAN_RX_LOADING;
+            timer1_disable();
+            return;
+        } // if
+
         rxDesc->ack = VAN_ACK;
 
         // The timer ISR 'WaitAckIsr' will do this
@@ -420,17 +480,26 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         return;
     } // if
 
+#ifdef VAN_RX_ISR_DEBUGGING
+    if (debugIsr != NULL) debugIsr->jitter = jitter;
+#endif // VAN_RX_ISR_DEBUGGING
+    unsigned int nBits = nBitsFromCycles(nCycles, jitter);
+#ifdef VAN_RX_ISR_DEBUGGING
+    if (debugIsr != NULL) debugIsr->nBits = nBits;
+#endif // VAN_RX_ISR_DEBUGGING
+
     // During packet reception, the "Enhanced Manchester" encoding guarantees at most 5 bits are the same,
     // except during EOD when it can be 6.
-    // However, sometimes the Manchester bit is missed (bug in driver chip?). Let's be tolerant with that, and just
-    // pretend it was there, by accepting up to 9 equal bits.
-    if (nBits > 9)
+    // However, sometimes the Manchester bit is missed. Let's be tolerant with that, and just pretend it
+    // was there, by accepting up to 10 equal bits.
+    if (nBits > 10)
     {
         if (state == VAN_RX_SEARCHING)
         {
             atBit = 0;
             readBits = 0;
             rxDesc->size = 0;
+            jitter = 0;
             return;
         } // if
 
@@ -442,13 +511,32 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     } // if
 
     // Wait at most one extra bit time for the Manchester bit (5 --> 4, 10 --> 9)
-    // But... Manchester bit error at bit 10 is needed to see EOD, so skip that.
+    // But... Manchester "low" bit error at bit 10 is needed to see EOD, so skip that.
     if (nBits > 1
-        && (atBit + nBits == 5
-            /*|| (rxDesc->size < 5 && atBit + nBits == 9)*/))
+        &&
+        (
+            atBit + nBits == 5
+            ||
+            (
+                atBit + nBits == 10
+                &&
+                (
+                    // pinLevelChangedTo == VAN_LOGICAL_LOW: just had a series of VAN_LOGICAL_HIGH bits
+                    pinLevelChangedTo == VAN_LOGICAL_LOW
+                    // ||
+                    // // EOD is never in bytes 0...4
+                    // rxDesc->size < 5
+                )
+            )
+        )
+       )
     {
         nBits--;
-        jitter = 500;
+        jitter = 500 * CPU_F_FACTOR;
+        if (nCycles > 667 * CPU_F_FACTOR * nBits ) jitter = nCycles - 667 * CPU_F_FACTOR * nBits; // TODO - magic constant 667
+    #ifdef VAN_RX_ISR_DEBUGGING
+        if (debugIsr != NULL) debugIsr->nBits--;
+    #endif // VAN_RX_ISR_DEBUGGING
     } // if
 
     atBit += nBits;
@@ -473,6 +561,11 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             {
                 rxDesc->state = VAN_RX_VACANT;
                 //SetTxBitTimer();
+
+            #ifdef VAN_RX_ISR_DEBUGGING
+                isrDebugPacket->Init();
+            #endif // VAN_RX_ISR_DEBUGGING
+
                 return;
             } // if
 
@@ -489,18 +582,9 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
         rxDesc->bytes[rxDesc->size++] = readByte;
 
-        // EOD detected?
-        if ((currentByte & 0x003) == 0)
+        // EOD detected if last two bits are 0 followed by a 1, but never in bytes 0...4
+        if ((currentByte & 0x003) == 0 && atBit == 0 && rxDesc->size >= 5)
         {
-            // Not really necessary to do this within the limited time there is inside this ISR
-            #if 0
-            if (   atBit != 0  // EOD must end with a transition 0 -> 1
-                || (currentByte >> 1 & 0x20) == (currentByte & 0x20))
-            {
-                rxDesc->result = VAN_RX_ERROR_MANCHESTER;
-            } // if
-            #endif
-
             rxDesc->state = VAN_RX_WAITING_ACK;
 
             // Set a timeout for the ACK bit
@@ -511,7 +595,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             timer1_enable(TIM_DIV16, TIM_EDGE, TIM_SINGLE);
 
             //timer1_write(12 * 5); // 1.5 time slots = 1.5 * 8 us = 12 us
-            timer1_write(16 * 5); // 2 time slots = 2 * 8 us = 12 us
+            timer1_write(16 * 5); // 2 time slots = 2 * 8 us = 16 us
 
             return;
         } // if
@@ -524,18 +608,6 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
             return;
         } // if
-
-        // Not really necessary to do this within the limited time there is inside this ISR
-        #if 0
-        // Check "Enhanced Manchester" encoding: bit 5 must be inverse of bit 6, and bit 0 must be inverse of bit 1
-        if (   (currentByte >> 1 & 0x20) == (currentByte & 0x20)
-            || (currentByte >> 1 & 0x01) == (currentByte & 0x01) )
-        {
-            rxDesc->result = VAN_RX_ERROR_MANCHESTER;
-            //SetTxBitTimer();
-            return;
-        } // if
-        #endif
     } // if
 
     return;
@@ -563,8 +635,6 @@ void TIsrDebugPacket::Dump(Stream& s) const
     unsigned int atBit = 0;
     unsigned int readBits = 0;
     boolean eodSeen = false;
-    uint32_t totalCycles;
-    uint32_t totalBits;
     int size = 0;
     int i = 0;
 
@@ -573,96 +643,41 @@ void TIsrDebugPacket::Dump(Stream& s) const
         atBit = 0; \
         readBits = 0; \
         eodSeen = false; \
-        totalCycles = 0; \
-        totalBits = 0; \
         size = 0; \
     }
 
     while (at > 2 && i < at)
     {
         const TIsrDebugData* isrData = samples + i;
-        uint8_t slot = isrData->slot + 1;
         if (i == 0)
         {
-            s.printf_P(PSTR("%sSlot # CPU nCycles -> nBits(*) pinLVLs data\n"), slot >= 10 ? " " : "");
+            s.printf_P(PSTR("%sSlot # CPU nCycles jitt -> nBits pinLVLs data\n"), slot + 1 >= 10 ? " " : "");
         } // if
 
         if (i <= 1) reset();
 
-        s.printf("#%d", slot);
+        s.printf("#%d", slot + 1);
 
         s.printf("%4u", i);
 
         uint32_t nCyclesProcessing = isrData->nCyclesProcessing;
-        if (nCyclesProcessing > 999) s.printf(">999 ");
-        else s.printf("%4lu ", nCyclesProcessing);
+        if (nCyclesProcessing > 999) s.printf(">999 "); else s.printf("%4lu ", nCyclesProcessing);
 
         uint32_t nCycles = isrData->nCycles;
-        if (nCycles > 999999)
-        {
-            totalCycles = 0;
-            //s.printf(">999999 (%7lu -> %5u)", totalCycles, 0);
-            s.printf(">999999", totalCycles);
-        }
-        else
-        {
-            totalCycles += nCycles;
-            // Note: nBitsFromCycles has state information ("static uint32_t jitter"), so calling
-            // twice makes result different
-            //s.printf("%7lu (%7lu -> %5u)", nCycles, totalCycles, nBitsFromCycles(totalCycles));
-            s.printf("%7lu", nCycles);
-        } // if
+        if (nCycles > 999999) s.printf(">999999"); else s.printf("%7lu", nCycles);
+
+        s.printf("%5d", isrData->jitter);
+
         s.print(" -> ");
 
-        static uint32_t jitter = 0;
-        unsigned int nBits = nBitsFromCycles(nCycles, jitter);
-
-        if (nBits > 9999)
-        {
-            totalBits = 0;
-            s.printf(">9999");
-            //s.printf(">9999 (%5u)", totalBits);
-        }
-        else
-        {
-            totalBits += nBits;
-            s.printf("%5u", nBits);
-            //s.printf("%5u (%5u)", nBits, totalBits);
-        } // if
-
-        // Wait at most one extra bit time for the Manchester bit (5 --> 4, 10 --> 9)
-        // But... Manchester bit error at bit 10 is needed to see EOD, so skip that.
-        if (nBits > 1
-            && (atBit + nBits == 5
-                || (size < 5 && atBit + nBits == 10)))
-        {
-            nBits--;
-            jitter = 500;
-            s.printf("*%u ", nBits);
-        }
-        else
-        {
-            s.print("   ");
-        } // if
+        unsigned int nBits = isrData->nBits;
+        if (nBits > 9999) s.printf(">9999"); else s.printf("%5u", nBits);
 
         unsigned char pinLevelChangedTo = isrData->pinLevel;
         unsigned char pinLevelAtReturnFromIsr = isrData->pinLevelAtReturnFromIsr;
         s.printf(" \"%u\",\"%u\" ", pinLevelChangedTo, pinLevelAtReturnFromIsr);
 
-        // Sometimes the ISR is called very late; this is recognized as difference in pin levels:
-/*
-        if (nBits > 1 && pinLevelChangedTo != pinLevelAtReturnFromIsr)
-        {
-            nBits--;
-            s.printf("*%u ", nBits);
-        } // if
-*/
-
-        // During packet reception, the "Enhanced Manchester" encoding guarantees at most 5 bits are the same,
-        // except during EOD when it can be 6.
-        // However, sometimes the Manchester bit is missed (bug in driver chip?). Let's be tolerant with that, and just
-        // pretend it was there, by accepting up to 9 equal bits.
-        if (nBits > 9)
+        if (nBits > 10)
         {
             // Show we just had a long series of 1's (shown as '1.....') or 0's (shown as '-.....')
             s.print(pinLevelChangedTo == VAN_LOGICAL_LOW ? "1....." : "-.....");
@@ -728,27 +743,11 @@ void TIsrDebugPacket::Dump(Stream& s) const
             s.printf(" --> %02X (#%d)", readByte, size);
             size++;
 
-            // EOD detected?
-            if ((currentByte & 0x003) == 0)
+            // EOD detected if last two bits are 0 followed by a 1, but never in bytes 0...4
+            if ((currentByte & 0x003) == 0 && atBit == 0 && size >= 5)
             {
-                if (
-                    atBit != 0  // EOD must end with a transition 0 -> 1
-                    || (currentByte >> 1 & 0x20) == (currentByte & 0x20)
-                   )
-                {
-                    s.print(" Manchester error");
-                } // if
-
                 eodSeen = true;
                 s.print(" EOD");
-            } // if
-
-            // Check if bit 5 is inverse of bit 6, and if bit 0 is inverse of bit 1
-            // TODO - keep this, or ignore?
-            else if (   (currentByte >> 1 & 0x20) == (currentByte & 0x20)
-                     || (currentByte >> 1 & 0x01) == (currentByte & 0x01) )
-            {
-                s.print(" Manchester error");
             } // if
         } // if
 
@@ -758,6 +757,7 @@ void TIsrDebugPacket::Dump(Stream& s) const
     } // while
 
     #undef reset()
+
 } // TIsrDebugPacket::Dump
 
 #endif // VAN_RX_ISR_DEBUGGING
