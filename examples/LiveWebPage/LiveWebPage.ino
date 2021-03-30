@@ -67,9 +67,9 @@
  *   "VAN PACKET QUEUE OVERRUN!" lines. Looks like it should be set to at least 200.
  */
 
-// Uncomment to see *all* JSON buffers printed on the Serial port.
+// Uncomment to see JSON buffers printed on the Serial port.
 // Note: printing the JSON buffers takes pretty long, so it leads to more Rx queue overruns.
-//#define PRINT_JSON_BUFFERS_ON_SERIAL
+#define PRINT_JSON_BUFFERS_ON_SERIAL
 
 #include <ESP8266WiFi.h>
 
@@ -247,6 +247,11 @@ char webpage[] PROGMEM = R"=====(
     </style>
   </head>
   <body>
+    <div>
+      <p>Remote control</p>
+      <p>Button: <b id="mfd_remote_control">---</b></p>
+    </div>
+    <hr/>
     <div>
       <p>Engine</p>
       <p>Dash light: <b id="dash_light">---</b></p>
@@ -498,20 +503,24 @@ char webpage[] PROGMEM = R"=====(
     <hr/>
     <div>
       <p>CD Changer</p>
-      <p>Command: <b id="cd_changer_command">---</b></p>
+      <p>Present: <b id="cd_changer_present">---</b></p>
+      <p>Loading: <b id="cd_changer_loading">---</b></p>
+      <p>Operational: <b id="cd_changer_operational">---</b></p>
+      <p>Searching: <b id="cd_changer_status_searching">---</b></p>
       <p>Status: <b id="cd_changer_status">---</b></p>
       <p>Random mode: <b id="cd_changer_random">---</b></p>
       <p>Cartridge: <b id="cd_changer_cartridge_present">---</b></p>
       <p>Current track time: <b id="cd_changer_track_time">---</b></p>
       <p>Current track: <b id="cd_changer_current_track">---</b></p>
       <p>Number of tracks: <b id="cd_changer_total_tracks">---</b></p>
-      <p>Current CD: <b id="cd_changer_current_cd">---</b></p>
+      <p>Current CD: <b id="cd_changer_current_disc">---</b></p>
       <p>CD 1 present: <b id="cd_changer_disc_1_present">---</b></p>
       <p>CD 2 present: <b id="cd_changer_disc_2_present">---</b></p>
       <p>CD 3 present: <b id="cd_changer_disc_3_present">---</b></p>
       <p>CD 4 present: <b id="cd_changer_disc_4_present">---</b></p>
       <p>CD 5 present: <b id="cd_changer_disc_5_present">---</b></p>
       <p>CD 6 present: <b id="cd_changer_disc_6_present">---</b></p>
+      <p>Command: <b id="cd_changer_command">---</b></p>
     </div>
     <hr/>
     <div>
@@ -537,6 +546,7 @@ char webpage[] PROGMEM = R"=====(
       <p>Status 3: <b id="satnav_status_3">---</b></p>
       <p>Disc: <b id="satnav_disc_present">---</b></p>
       <p>Disc status: <b id="satnav_disc_status">---</b></p>
+      <p>Navigation preference: <b id="satnav_navigation_preference">---</b></p>
       <p>System ID</p>
       <div id="satnav_system_id" style="border:1px solid; width:700px; height:200px; overflow:scroll; overflow-x:hidden; white-space:nowrap;">
       </div>
@@ -703,7 +713,6 @@ char webpage[] PROGMEM = R"=====(
       <p>Place of interest address - province: <b id="satnav_place_of_interest_address_province">---</b></p>
       <p>Place of interest address - city: <b id="satnav_place_of_interest_address_city">---</b></p>
       <p>Place of interest address - street: <b id="satnav_place_of_interest_address_street">---</b></p>
-      <p>Place of interest address - house number: <b id="satnav_place_of_interest_address_house_number">---</b></p>
       <p>Place of interest address distance: <b id="satnav_place_of_interest_address_distance">---</b></p>
       <p>Address list</p>
       <div id="satnav_list" class="listbox"></div>
@@ -810,6 +819,17 @@ char webpage[] PROGMEM = R"=====(
 </html>
 )=====";
 
+enum VanPacketFilter_t
+{
+    VAN_PACKETS_ALL_EXCEPT,
+    VAN_PACKETS_NONE_EXCEPT,
+    VAN_PACKETS_HEAD_UNIT,
+    VAN_PACKETS_AIRCON,
+    VAN_PACKETS_SAT_NAV
+}; // enum VanPacketFilter_t
+
+// serialDumpFilter == 0 means: no filtering; print all
+// serialDumpFilter != 0 means: print only the packet + JSON data for the specified IDEN
 uint16_t serialDumpFilter;
 
 // Set a simple filter on the dumping of packet + JSON data on Serial.
@@ -891,6 +911,20 @@ void printSystemSpecs()
     Serial.printf_P(PSTR("Flash chip configuration %S\n"), ideSize != realSize ? PSTR("wrong!") : PSTR("ok."));
 } // printSystemSpecs
 
+// Results returned from the IR decoder
+typedef struct
+{
+    unsigned long value;  // Decoded value
+    int bits;  // Number of bits in decoded value
+    volatile unsigned int *rawbuf;  // Raw intervals in 50 usec ticks
+    int rawlen;  // Number of records in rawbuf
+} TIrPacket;
+
+// Defined in IRrecv.ino
+void irSetup();
+const char* ParseIrPacketToJson(TIrPacket& pkt);
+bool irReceive(TIrPacket& irPacket);
+
 // Defined in Wifi.ino
 void setupWifi();
 
@@ -920,48 +954,53 @@ void setup()
 
     VanBusRx.Setup(RX_PIN);
     Serial.printf_P(PSTR("VanBusRx queue of size %d is set up\n"), VAN_RX_QUEUE_SIZE);
+
+    irSetup();
 } // setup
 
 // Defined in PacketToJson.ino
 const char* ParseVanPacketToJson(TVanPacketRxDesc& pkt);
-
 void PrintJsonText(const char* jsonBuffer);
+
+void broadcastJsonText(const char* json)
+{
+    if (strlen(json) > 0)
+    {
+        delay(1); // Give some time to system to process other things?
+
+        unsigned long start = millis();
+
+        webSocket.broadcastTXT(json);
+
+        // Print a message if the websocket broadcast took outrageously long (normally it takes around 1-2 msec).
+        // If that takes really long (seconds or more), the VAN bus Rx queue will overrun.
+        unsigned long duration = millis() - start;
+        if (duration > 100)
+        {
+            Serial.printf_P(
+                PSTR("Sending %zu JSON bytes via 'webSocket.broadcastTXT' took: %lu msec\n"),
+                strlen(json),
+                duration);
+
+            Serial.print(F("JSON object:\n"));
+            PrintJsonText(json);
+        } // if
+    } // if
+} // broadcastJsonText
 
 void loop()
 {
     webSocket.loop();
     webServer.handleClient();
 
+    // IR receiver
+    TIrPacket irPacket;
+    if (irReceive(irPacket)) broadcastJsonText(ParseIrPacketToJson(irPacket));
+
+    // VAN bus receiver
     TVanPacketRxDesc pkt;
     bool isQueueOverrun = false;
-
-    if (VanBusRx.Receive(pkt, &isQueueOverrun))
-    {
-        const char* json = ParseVanPacketToJson(pkt);
-        if (strlen(json) > 0)
-        {
-            delay(10); // Give some time to system to process other things?
-
-            unsigned long start = millis();
-
-            webSocket.broadcastTXT(json);
-
-            // Print a message if the websocket broadcast took outrageously long (normally it takes around 1-2 msec).
-            // If that takes really long (seconds or more), the VAN bus Rx queue will overrun.
-            unsigned long duration = millis() - start;
-            if (duration > 100)
-            {
-                Serial.printf_P(
-                    PSTR("Sending %zu JSON bytes via 'webSocket.broadcastTXT' took: %lu msec\n"),
-                    strlen(json),
-                    duration);
-
-                Serial.print(F("JSON object:\n"));
-                PrintJsonText(json);
-            } // if
-        } // if
-    } // if
-
+    if (VanBusRx.Receive(pkt, &isQueueOverrun)) broadcastJsonText(ParseVanPacketToJson(pkt));
     if (isQueueOverrun) Serial.print(F("VAN PACKET QUEUE OVERRUN!\n"));
 
     // Print statistics every 5 seconds
