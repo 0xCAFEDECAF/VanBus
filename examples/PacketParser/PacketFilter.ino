@@ -205,13 +205,13 @@ bool isPacketSelected(uint16_t iden, VanPacketFilter_t filter)
             || iden == HEAD_UNIT_STALK_IDEN
             || iden == LIGHTS_STATUS_IDEN
             // || iden == DEVICE_REPORT
-            // || iden == CAR_STATUS1_IDEN //
+            || iden == CAR_STATUS1_IDEN
             || iden == CAR_STATUS2_IDEN
             || iden == DASHBOARD_IDEN
             || iden == DASHBOARD_BUTTONS_IDEN
             || iden == HEAD_UNIT_IDEN
             || iden == TIME_IDEN
-            // || iden == AUDIO_SETTINGS_IDEN
+            || iden == AUDIO_SETTINGS_IDEN
             || iden == MFD_STATUS_IDEN
             || iden == AIRCON1_IDEN
             || iden == AIRCON2_IDEN
@@ -227,9 +227,9 @@ bool isPacketSelected(uint16_t iden, VanPacketFilter_t filter)
             // || iden == SATNAV_DOWNLOADING_IDEN
             // || iden == SATNAV_DOWNLOADED1_IDEN
             // || iden == SATNAV_DOWNLOADED2_IDEN
-            // || iden == WHEEL_SPEED_IDEN
-            // || iden == ODOMETER_IDEN
-            // || iden == COM2000_IDEN //
+            || iden == WHEEL_SPEED_IDEN
+            || iden == ODOMETER_IDEN
+            || iden == COM2000_IDEN
             || iden == CDCHANGER_COMMAND_IDEN
             || iden == MFD_TO_HEAD_UNIT_IDEN
             || iden == AIR_CONDITIONER_DIAG_IDEN

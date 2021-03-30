@@ -1511,37 +1511,55 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                         return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                     } // if
 
-                    SERIAL.printf_P(PSTR("status=%S"),
-                        data[3] == 0x11 ? PSTR("INSERTED") :
+                    bool searching = data[3] & 0x10;
+
+                    char trackTimeStr[7];
+                    sprintf_P(trackTimeStr, PSTR("%X:%02X"), data[5], data[6]);
+
+                    uint8_t totalTracks = data[8];
+                    bool totalTracksInvalid = totalTracks == 0xFF;
+                    char totalTracksStr[3];
+                    if (! totalTracksInvalid) sprintf_P(totalTracksStr, PSTR("%X"), totalTracks);
+
+                    char totalTimeStr[7];
+                    bool totalTimeInvalid = dataLen < 12;
+                    if (! totalTimeInvalid)
+                    {
+                        uint8_t totalTimeMin = data[9];
+                        uint8_t totalTimeSec = data[10];
+                        totalTimeInvalid = totalTimeMin == 0xFF || totalTimeSec == 0xFF;
+                        if (! totalTimeInvalid) sprintf_P(totalTimeStr, PSTR("%X:%02X"), totalTimeMin, totalTimeSec);
+                    } // if
+
+                    SERIAL.printf_P(
+                        PSTR(
+                            "status=%S; cd_loading_changing_to_cd_source=%S; pause=%S; play=%S; fast_forward=%S; "
+                            "rewind=%S;\n"
+                            "    searching=%S; track_time=%S; current_track=%X; total_tracks=%S; total_time=%S\n"
+                        ),
+
+                        data[3] == 0x11 ? PSTR("LOADING_CD_AND_CHANGING_TO_CD_AUDIO_SOURCE") :
                         data[3] == 0x12 ? PSTR("PAUSE-SEARCHING") :
                         data[3] == 0x13 ? PSTR("PLAY-SEARCHING") :
                         data[3] == 0x02 ? PSTR("PAUSE") :
                         data[3] == 0x03 ? PSTR("PLAY") :
                         data[3] == 0x04 ? PSTR("FAST_FORWARD") :
                         data[3] == 0x05 ? PSTR("REWIND") :
-                        ToHexStr(data[3])
+                        ToHexStr(data[3]),
+
+                        (data[3] & 0x0F) == 0x01 ? yesStr : noStr,
+                        (data[3] & 0x0F) == 0x02 && ! searching ? yesStr : noStr,
+                        (data[3] & 0x0F) == 0x03 && ! searching ? yesStr : noStr,
+                        (data[3] & 0x0F) == 0x04 ? yesStr : noStr,
+                        (data[3] & 0x0F) == 0x05 ? yesStr : noStr,
+
+                        searching ? yesStr : noStr,
+
+                        searching ? PSTR("--:--") : trackTimeStr,
+                        data[7],
+                        totalTracksInvalid ? notApplicable2Str : totalTracksStr,
+                        totalTimeInvalid ? PSTR("--:--") : totalTimeStr
                     );
-
-                    SERIAL.printf_P(PSTR(" - %X:%02X in track %X"),
-                        data[5],
-                        data[6],
-                        data[7]
-                    );
-
-                    if (data[8] != 0xFF)
-                    {
-                        SERIAL.printf_P(PSTR("/%X"), data[8]);
-
-                        if (dataLen >= 12 && data[9] != 0xFF)
-                        {
-                            SERIAL.printf_P(PSTR(" (total: %X:%02X)"),
-                                data[9],
-                                data[10]
-                            );
-                        } // if
-                    } // if
-
-                    SERIAL.println();
                 }
                 break;
 
@@ -1702,8 +1720,8 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 "MFD_SCREEN_%S\n",
 
                 // hmmm... MFD can also be ON if this is reported; this happens e.g. in the "minimal VAN network" test
-                // setup with only the head unit (radio) and MFD. Maybe this is a status report: the MFD shows if has
-                // received any packets that show connectivity to e.g. the BSI?
+                // setup with only the head unit (radio) and MFD. Maybe this is a status report: the MFD indicates that
+                // it has received packets showing connectivity to e.g. the BSI?
                 data[0] == 0x00 && data[1] == 0xFF ? offStr :
 
                 data[0] == 0x20 && data[1] == 0xFF ? onStr :
@@ -1923,21 +1941,39 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             SERIAL.printf_P(intro);
 
-            char floatBuf[3][MAX_FLOAT_SIZE];
+            bool searching = data[2] & 0x10;
 
             SERIAL.printf_P(
                 PSTR(
-                    "random=%S; state=%S"
+                    "random=%S; operational=%S; present=%S; searching=%S; loading=%S; state=%S;\n"
+                    "    pause=%S; play=%S; fast_forward=%S; rewind=%S;\n"
                 ),
+
                 data[1] == 0x01 ? onStr : offStr,
 
-                data[2] == 0x41 ? offStr :
+                // Head unit powered on; CD changer operational (either standby or selected as audio source)
+                data[2] & 0x80 ? yesStr : noStr,
+
+                data[2] & 0x40 ? yesStr : noStr,  // CD changer device present
+                searching ? yesStr : noStr,
+                data[2] & 0x08 ? yesStr : noStr,  // Loading disc? Not sure
+
+                // TODO - remove this field?
+                data[2] == 0x40 ? PSTR("POWER_OFF") :  // Not sure
+                data[2] == 0x41 ? PSTR("POWER_ON") : // Not sure
+                data[2] == 0x49 ? PSTR("INITIALIZE") :  // Not sure
+                data[2] == 0xC0 ? PSTR("POWER_ON_READY") :  // Not sure
                 data[2] == 0xC1 ? PSTR("PAUSE") :
-                data[2] == 0xD3 ? PSTR("SEARCHING") :
-                data[2] == 0xC3 ? PSTR("PLAYING") :
+                data[2] == 0xC3 ? PSTR("PLAY") :
                 data[2] == 0xC4 ? PSTR("FAST_FORWARD") :
                 data[2] == 0xC5 ? PSTR("REWIND") :
-                ToHexStr(data[2])
+                data[2] == 0xD3 ? PSTR("PLAY-SEARCHING") :
+                ToHexStr(data[2]),
+
+                (data[2] & 0x07) == 0x01 ? yesStr : noStr,
+                (data[2] & 0x07) == 0x03 && ! searching ? yesStr : noStr,
+                (data[2] & 0x07) == 0x04 ? yesStr : noStr,
+                (data[2] & 0x07) == 0x05 ? yesStr : noStr
             );
 
             uint8_t trackTimeMin = data[4];
@@ -1953,8 +1989,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             SERIAL.printf_P(
                 PSTR(
-                    "; cartridge=%S; %S in track %X/%S on CD %X; "
-                    "presence=%S-%S-%S-%S-%S-%S\n"
+                    "    cartridge=%S; %S in track %X/%S on disc %X; presence=%S-%S-%S-%S-%S-%S\n"
                 ),
                 data[3] == 0x16 ? PSTR("IN") :
                 data[3] == 0x06 ? PSTR("OUT") :
@@ -2015,13 +2050,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 status == 0x0020 ? ToHexStr(status) :  // Seen this but what is it?? Nearly at destination ??
                 status == 0x0080 ? PSTR("READY") :
                 status == 0x0101 ? ToHexStr(status) :  // Seen this but what is it??
-                //status == 0x0200 ? PSTR("INITIALISING") : // No, definitely not this
                 status == 0x0200 ? PSTR("READING_DISC_1") :
                 status == 0x0220 ? ToHexStr(status) :  // Seen this but what is it??
                 status == 0x0300 ? PSTR("IN_GUIDANCE_MODE_1") :
                 status == 0x0301 ? PSTR("IN_GUIDANCE_MODE_2") :
                 status == 0x0320 ? PSTR("STOPPING_GUIDANCE") :
-                //status == 0x0400 ? PSTR("TERMS_AND_CONDITIONS_ACCEPTED") : // No, definitely not this
                 status == 0x0400 ? PSTR("START_OF_AUDIO_MESSAGE") :
                 status == 0x0410 ? PSTR("ARRIVED_AT_DESTINATION_1") :
                 status == 0x0600 ? ToHexStr(status) :  // Seen this but what is it??
@@ -2177,7 +2210,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 data[1] == 0x20 ? PSTR("IDLE_NOT_READY") :
                 data[1] == 0x21 ? PSTR("IDLE_READY") :
                 data[1] == 0x25 ? PSTR("CALCULATING_ROUTE") :
-                data[1] == 0x41 ? ToHexStr(data[1]) :  // Seen this but what is it??
+                data[1] == 0x41 ? PSTR("NOT_ON_MAP") :  // TODO - check if this is correct
                 data[1] == 0xC1 ? PSTR("FINISHED_DOWNLOADING") :
                 ToHexStr(data[1])
             );
@@ -2263,9 +2296,22 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
                     // This starts when the nag screen is accepted and is seen repeatedly when selecting a destination
                     // and during guidance. It stops after a "STOPPING_NAVIGATION" status message.
-                    status == 0x0108 ? PSTR("SATNAV_IN_OPERATION") :  // NAVIGATION_MENU_ENTERED
+                    status == 0x0108 ? PSTR("SATNAV_IN_OPERATION") :
 
                     ToHexStr(status)
+                );
+            }
+            else if (dataLen == 3)
+            {
+                // Navigation preference
+
+                SERIAL.printf_P(
+                    PSTR("satnav_navigation_preference=%S\n"),
+                    data[1] == 0x01 ? PSTR("FASTEST_ROUTE") :
+                    data[1] == 0x04 ? PSTR("SHORTEST_DISTANCE") :
+                    data[1] == 0x12 ? PSTR("AVOID_HIGHWAY") :
+                    data[1] == 0x02 ? PSTR("COMPROMISE_FAST_SHORT") :
+                    ToHexStr(data[1])
                 );
             }
             else if (dataLen == 17 && data[0] == 0x20)
@@ -2736,14 +2782,16 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // Then, depending on the content of string [0] ("V" or "C"):
             // * Type "V"
             //   [7]: house number (or "0" if unknown or not applicable),
+            //   For  "private" and "business" address:
+            //   [8] Name of entry (e.g. "HOME")
             // * Type "C"
             //   [7], [8]: GPS coordinates (e.g. "+495456", "+060405"). Note that these coordinates are in degrees, NOT
             //             in decimal notation. So the just given example would translate to: 49°54'56"N 6°04'05"E.
             //             There seems to be however some offset, because the shown GPS coordinates do not exactly
             //             match the destination.
+            //   For  "private" and "business" address:
+            //   [9] Name of entry (e.g. "HOME")
             //
-            // For  "private" and "business" address (always type "V"):
-            // [8] Name of entry (e.g. "HOME")
             //
             // For "place of interest" address (always type "C"):
             // [9] Name of entry (e.g. "CINE SCALA")
@@ -3681,7 +3729,7 @@ void setup()
     SERIAL.begin(115200);
     SERIAL.println(F("Starting VAN bus packet parser"));
 
-    // Disable WIFI altogether to get rid of long and variable interrupt latency, causing packet CRC errors
+    // Disable Wi-Fi altogether to get rid of long and variable interrupt latency, causing packet CRC errors
     // From: https://esp8266hints.wordpress.com/2017/06/29/save-power-by-reliably-switching-the-esp-wifi-on-and-off/
     WiFi.disconnect(true);
     delay(1); 
