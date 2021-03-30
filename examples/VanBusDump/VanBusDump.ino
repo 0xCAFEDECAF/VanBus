@@ -75,7 +75,7 @@ void setup()
     Serial.begin(115200);
     Serial.println("Starting VAN bus receiver");
 
-    // Disable WIFI altogether to get rid of long and variable interrupt latency, causing packet CRC errors
+    // Disable Wi-Fi altogether to get rid of long and variable interrupt latency, causing packet CRC errors
     // From: https://esp8266hints.wordpress.com/2017/06/29/save-power-by-reliably-switching-the-esp-wifi-on-and-off/
     WiFi.disconnect(true);
     delay(1); 
