@@ -235,6 +235,9 @@ class TVanPacketRxQueue
         , count(0)
         , nCorrupt(0)
         , nRepaired(0)
+        , nOneBitError(0)
+        , nTwoConsecutiveBitErrors(0)
+        , nTwoSeparateBitErrors(0)
     { }
 
     void Setup(uint8_t rxPin);
@@ -259,6 +262,9 @@ class TVanPacketRxQueue
     uint32_t count;
     uint32_t nCorrupt;
     uint32_t nRepaired;
+    uint32_t nOneBitError;
+    uint32_t nTwoConsecutiveBitErrors;
+    uint32_t nTwoSeparateBitErrors;
 
     void RegisterTxTimerTicks(uint32_t ticks) { txTimerTicks = ticks; };
     void RegisterTxIsr(timercallback isr) { ISR_SAFE_SET(txTimerIsr, isr); };

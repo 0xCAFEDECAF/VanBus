@@ -116,6 +116,7 @@ bool TVanPacketRxDesc::CheckCrcAndRepair()
             if (CheckCrc())
             {
                 VanBusRx.nRepaired++;
+                VanBusRx.nOneBitError++;
                 return true;
             } // if
 
@@ -127,6 +128,7 @@ bool TVanPacketRxDesc::CheckCrcAndRepair()
                 if (CheckCrc())
                 {
                     VanBusRx.nRepaired++;
+                    VanBusRx.nTwoConsecutiveBitErrors++;
                     return true;
                 } // if
 
@@ -157,6 +159,7 @@ bool TVanPacketRxDesc::CheckCrcAndRepair()
                     if (CheckCrc())
                     {
                         VanBusRx.nRepaired++;
+                        VanBusRx.nTwoSeparateBitErrors++;
                         return true;
                     } // if
 
@@ -262,6 +265,13 @@ void TVanPacketRxQueue::DumpStats(Stream& s) const
             ? "---" 
             : FloatToStr(floatBuf, 100.0 * nRepaired / nCorrupt, 0));
 
+    s.printf_P(
+        PSTR(" [SB_err: %lu, DCB_err: %lu: DSB_err: %lu]"),
+        nOneBitError,
+        nTwoConsecutiveBitErrors,
+        nTwoSeparateBitErrors
+    );
+
     uint32_t overallCorrupt = nCorrupt - nRepaired;
     s.printf_P(
         PSTR(", overall: %lu (%s%%)\n"),
@@ -334,9 +344,12 @@ inline unsigned int ICACHE_RAM_ATTR nBitsFromCycles(uint32_t nCycles, uint32_t& 
         return 5;
     } // if
 
+// Normal bit time (8 microseconds), expressed as number of CPU cycles
+#define VAN_NORMAL_BIT_TIME_CPU_CYCLES (667 * CPU_F_FACTOR)
+
     // We hardly ever get here. And if we do, the "number of bits" is not so important.
     //unsigned int nBits = (nCycles + 300 * CPU_F_FACTOR) / (650 * CPU_F_FACTOR);
-    unsigned int nBits = (nCycles + 200 * CPU_F_FACTOR) / (667 * CPU_F_FACTOR);
+    unsigned int nBits = (nCycles + 200 * CPU_F_FACTOR) / VAN_NORMAL_BIT_TIME_CPU_CYCLES;
 
     return nBits;
 } // nBitsFromCycles
@@ -466,8 +479,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
         rxDesc->ack = VAN_ACK;
 
-        // The timer ISR 'WaitAckIsr' will do this
-        //VanBusRx._AdvanceHead();
+        // The timer ISR 'WaitAckIsr' will call 'VanBusRx._AdvanceHead()'
 
         return;
     } // if
@@ -533,10 +545,24 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     {
         nBits--;
         jitter = 500 * CPU_F_FACTOR;
-        if (nCycles > 667 * CPU_F_FACTOR * nBits ) jitter = nCycles - 667 * CPU_F_FACTOR * nBits; // TODO - magic constant 667
+        if (nCycles > VAN_NORMAL_BIT_TIME_CPU_CYCLES * nBits ) jitter = nCycles - VAN_NORMAL_BIT_TIME_CPU_CYCLES * nBits;
     #ifdef VAN_RX_ISR_DEBUGGING
         if (debugIsr != NULL) debugIsr->nBits--;
     #endif // VAN_RX_ISR_DEBUGGING
+/*
+    }
+
+    // Experiment: read the pin level again; if it changed during the processing of the current interrupt, then
+    // apparently the interrupt service was called quite late, so the number of bits is in fact one less
+    else if (pinLevelChangedTo != GPIP(VanBusRx.pin))
+    {
+        nBits--;
+        jitter = 500 * CPU_F_FACTOR;
+        if (nCycles > VAN_NORMAL_BIT_TIME_CPU_CYCLES * nBits ) jitter = nCycles - VAN_NORMAL_BIT_TIME_CPU_CYCLES * nBits;
+    #ifdef VAN_RX_ISR_DEBUGGING
+        if (debugIsr != NULL) debugIsr->nBits--;
+    #endif // VAN_RX_ISR_DEBUGGING
+*/
     } // if
 
     atBit += nBits;
