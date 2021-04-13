@@ -62,7 +62,7 @@
  *   lwIP variant: "v2 Higher Bandwidth" or "v2 Higher Bandwidth (no features)". The "Lower Memory" variants seem
  *   to have hiccups in the TCP traffic, ultimately causing the VAN Rx bus to overrun.
  *
- * - Having #define VAN_RX_QUEUE_SIZE set to 15 (see VanBusRx.h) seems too little given the current setup
+ * - Having #define VAN_PACKET_QUEUE_SIZE set to 15 (see VanBusRx.h) seems too little given the current setup
  *   where JSON buffers are printed on the Serial port (#define PRINT_JSON_BUFFERS_ON_SERIAL); seeing quite some
  *   "VAN PACKET QUEUE OVERRUN!" lines. Looks like it should be set to at least 200.
  */
@@ -870,47 +870,6 @@ void handleDumpFilter()
             F("OK: filtering JSON data"));
 } // handleDumpFilter
 
-void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length)
-{
-    switch(type)
-    {
-        case WStype_DISCONNECTED:
-        {
-            Serial.printf("Websocket [%u] Disconnected!\n", num);
-        }
-        break;
-
-        case WStype_CONNECTED:
-        {
-            IPAddress ip = webSocket.remoteIP(num);
-            Serial.printf("Websocket [%u] Connected from %d.%d.%d.%d url: %s\n", num, ip[0], ip[1], ip[2], ip[3], payload);
-        }
-        break;
-    } // switch
-} // webSocketEvent
-
-void printSystemSpecs()
-{
-    Serial.printf_P(PSTR("CPU Speed: %u MHz\n"), system_get_cpu_freq());
-    Serial.printf_P(PSTR("SDK: %s\n"), system_get_sdk_version());
-
-    uint32_t realSize = ESP.getFlashChipRealSize();
-    uint32_t ideSize = ESP.getFlashChipSize();
-
-    char floatBuf[MAX_FLOAT_SIZE];
-    Serial.printf_P(PSTR("Flash real size: %s MBytes\n"), FloatToStr(floatBuf, realSize/1024.0/1024.0, 2));
-    Serial.printf_P(PSTR("Flash ide size: %s MBytes\n"), FloatToStr(floatBuf, ideSize/1024.0/1024.0, 2));
-    Serial.printf_P(PSTR("Flash ide speed: %s MHz\n"), FloatToStr(floatBuf, ESP.getFlashChipSpeed()/1000000.0, 2));
-    FlashMode_t ideMode = ESP.getFlashChipMode();
-    Serial.printf_P(PSTR("Flash ide mode: %S\n"),
-        ideMode == FM_QIO ? PSTR("QIO") :
-        ideMode == FM_QOUT ? PSTR("QOUT") :
-        ideMode == FM_DIO ? PSTR("DIO") :
-        ideMode == FM_DOUT ? PSTR("DOUT") :
-        PSTR("UNKNOWN"));
-    Serial.printf_P(PSTR("Flash chip configuration %S\n"), ideSize != realSize ? PSTR("wrong!") : PSTR("ok."));
-} // printSystemSpecs
-
 // Results returned from the IR decoder
 typedef struct
 {
@@ -920,43 +879,17 @@ typedef struct
     int rawlen;  // Number of records in rawbuf
 } TIrPacket;
 
-// Defined in IRrecv.ino
-void irSetup();
-const char* ParseIrPacketToJson(TIrPacket& pkt);
-bool irReceive(TIrPacket& irPacket);
-
 // Defined in Wifi.ino
 void setupWifi();
 
-void setup()
-{
-    delay(1000);
-    Serial.begin(115200);
-    Serial.println(F("Starting VAN bus live web page server"));
+// Defined in IRrecv.ino
+void irSetup();
+const char* parseIrPacketToJson(TIrPacket& pkt);
+bool irReceive(TIrPacket& irPacket);
 
-    printSystemSpecs();
-
-    setupWifi();
-
-    webServer.on("/",[](){
-        unsigned long start = millis();
-        webServer.send_P(200, "text/html", webpage);  
-        Serial.printf_P(PSTR("Sending HTML took: %lu msec\n"), millis() - start);
-    });
-    webServer.on("/dumpOnly", handleDumpFilter);
-    webServer.begin();
-
-    webSocket.begin();
-    webSocket.onEvent(webSocketEvent);
-
-    Serial.print(F("Please surf to: http://"));
-    Serial.println(WiFi.localIP());
-
-    VanBusRx.Setup(RX_PIN);
-    Serial.printf_P(PSTR("VanBusRx queue of size %d is set up\n"), VAN_RX_QUEUE_SIZE);
-
-    irSetup();
-} // setup
+// Defined in Esp.ino
+void printSystemSpecs();
+const char* espDataToJson();
 
 // Defined in PacketToJson.ino
 const char* ParseVanPacketToJson(TVanPacketRxDesc& pkt);
@@ -988,6 +921,59 @@ void broadcastJsonText(const char* json)
     } // if
 } // broadcastJsonText
 
+void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length)
+{
+    switch(type)
+    {
+        case WStype_DISCONNECTED:
+        {
+            Serial.printf("Websocket [%u] Disconnected!\n", num);
+        }
+        break;
+
+        case WStype_CONNECTED:
+        {
+            IPAddress ip = webSocket.remoteIP(num);
+            Serial.printf("Websocket [%u] Connected from %d.%d.%d.%d url: %s\n", num, ip[0], ip[1], ip[2], ip[3], payload);
+
+            // Dump some system data
+            broadcastJsonText(espDataToJson());
+        }
+        break;
+    } // switch
+} // webSocketEvent
+
+void setup()
+{
+    delay(1000);
+    Serial.begin(115200);
+    Serial.println(F("Starting VAN bus live web page server"));
+
+    printSystemSpecs();
+
+    setupWifi();
+
+    webServer.on("/",[](){
+        unsigned long start = millis();
+        webServer.send_P(200, "text/html", webpage);  
+        Serial.printf_P(PSTR("Sending HTML took: %lu msec\n"), millis() - start);
+    });
+    webServer.on("/dumpOnly", handleDumpFilter);
+    webServer.begin();
+
+    webSocket.begin();
+    webSocket.onEvent(webSocketEvent);
+
+    Serial.print(F("Please surf to: http://"));
+    Serial.println(WiFi.localIP());
+
+    #define VAN_PACKET_QUEUE_SIZE 100
+    VanBusRx.Setup(RX_PIN, VAN_PACKET_QUEUE_SIZE);
+    Serial.printf_P(PSTR("VanBusRx queue of size %d is set up\n"), VanBusRx.QueueSize());
+
+    irSetup();
+} // setup
+
 void loop()
 {
     webSocket.loop();
@@ -995,7 +981,7 @@ void loop()
 
     // IR receiver
     TIrPacket irPacket;
-    if (irReceive(irPacket)) broadcastJsonText(ParseIrPacketToJson(irPacket));
+    if (irReceive(irPacket)) broadcastJsonText(parseIrPacketToJson(irPacket));
 
     // VAN bus receiver
     TVanPacketRxDesc pkt;

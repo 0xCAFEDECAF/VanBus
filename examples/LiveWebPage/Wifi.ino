@@ -13,15 +13,11 @@ void setupWifi()
 {
     Serial.printf_P(PSTR("Connecting to Wi-Fi SSID '%s' "), ssid);
 
-    // // TODO - move to after WiFi.status() == WL_CONNECTED ?
-    // WiFi.hostname(getHostname());
-
     WifiConfig();
 
     // TODO - does this decrease the jitter on the bit timings?
     wifi_set_sleep_type(NONE_SLEEP_T);
 
-    // TODO - use AP mode?
     WiFi.mode(WIFI_STA);  // Otherwise it may be in WIFI_AP_STA mode, broadcasting an SSID like AI_THINKER_XXXXXX
     WiFi.disconnect();  // After reset via HW button sometimes cannot seem to reconnect without this
     WiFi.persistent(false);
@@ -30,14 +26,9 @@ void setupWifi()
     WiFi.setPhyMode(WIFI_PHY_MODE_11N);
     WiFi.setOutputPower(20.5);
 
-    // TODO - using Wi-Fi has a detrimental effect on the packet CRC error rate. It will rise from around
-    // 0.006% up to 1% or more. Not sure what is the underlying cause; it can be either:
-    // - cross-talk on the wiring (Wi-Fi packets have effect on the quality of the signal that comes in
-    //   on the Rx GPIO pin),
-    // - timing failures due to Wi-Fi causing varying interrupt latency, or
-    // - both
-    //
-    // Not sure how to tackle this.
+    // TODO - using Wi-Fi, unfortunately, has a detrimental effect on the packet CRC error rate. It will rise from
+    // around 0.006% up to 0.1% or more. Underlying cause is timing failures due to Wi-Fi causing varying interrupt
+    // latency. Not sure how to tackle this.
     WiFi.begin(ssid, password);
     while (WiFi.status() != WL_CONNECTED)
     {

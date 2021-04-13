@@ -402,18 +402,18 @@ const char* SatNavRequestStr(uint8_t data)
         data == SR_ENTER_DISTRICT ? PSTR("Enter district") :
         data == SR_ENTER_NEIGHBORHOOD ? PSTR("Enter neighborhood") :
         data == SR_ENTER_STREET ? PSTR("Enter street") :
-        data == SR_ENTER_HOUSE_NUMBER ? PSTR("Enter house number") :
-        data == SR_ENTER_HOUSE_NUMBER_LETTER ? PSTR("Enter house number letter") :
+        data == SR_ENTER_HOUSE_NUMBER ? PSTR("Enter number") :
+        data == SR_ENTER_HOUSE_NUMBER_LETTER ? PSTR("Enter letter") :
         data == SR_PLACE_OF_INTEREST_CATEGORY ? PSTR("Place of interest category") :
         data == SR_PLACE_OF_INTEREST ? PSTR("Place of interest") :
         data == SR_LAST_DESTINATION ? PSTR("Last destination") :
         data == SR_NEXT_STREET ? PSTR("Next street") :
         data == SR_CURRENT_STREET ? PSTR("Current street") :
-        data == SR_PRIVATE_ADDRESS ? PSTR("Private address") :
-        data == SR_BUSINESS_ADDRESS ? PSTR("Business address") :
+        data == SR_PRIVATE_ADDRESS ? PSTR("Personal address") :
+        data == SR_BUSINESS_ADDRESS ? PSTR("Professional address") :
         data == SR_SOFTWARE_MODULE_VERSIONS ? PSTR("Software module versions") :
-        data == SR_PRIVATE_ADDRESS_LIST ? PSTR("Private address list") :
-        data == SR_BUSINESS_ADDRESS_LIST ? PSTR("Business address list") :
+        data == SR_PRIVATE_ADDRESS_LIST ? PSTR("Personal address list") :
+        data == SR_BUSINESS_ADDRESS_LIST ? PSTR("Professional address list") :
         data == SR_DESTINATION ? PSTR("Current destination") :
         ToHexStr(data);
 } // SatNavRequestStr
@@ -611,10 +611,9 @@ VanPacketParseResult_t ParseEnginePkt(const char* idenStr, TVanPacketRxDesc& pkt
 
         // TODO - hard coded value 130 degrees Celsius for 100%
         #define MAX_COOLANT_TEMP (130)
-        isWaterTempValid ?
-            waterTemp >= MAX_COOLANT_TEMP ? PSTR("1") :
-                FloatToStr(floatBuf[0], (float)waterTemp / MAX_COOLANT_TEMP, 2) :
-            PSTR("0"),
+        ! isWaterTempValid || waterTemp < 0 ? PSTR("0") :
+        waterTemp >= MAX_COOLANT_TEMP ? PSTR("1") :
+        FloatToStr(floatBuf[0], (float)waterTemp / MAX_COOLANT_TEMP, 2),
 
         FloatToStr(floatBuf[1], ((uint32_t)data[3] << 16 | (uint32_t)data[4] << 8 | data[5]) / 10.0, 1),
         FloatToStr(floatBuf[2], (data[6] - 0x50) / 2.0, 1)
@@ -2398,7 +2397,7 @@ VanPacketParseResult_t ParseSatNavStatus2Pkt(const char* idenStr, TVanPacketRxDe
 
         data[1] == 0x11 ? PSTR("STOPPING_GUIDANCE") :
         data[1] == 0x15 ? PSTR("IN_GUIDANCE_MODE") :
-        data[1] == 0x20 ? PSTR("IDLE_NOT_READY") :
+        data[1] == 0x20 ? PSTR("INITIALIZING") :
         data[1] == 0x21 ? PSTR("IDLE_READY") :
         data[1] == 0x25 ? PSTR("CALCULATING_ROUTE") :
         data[1] == 0x41 ? PSTR("NOT_ON_MAP") :  // TODO - check if this is correct
@@ -2486,19 +2485,21 @@ VanPacketParseResult_t ParseSatNavStatus3Pkt(const char* idenStr, TVanPacketRxDe
             // and during guidance. It stops after a "STOPPING_NAVIGATION" status message.
             status == 0x0108 ? PSTR("SATNAV_IN_OPERATION") :
 
+            status == 0x0306 ? PSTR("SATNAV_DISC_ID_READ") :
+
             ToHexStr(status)
         );
     }
     else if (dataLen == 3)
     {
-        // Navigation preference
+        // Sat nav guidance preference
 
         const static char jsonFormatter[] PROGMEM =
         "{\n"
             "\"event\": \"display\",\n"
             "\"data\":\n"
             "{\n"
-                "\"satnav_navigation_preference\": \"%S\"\n"
+                "\"satnav_guidance_preference\": \"%S\"\n"
             "}\n"
         "}\n";
 
@@ -3007,10 +3008,14 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
                         PSTR("satnav_current_destination_house_number") :
                         PSTR("satnav_last_destination_house_number"),
 
+                    //report == SR_DESTINATION ? records[0][7].c_str() :
+
                     // First string is either "C" or "V"; "C" has GPS coordinates in [7] and [8]; "V" has house number
                     // in [7]. If we see "V", show house number
-                    records[0][0] == "C" ? PSTR("No number") :
-                    records[0][7] == "0" ? PSTR("No number") : records[0][7].c_str()
+                    records[0][0] == "V" && records[0][7] != "0" ?
+                        records[0][7].c_str() :
+                        //report == SR_DESTINATION ? emptyStr : PSTR("No number")
+                        emptyStr
                 );
         }
         break;
@@ -3160,7 +3165,7 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
         {
             const static char jsonFormatter[] PROGMEM =
                 ",\n"
-                "\"satnav_house_number_range\": \"%s...%s\"";
+                "\"satnav_house_number_range\": \"From %s to %s\"";
 
             // Range of "house numbers" is in first (and only) record, the lowest number is in the first string, and
             // highest number is in the second string.
@@ -3329,7 +3334,7 @@ VanPacketParseResult_t ParseMfdToSatNavPkt(const char* idenStr, TVanPacketRxDesc
         //     -- data[5] << 8 | data[6]: offset in list (always 0)
         //     -- data[7] << 8 | data[8]: number of items to retrieve (always 38)
 
-        request == SR_PLACE_OF_INTEREST_CATEGORY && param == 0xFF && type == 0 ? PSTR("satnav_disclaimer") :
+        request == SR_PLACE_OF_INTEREST_CATEGORY && param == 0xFF && type == 0 ? PSTR("") :
         request == SR_PLACE_OF_INTEREST_CATEGORY && param == 0xFF && type == 1 ? PSTR("satnav_choose_from_list") :
 
         // * request == 0x09 ("PLACE_OF_INTEREST"),
@@ -3348,7 +3353,7 @@ VanPacketParseResult_t ParseMfdToSatNavPkt(const char* idenStr, TVanPacketRxDesc
         //     -- data[5] << 8 | data[6]: selected entry (0-based)
 
         // TODO - popup with question: select fastest route? (Yes/No)
-        request == SR_PLACE_OF_INTEREST && param == 0x0E && type == 2 ? PSTR("satnav_guidance") :
+        request == SR_PLACE_OF_INTEREST && param == 0x0E && type == 2 ? emptyStr : // PSTR("satnav_guidance") :
 
         // * request == 0x0E ("LAST_DESTINATION"),
         //   param == 0x0D:
@@ -3371,7 +3376,7 @@ VanPacketParseResult_t ParseMfdToSatNavPkt(const char* idenStr, TVanPacketRxDesc
         //     -- data[5] << 8 | data[6]: offset in list (always 0)
         //     -- data[7] << 8 | data[8]: number of items to retrieve (always 1)
 
-        request == SR_NEXT_STREET && param == 0xFF && type == 1 ? PSTR("satnav_guidance") :
+        request == SR_NEXT_STREET && param == 0xFF && type == 1 ? emptyStr : // PSTR("satnav_guidance") :
 
         // * request == 0x10 ("CURRENT_STREET"),
         //   param == 0x0D:
@@ -3389,7 +3394,7 @@ VanPacketParseResult_t ParseMfdToSatNavPkt(const char* idenStr, TVanPacketRxDesc
         // Don't switch screen; the screen must either stay "satnav_guidance" in guidance mode, or
         // "satnav_current_location" if the current screen is "clock". Complicated, so let the Javascript logic
         // handle this.
-        request == SR_CURRENT_STREET && param == 0xFF && type == 1 ? emptyStr : //PSTR("satnav_guidance") :
+        request == SR_CURRENT_STREET && param == 0xFF && type == 1 ? emptyStr : // PSTR("satnav_guidance") :
 
         // * request == 0x11 ("PRIVATE_ADDRESS"),
         //   param == 0x0E:
@@ -3397,7 +3402,7 @@ VanPacketParseResult_t ParseMfdToSatNavPkt(const char* idenStr, TVanPacketRxDesc
         //     -- data[5] << 8 | data[6]: selected entry (0-based)
 
         // TODO - popup with question: select fastest route? (Yes/No)
-        request == SR_PRIVATE_ADDRESS && param == 0x0E && type == 2 ? PSTR("satnav_guidance") :
+        request == SR_PRIVATE_ADDRESS && param == 0x0E && type == 2 ? emptyStr : // PSTR("satnav_guidance") :
 
         // * request == 0x11 ("PRIVATE_ADDRESS"),
         //   param == 0xFF:
@@ -3412,7 +3417,7 @@ VanPacketParseResult_t ParseMfdToSatNavPkt(const char* idenStr, TVanPacketRxDesc
         //     -- data[5] << 8 | data[6]: selected entry (0-based)
 
         // TODO - popup with question: select fastest route? (Yes/No)
-        request == SR_BUSINESS_ADDRESS && param == 0x0E && type == 2 ? PSTR("satnav_guidance") :
+        request == SR_BUSINESS_ADDRESS && param == 0x0E && type == 2 ? emptyStr : // PSTR("satnav_guidance") :
 
         // * request == 0x12 ("BUSINESS_ADDRESS"),
         //   param == 0xFF:
@@ -3449,7 +3454,7 @@ VanPacketParseResult_t ParseMfdToSatNavPkt(const char* idenStr, TVanPacketRxDesc
         // TODO - run a session in which something else than fastest route is selected
 
         // TODO - popup with question: select fastest route? (Yes/No)
-        request == SR_DESTINATION && param == 0x0E && type == 2 ? PSTR("satnav_guidance") :
+        request == SR_DESTINATION && param == 0x0E && type == 2 ? emptyStr : // PSTR("satnav_guidance") :
 
         // * request == 0x1D ("DESTINATION"),
         //   param == 0xFF:
@@ -3459,7 +3464,7 @@ VanPacketParseResult_t ParseMfdToSatNavPkt(const char* idenStr, TVanPacketRxDesc
         //     -- data[5] << 8 | data[6]: offset in list (always 0)
         //     -- data[7] << 8 | data[8]: number of items to retrieve (always 1)
 
-        request == SR_DESTINATION && param == 0xFF && type == 1 ? PSTR("satnav_show_current_destination") :
+        request == SR_DESTINATION && param == 0xFF && type == 1 ? emptyStr :
 
         emptyStr
     );
@@ -3478,8 +3483,9 @@ VanPacketParseResult_t ParseMfdToSatNavPkt(const char* idenStr, TVanPacketRxDesc
 
                 (data[3] >= 'A' && data[3] <= 'Z') || (data[3] >= '0' && data[3] <= '9') || data[3] == '\'' ? buffer :
                 data[3] == ' ' ? "_" : // Space
-                data[3] == 0x01 ? "Esc" :
-                "?"
+                //data[3] == 0x01 ? "Esc" :
+                //"?"
+                ""
             );
     } // if
 
@@ -3546,36 +3552,44 @@ VanPacketParseResult_t ParseSatNavToMfdPkt(const char* idenStr, TVanPacketRxDesc
         (uint16_t)data[4] << 8 | data[5]
     );
 
-    // Available letters are bit-coded in bytes 17...20. Print the letter if it is available, print a '.'
-    // if not.
+    // Available letters are bit-coded in bytes 17...20. Print the letter if it is available.
     for (int byte = 0; byte <= 3; byte++)
     {
         for (int bit = 0; bit < (byte == 3 ? 2 : 8); bit++)
         {
-            at += at >= JSON_BUFFER_SIZE ? 0 :
-                snprintf_P(buf + at, n - at, PSTR("%c"), data[byte + 17] >> bit & 0x01 ? 65 + 8 * byte + bit : '.');
-
+            if (data[byte + 17] >> bit & 0x01)
+            {
+                at += at >= JSON_BUFFER_SIZE ? 0 :
+                    snprintf_P(buf + at, n - at, PSTR("%c"), 65 + 8 * byte + bit);
+            } // if
         } // for
     } // for
 
-    // Special character: single quote (')
-    at += at >= JSON_BUFFER_SIZE ? 0 :
-        snprintf_P(buf + at, n - at, PSTR("%c"), data[21] >> 6 & 0x01 ? '\'' : '.');
+    if (data[21] >> 6 & 0x01)
+    {
+        // Special character: single quote (')
+        at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("\'"));
+    } // if
 
     // Available numbers are bit-coded in bytes 20...21, starting with '0' at bit 2 of byte 20, ending
-    // with '9' at bit 3 of byte 21. Print the number if it is available, print a '.' if not.
+    // with '9' at bit 3 of byte 21. Print the number if it is available.
     for (int byte = 0; byte <= 1; byte++)
     {
         for (int bit = (byte == 0 ? 2 : 0); bit < (byte == 1 ? 3 : 8); bit++)
         {
-            at += at >= JSON_BUFFER_SIZE ? 0 :
-                snprintf_P(buf + at, n - at, PSTR("%c"), data[byte + 20] >> bit & 0x01 ? 48 + 8 * byte + bit - 2 : '.');
+            if (data[byte + 20] >> bit & 0x01)
+            {
+                at += at >= JSON_BUFFER_SIZE ? 0 :
+                    snprintf_P(buf + at, n - at, PSTR("%c"), 48 + 8 * byte + bit - 2);
+            } // if
         } // for
     } // for
 
-    // <Space>, will be shown as '_'
-    at += at >= JSON_BUFFER_SIZE ? 0 :
-        snprintf_P(buf + at, n - at, PSTR("%c"),  data[22] >> 1 & 0x01 ? '_' : '.');
+    if (data[22] >> 1 & 0x01)
+    {
+        // <Space>, will be shown as '_'
+        at += at >= JSON_BUFFER_SIZE ? 0 : snprintf_P(buf + at, n - at, PSTR("_"));
+    } // if
 
     at += at >= JSON_BUFFER_SIZE ? 0 :
         snprintf_P(buf + at, n - at, PSTR("\"\n}\n}\n"));

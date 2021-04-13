@@ -175,7 +175,7 @@ int IRrecv::compare(unsigned int oldval, unsigned int newval)
   return 1;
 } // IRrecv::compare
 
-const char* ParseIrPacketToJson(TIrPacket& pkt)
+const char* parseIrPacketToJson(TIrPacket& pkt)
 {
     #define IR_JSON_BUFFER_SIZE 256
     static char jsonBuffer[IR_JSON_BUFFER_SIZE];
@@ -215,7 +215,7 @@ const char* ParseIrPacketToJson(TIrPacket& pkt)
     #endif // PRINT_JSON_BUFFERS_ON_SERIAL
 
     return jsonBuffer;
-} // ParseIrPacketToJson
+} // parseIrPacketToJson
 
 IRrecv irrecv(IR_RECV_PIN);
 
@@ -244,12 +244,12 @@ bool irReceive(TIrPacket& irPacket)
 
     irrecv.resume(); // Receive the next value
 
-    // Ignore same code within 200 ms
+    // Ignore same code within 300 ms
     static unsigned long lastValue = 0;
     static unsigned long lastUpdate = 0;
 
     // Arithmetic has safe roll-over
-    if (irPacket.value == lastValue && millis() - lastUpdate < 200UL) return false;
+    if (irPacket.value == lastValue && millis() - lastUpdate < 300UL) return false;
 
     lastUpdate = millis();
     lastValue = irPacket.value;
