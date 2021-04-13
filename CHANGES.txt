@@ -1,3 +1,27 @@
+0.2.1
+    VanBusRx.cpp: various changes that seem to decrease the number of packets with CRC errors
+
+    Added parameter 'queueSize' to TVanPacketRxQueue::Setup(...), giving option to set queue size at runtime
+
+    LiveWebPage.ino:
+    * Added separate 'Config.h' file for Wi-Fi settings
+    * Added reading of infrared remote control
+    * Added reading of ESP system data
+    * Improved way to filter which packets are dumped (in JSON format) to Serial
+    * Various packet parsing improvements
+
+    PacketParser.ino:
+    * Disabled Wi-Fi to practically eliminate occurrence of packets with CRC errors 
+    * Various packet parsing improvements
+
+    DisplayNotifications.ino
+    * Disabled Wi-Fi to practically eliminate occurrence of packets with CRC errors 
+
+    SendPacket.ino
+    * Disabled Wi-Fi to practically eliminate occurrence of packets with CRC errors 
+
+    VanBusDump.ino 
+    * Disabled Wi-Fi to practically eliminate occurrence of packets with CRC errors 
 
 0.2.0
     Added function to transmit packets onto the VAN bus:
