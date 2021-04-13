@@ -220,14 +220,11 @@ class TVanPacketRxQueue
 {
   public:
 
-    #define VAN_RX_QUEUE_SIZE 15
+    #define VAN_DEFAULT_RX_QUEUE_SIZE 15
 
     // Constructor
     TVanPacketRxQueue()
         : pin(VAN_NO_PIN_ASSIGNED)
-        , _head(pool)
-        , tail(pool)
-        , end(pool + VAN_RX_QUEUE_SIZE)
         , _overrun(false)
         , txTimerIsr(NULL)
         , txTimerTicks(0)
@@ -240,16 +237,18 @@ class TVanPacketRxQueue
         , nTwoSeparateBitErrors(0)
     { }
 
-    void Setup(uint8_t rxPin);
+    void Setup(uint8_t rxPin, int queueSize = VAN_DEFAULT_RX_QUEUE_SIZE);
     bool Available() const { ISR_SAFE_GET(bool, tail->state == VAN_RX_DONE); }
     bool Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun = NULL);
     uint32_t GetCount() const { ISR_SAFE_GET(uint32_t, count); }
     void DumpStats(Stream& s) const;
+    int QueueSize() const { return size; }
 
   private:
 
     uint8_t pin;
-    TVanPacketRxDesc pool[VAN_RX_QUEUE_SIZE];
+    int size;
+    TVanPacketRxDesc* pool;
     TVanPacketRxDesc* volatile _head;
     TVanPacketRxDesc* tail;
     TVanPacketRxDesc* end;

@@ -9,6 +9,7 @@
  */
 
 #include "VanBusRx.h"
+#include "ESP8266WiFi.h"  // wifi_fpm_set_sleep_type
 
 static const uint16_t VAN_CRC_POLYNOM = 0x0F9D;
 
@@ -180,9 +181,9 @@ void TVanPacketRxDesc::DumpRaw(Stream& s, char last) const
 {
     s.printf("Raw: #%04u (%*u/%u) %2d(%2d) ",
         seqNo % 10000,
-        VAN_RX_QUEUE_SIZE > 100 ? 3 : VAN_RX_QUEUE_SIZE > 10 ? 2 : 1,  // This is all compile-time
+        VanBusRx.size > 100 ? 3 : VanBusRx.size > 10 ? 2 : 1,
         slot + 1,
-        VAN_RX_QUEUE_SIZE,
+        VanBusRx.size,
         size - 5 < 0 ? 0 : size - 5,
         size);
 
@@ -459,6 +460,9 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             rxDesc->size = 0;
             jitter = 0;
 
+            // TODO - does this help at all in lowering the number of packets with CRC errors?
+            wifi_fpm_set_sleep_type(LIGHT_SLEEP_T);
+
             //timer1_disable(); // TODO - necessary?
         } // if
 
@@ -643,10 +647,17 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 } // RxPinChangeIsr
 
 // Initializes the VAN packet receiver
-void TVanPacketRxQueue::Setup(uint8_t rxPin)
+void TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
 {
     pin = rxPin;
     pinMode(rxPin, INPUT_PULLUP);
+
+    size = queueSize;
+    pool = new TVanPacketRxDesc[queueSize];
+    _head = pool;
+    tail = pool;
+    end = pool + queueSize;
+
     attachInterrupt(digitalPinToInterrupt(rxPin), RxPinChangeIsr, CHANGE);
     timer1_isr_init();
     timer1_disable();
