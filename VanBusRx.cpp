@@ -140,6 +140,9 @@ bool TVanPacketRxDesc::CheckCrcAndRepair()
         } // for
     } // for
 
+// 2021-04-12 - Commented out. Seems like "repairing" two separate bits is in fact increasing the probability of
+// getting a CRC "OK" for a packet that is in fact corrupt.
+#if 0
     // Flip two bits - is this pushing it? Maybe limit the following to the shorter packets, e.g. up to say 15 bytes?
     for (int atByte1 = 0; atByte1 < size; atByte1++)
     {
@@ -171,6 +174,7 @@ bool TVanPacketRxDesc::CheckCrcAndRepair()
             bytes[atByte1] ^= mask1;  // Flip back
         } // for
     } // for
+#endif
 
     return false;
 } // TVanPacketRxDesc::CheckCrcAndRepair
@@ -266,12 +270,9 @@ void TVanPacketRxQueue::DumpStats(Stream& s) const
             ? "---" 
             : FloatToStr(floatBuf, 100.0 * nRepaired / nCorrupt, 0));
 
-    s.printf_P(
-        PSTR(" [SB_err: %lu, DCB_err: %lu: DSB_err: %lu]"),
-        nOneBitError,
-        nTwoConsecutiveBitErrors,
-        nTwoSeparateBitErrors
-    );
+    s.printf_P(PSTR(" [SB_err: %lu, DCB_err: %lu"), nOneBitError, nTwoConsecutiveBitErrors);
+    if (nTwoSeparateBitErrors > 0) s.printf_P(PSTR(", DSB_err: %lu"), nTwoSeparateBitErrors);
+    s.print(F("]"));
 
     uint32_t overallCorrupt = nCorrupt - nRepaired;
     s.printf_P(
