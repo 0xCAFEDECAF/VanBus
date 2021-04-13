@@ -2998,11 +2998,9 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
                         PSTR("satnav_last_destination_street"),
 
                     // Street
-
+                    // Note: if the street is empty: it means "City center"
                     records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
-                    report == SR_LAST_DESTINATION && records[0][6].length() == 0 ? // Last destination, empty street?
-                        PSTR("City center") :
-                        records[0][6].c_str(),
+                    records[0][6].c_str(),
 
                     report == SR_DESTINATION ?
                         PSTR("satnav_current_destination_house_number") :
@@ -3014,7 +3012,6 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
                     // in [7]. If we see "V", show house number
                     records[0][0] == "V" && records[0][7] != "0" ?
                         records[0][7].c_str() :
-                        //report == SR_DESTINATION ? emptyStr : PSTR("No number")
                         emptyStr
                 );
         }
@@ -3074,9 +3071,9 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
                         PSTR("satnav_business_address_street"),
 
                     // Street
-                    // If the street is empty: it means "City center"
+                    // Note: if the street is empty: it means "City center"
                     records[0][5].c_str() + 1,  // Skip the fixed first letter 'G'
-                    records[0][6].length() == 0 ? PSTR("City center") : records[0][6].c_str(),
+                    records[0][6].c_str(),
 
                     report == SR_PRIVATE_ADDRESS ?
                         PSTR("satnav_private_address_house_number") :
@@ -3084,8 +3081,9 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
 
                     // First string is either "C" or "V"; "C" has GPS coordinates in [7] and [8]; "V" has house number
                     // in [7]. If we see "V", show house number
-                    records[0][0] == "C" ? PSTR("No number") :
-                    records[0][7] == "0" ? PSTR("No number") : records[0][7].c_str()
+                    records[0][0] == "V" && records[0][7] != "0" ?
+                        records[0][7].c_str() :
+                        emptyStr
                 );
         }
         break;

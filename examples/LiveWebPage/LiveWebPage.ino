@@ -542,7 +542,7 @@ char webpage[] PROGMEM = R"=====(
       <p>Status 3: <b id="satnav_status_3">---</b></p>
       <p>Disc: <b id="satnav_disc_present">---</b></p>
       <p>Disc status: <b id="satnav_disc_status">---</b></p>
-      <p>Navigation preference: <b id="satnav_navigation_preference">---</b></p>
+      <p>Guidance preference: <b id="satnav_guidance_preference">---</b></p>
       <p>System ID</p>
       <div id="satnav_system_id" style="border:1px solid; width:700px; height:200px; overflow:scroll; overflow-x:hidden; white-space:nowrap;">
       </div>
