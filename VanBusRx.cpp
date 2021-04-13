@@ -8,8 +8,9 @@
  * MIT license, all text above must be included in any redistribution.
  */
 
+#include <ESP8266WiFi.h>  // wifi_fpm_set_sleep_type
+
 #include "VanBusRx.h"
-#include "ESP8266WiFi.h"  // wifi_fpm_set_sleep_type
 
 static const uint16_t VAN_CRC_POLYNOM = 0x0F9D;
 
