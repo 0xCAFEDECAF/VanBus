@@ -3739,6 +3739,7 @@ void setup()
     delay(1);
 
     VanBusRx.Setup(RX_PIN);
+    Serial.printf_P(PSTR("VanBusRx queue of size %d is set up\n"), VanBusRx.QueueSize());
 } // setup
 
 enum VanPacketFilter_t
