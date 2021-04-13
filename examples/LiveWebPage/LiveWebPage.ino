@@ -61,10 +61,6 @@
  * - Make sure to select a "Higher Bandwidth" variant of the embedded IP stack "lwIP": Arduino IDE --> Tools -->
  *   lwIP variant: "v2 Higher Bandwidth" or "v2 Higher Bandwidth (no features)". The "Lower Memory" variants seem
  *   to have hiccups in the TCP traffic, ultimately causing the VAN Rx bus to overrun.
- *
- * - Having #define VAN_PACKET_QUEUE_SIZE set to 15 (see VanBusRx.h) seems too little given the current setup
- *   where JSON buffers are printed on the Serial port (#define PRINT_JSON_BUFFERS_ON_SERIAL); seeing quite some
- *   "VAN PACKET QUEUE OVERRUN!" lines. Looks like it should be set to at least 200.
  */
 
 // Uncomment to see JSON buffers printed on the Serial port.
@@ -967,6 +963,9 @@ void setup()
     Serial.print(F("Please surf to: http://"));
     Serial.println(WiFi.localIP());
 
+    // Having the default VAN packet queue size of 15 (see VanBusRx.h) seems too little given the time that
+    // is needed to send a JSON packet over the Wi-Fi; seeing quite some "VAN PACKET QUEUE OVERRUN!" lines.
+    // Looks like it should be set to at least 100.
     #define VAN_PACKET_QUEUE_SIZE 100
     VanBusRx.Setup(RX_PIN, VAN_PACKET_QUEUE_SIZE);
     Serial.printf_P(PSTR("VanBusRx queue of size %d is set up\n"), VanBusRx.QueueSize());
