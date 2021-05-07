@@ -2743,9 +2743,10 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             // Meanings of data:
             //
-            // data[0]: starts low for the first packet in the sequence (0x02, 0x05), then increments with each
-            //   subsequent packet with either 9 or 1.
-            //   & 0x80: last packet in sequence
+            // data[0] - Sequence numbers and "end of report" flag
+            //  & 0x07 - Global sequence number: increments with every packet
+            //  & 0x78 - In-report sequence number: starts from 0 on first packet of new report
+            //  & 0x80 - Marks last packet in report
             //
             // data[1]: Code of report; see function SatNavRequestStr(). Only in first packet.
             //
@@ -2802,9 +2803,13 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             static char buffer[MAX_SATNAV_STRING_SIZE];
             static int offsetInBuffer = 0;
 
+            uint8_t globalSeqNo = data[0] & 0x07;
+            uint8_t packetFragmentNo = data[0] >> 3 & 0x0F; // Starts at 0, rolls over from 15 to 1
+            bool lastPacket = data[0] & 0x80;
+
             int offsetInPacket = 1;
 
-            if ((data[0] & 0x7F) <= 7)
+            if (packetFragmentNo == 0)
             {
                 // First packet of a report sequence
                 offsetInPacket = 2;
@@ -2814,8 +2819,9 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             }
             else
             {
-                // TODO - check if data[0] & 0x7F has incremented by either 1 or 9 w.r.t. the last received packet.
-                // If it has incremented by e.g. 10 (9+1) or 18 (9+9), then we have obviously missed a packet, so
+                // TODO - check if packetFragmentNo has incremented by 1 w.r.t. the last received packet
+                // (note: rolls over from 15 to 1).
+                // If it has incremented by 2 or more, then we have obviously missed a packet, so
                 // appending the text of the current packet to that of the previous packet would be incorrect.
 
                 SERIAL.print(F("\n    "));
@@ -2853,7 +2859,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             } // while
 
             // Last packet in report sequence?
-            if (data[0] & 0x80) SERIAL.print(F("--LAST--"));
+            if (lastPacket) SERIAL.print(F("--LAST--"));
             SERIAL.println();
         }
         break;
@@ -3193,9 +3199,9 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // data[17...22]: bits indicating available letters, numbers, single quote (') or space
 
             SERIAL.printf_P(
-                PSTR("response=%S; list_size=%u, "),
+                PSTR("response=%S; list_size=%d, "),
                 SatNavRequestStr(data[1]),
-                (uint16_t)data[4] << 8 | data[5]
+                (sint16_t)(data[4] << 8 | data[5])
             );
 
             // Available letters are bit-coded in bytes 17...20. Print the letter if it is available, print a '.'
@@ -3215,7 +3221,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // with '9' at bit 3 of byte 21. Print the number if it is available, print a '.' if not.
             for (int byte = 0; byte <= 1; byte++)
             {
-                for (int bit = (byte == 0 ? 2 : 0); bit < (byte == 1 ? 3 : 8); bit++)
+                for (int bit = (byte == 0 ? 2 : 0); bit < (byte == 1 ? 4 : 8); bit++)
                 {
                     SERIAL.printf_P(PSTR("%c"), data[byte + 20] >> bit & 0x01 ? 48 + 8 * byte + bit - 2 : '.');
                 } // for
