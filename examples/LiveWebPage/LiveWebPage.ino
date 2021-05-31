@@ -3,7 +3,7 @@
  *
  * Written by Erik Tromp
  *
- * Version 0.2.1 - April, 2021
+ * Version 0.2.2 - June, 2021
  *
  * MIT license, all text above must be included in any redistribution.
  *
@@ -243,6 +243,23 @@ char webpage[] PROGMEM = R"=====(
     </style>
   </head>
   <body>
+    <hr/>
+    <div>
+      <p>ESP</p>
+      <p>Boot version: <b id="esp_boot_version">---</b></p>
+      <p>CPU speed: <b id="esp_cpu_speed">---</b></p>
+      <p>SDK version: <b id="esp_sdk_version">---</b></p>
+      <p>Chip ID: <b id="esp_chip_id">---</b></p>
+      <p>Flash ID: <b id="esp_flash_id">---</b></p>
+      <p>Flash size (real): <b id="esp_flash_size_real">---</b></p>
+      <p>Flash size (IDE): <b id="esp_flash_size_ide">---</b></p>
+      <p>Flash mode (IDE): <b id="esp_flash_mode_ide">---</b></p>
+      <p>MAC address: <b id="esp_mac_address">---</b></p>
+      <p>IP address: <b id="esp_ip_address">---</b></p>
+      <p>Wi-Fi RSSI: <b id="esp_wifi_rssi">---</b></p>
+      <p>Free RAM: <b id="esp_free_ram">---</b></p>
+    </div>
+    <hr/>
     <div>
       <p>Remote control</p>
       <p>Button: <b id="mfd_remote_control">---</b></p>
@@ -438,7 +455,7 @@ char webpage[] PROGMEM = R"=====(
       <p>Searching: <b id="search_mode">---</b></p>
       <p>Search direction: <b id="search_direction">---</b></p>
       <p>PTY selection menu: <b id="pty_selection_menu">---</b></p>
-      <p>PTY selected: <b id="selected_pty">---</b></p>
+      <p>PTY selected: <b id="selected_pty_full">---</b></p>
       <p>PTY standby mode: <b id="pty_standby_mode">---</b></p>
       <p>PTY match: <b id="pty_match">---</b></p>
       <p>PTY: <b id="pty_full">---</b></p>
@@ -541,7 +558,7 @@ char webpage[] PROGMEM = R"=====(
       <p>Status 2: <b id="satnav_status_2">---</b></p>
       <p>Status 3: <b id="satnav_status_3">---</b></p>
       <p>Disc: <b id="satnav_disc_present">---</b></p>
-      <p>Disc status: <b id="satnav_disc_status">---</b></p>
+      <p>Guidance status: <b id="satnav_guidance_status">---</b></p>
       <p>Guidance preference: <b id="satnav_guidance_preference">---</b></p>
       <p>Route computed: <b id="satnav_route_computed">---</b></p>
       <p>Destination reachable: <b id="satnav_destination_reachable">---</b></p>
@@ -562,34 +579,38 @@ char webpage[] PROGMEM = R"=====(
       <p>SatNav guidance data</p>
 
       <!-- Rotating round an abstract transform-origin like 'center' is better supported for a <div> than an <svg> element -->
-      <div id="satnav_curr_heading" style="width:120px; height:120px; transform:rotate(65deg); transform-origin:center;">
+      <div id="satnav_curr_heading_compass_needle" style="width:120px; height:120px; transform:rotate(65deg); transform-origin:center;">
         <svg>
           <path style="stroke-width:8;" d="M60 15 l30 100 l-60 0 Z"></path>
         </svg>
       </div>
-      <p>Current heading: <b id="satnav_curr_heading_as_text">---</b></p>
+      <p>Current heading: <b id="satnav_curr_heading">---</b></p>
 
-      <div id="satnav_heading_to_dest" style="width:120px; height:120px; transform:rotate(22.5deg); transform-origin:center;">
+      <div id="satnav_heading_to_dest_pointer" style="width:120px; height:120px; transform:rotate(22.5deg); transform-origin:center;">
         <svg>
           <path style="stroke-width:8;" d="M60 10 l30 100 l-60 0 Z"></path>
         </svg>
       </div>
-      <p>Heading to destination: <b id="satnav_heading_to_dest_as_text">---</b></p>
+      <p>Heading to destination: <b id="satnav_heading_to_dest">---</b></p>
 
       <p>Road distance to destination: <b id="satnav_distance_to_dest_via_road">---</b> (unit is meters: <b id="satnav_distance_to_dest_via_road_m">---</b>, unit is kilometers: <b id="satnav_distance_to_dest_via_road_km">---</b>)</p>
       <p>Straight line to destination: <b id="satnav_distance_to_dest_via_straight_line">---</b> (unit is meters: <b id="satnav_distance_to_dest_via_straight_line_m">---</b>, unit is kilometers: <b id="satnav_distance_to_dest_via_straight_line_km">---</b>)</p>
-      <p>Turn at: <b id="satnav_turn_at">---</b> (unit is meters: <b id="satnav_turn_at_m">---</b>, unit is kilometers: <b id="satnav_turn_at_km">---</b>)</p>
+      <p>Turn at: <b id="satnav_turn_at">---</b></p>
       <p>Heading on roundabout: <b id="satnav_heading_on_roundabout_as_text">---</b></p>
       <p>Minutes to travel (?): <b id="satnav_minutes_to_travel">---</b></p>
     </div>
     <hr/>
     <div>
       <p>SatNav guidance instruction</p>
-      <p>Current turn icon: <b style="display:none;" id="satnav_curr_turn_icon">VISIBLE</b></p>
-      <p>Next turn icon: <b style="display:none;" d="satnav_next_turn_icon">VISIBLE</b></p>
-      <p>'Turn around if possible' icon: <b style="display:none;" id="satnav_turn_around_if_possible_icon">VISIBLE</b></p>
-      <p>'Follow road' icon: <b style="display:none;" id="satnav_follow_road_icon">VISIBLE</b></p>
-      <p>'Not on map' icon: <b style="display:none;" id="satnav_not_on_map_icon">VISIBLE</b></p>
+      <p>Current turn icon: <b id="satnav_curr_turn_icon">---</b></p>
+      <p>Take right exit icon: <b id="satnav_fork_icon_take_right_exit">---</b></p>
+      <p>Keep right icon: <b id="satnav_fork_icon_keep_right">---</b></p>
+      <p>Take left exit icon: <b id="satnav_fork_icon_take_left_exit">---</b></p>
+      <p>Keep left icon: <b id="satnav_fork_icon_keep_left">---</b></p>
+      <p>Next turn icon: <b id="satnav_next_turn_icon">---</b></p>
+      <p>'Turn around if possible' icon: <b id="satnav_turn_around_if_possible_icon">---</b></p>
+      <p>'Follow road' icon: <b id="satnav_follow_road_icon">---</b></p>
+      <p>'Not on map' icon: <b id="satnav_not_on_map_icon">---</b></p>
 
       <div id="satnav_curr_turn_icon_direction" style="width:120px; height:120px; transform:rotate(0deg); transform-origin:center;">
         <svg>
