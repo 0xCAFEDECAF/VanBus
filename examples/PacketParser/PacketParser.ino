@@ -4,7 +4,7 @@
  *
  * Written by Erik Tromp
  *
- * Version 0.2.1 - April, 2021
+ * Version 0.2.2 - June, 2021
  *
  * MIT license, all text above must be included in any redistribution.
  *
@@ -99,8 +99,6 @@ enum VanPacketParseResult_t
 #define AIR_CONDITIONER_DIAG_IDEN 0xADC
 #define AIR_CONDITIONER_DIAG_COMMAND_IDEN 0xA5C
 #define ECU_IDEN 0xB0E
-
-#define SERIAL Serial
 
 // Often used string constants
 static const char PROGMEM emptyStr[] = "";
@@ -384,45 +382,45 @@ void PrintGuidanceInstruction(const uint8_t data[8])
     static const char PROGMEM turnHalfRightStr[] = "/";
     static const char PROGMEM turnSharpLeftStr[] = "/";
 
-    SERIAL.printf_P(PSTR("      %S%S%S%S%S\n"),
+    Serial.printf_P(PSTR("      %S%S%S%S%S\n"),
         data[5] & 0x40 ? noEntryStr : entryStr,
         data[5] & 0x80 ? noEntryStr : entryStr,
         data[4] & 0x01 ? noEntryStr : entryStr,
         data[4] & 0x02 ? noEntryStr : entryStr,
         data[4] & 0x04 ? noEntryStr : entryStr
     );
-    SERIAL.printf_P(PSTR("       %S  %S  %S  %S  %S\n"),
+    Serial.printf_P(PSTR("       %S  %S  %S  %S  %S\n"),
         data[0] == 6 ? turnHalfLeftStr : data[3] & 0x40 ? legStr : noLegStr,
         data[0] == 7 ? turnHalfLeftStr : data[3] & 0x80 ? legStr : noLegStr,
         data[0] == 8 ? goStraightAheadStr : data[2] & 0x01 ? legStr : noLegStr,
         data[0] == 9 ? turnHalfRightStr : data[2] & 0x02 ? legStr : noLegStr,
         data[0] == 10 ? turnHalfRightStr : data[2] & 0x04 ? legStr : noLegStr
     );
-    SERIAL.printf_P(PSTR("    %S%S           %S%S\n"),
+    Serial.printf_P(PSTR("    %S%S           %S%S\n"),
         data[5] & 0x20 ? noEntryStr : entryStr,
         data[0] == 5 ? turnLeftStr : data[3] & 0x20 ? legStr : noLegStr,
         data[0] == 11 ? turnRightStr : data[2] & 0x08 ? legStr : noLegStr,
         data[4] & 0x08 ? noEntryStr : entryStr
     );
-    SERIAL.printf_P(PSTR("    %S%S     +     %S%S\n"),
+    Serial.printf_P(PSTR("    %S%S     +     %S%S\n"),
         data[5] & 0x10 ? noEntryStr : entryStr,
         data[0] == 4 ? turnLeftStr : data[3] & 0x10 ? legStr : noLegStr,
         data[0] == 12 ? turnRightStr : data[2] & 0x10 ? legStr : noLegStr,
         data[4] & 0x10 ? noEntryStr : entryStr
     );
-    SERIAL.printf_P(PSTR("    %S%S     |     %S%S\n"),
+    Serial.printf_P(PSTR("    %S%S     |     %S%S\n"),
         data[5] & 0x08 ? noEntryStr : entryStr,
         data[0] == 3 ? turnLeftStr : data[3] & 0x08 ? legStr : noLegStr,
         data[0] == 13 ? turnRightStr : data[2] & 0x20 ? legStr : noLegStr,
         data[4] & 0x20 ? noEntryStr : entryStr
     );
-    SERIAL.printf_P(PSTR("       %S  %S  |  %S  %S\n"),
+    Serial.printf_P(PSTR("       %S  %S  |  %S  %S\n"),
         data[0] == 2 ? turnSharpLeftStr : data[3] & 0x04 ? legStr : noLegStr,
         data[0] == 1 ? turnSharpLeftStr : data[3] & 0x02 ? legStr : noLegStr,
         data[0] == 14 ? turnSharpRightStr : data[3] & 0x40 ? legStr : noLegStr,
         data[0] == 15 ? turnSharpRightStr : data[3] & 0x80 ? legStr : noLegStr
     );
-    SERIAL.printf_P(PSTR("      %S%S%S%S%S\n"),
+    Serial.printf_P(PSTR("      %S%S%S%S%S\n"),
         data[5] & 0x04 ? noEntryStr : entryStr,
         data[5] & 0x02 ? noEntryStr : entryStr,
         data[5] & 0x01 ? noEntryStr : entryStr,
@@ -454,11 +452,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
-            SERIAL.print(F("--> VIN: "));
+            Serial.print(F("--> VIN: "));
 
             if (dataLen != 17)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -466,7 +464,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             memcpy(vinTxt, data, 17);
             vinTxt[17] = 0;
 
-            SERIAL.printf_P(PSTR("%s\n"), vinTxt);
+            Serial.printf_P(PSTR("%s\n"), vinTxt);
         }
         break;
 
@@ -480,11 +478,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
-            SERIAL.print(F("--> Engine: "));
+            Serial.print(F("--> Engine: "));
 
             if (dataLen != 7)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -493,7 +491,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             //data[1] & 0x08 ? "door=OPEN" : "door=CLOSE",
 
             char floatBuf[3][MAX_FLOAT_SIZE];
-            SERIAL.printf_P(
+            Serial.printf_P(
                 PSTR(
                     "dash_light=%S, dash_actual_brightness=%u; contact_key_position=%S; engine=%S;\n"
                     "    economy_mode=%S; in_reverse=%S; trailer=%S; water_temp=%S; odometer=%s; exterior_temperature=%s\n"
@@ -528,15 +526,15 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
-            SERIAL.print(F("--> Head unit stalk: "));
+            Serial.print(F("--> Head unit stalk: "));
 
             if (dataLen != 2)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
-            SERIAL.printf_P(
+            Serial.printf_P(
                 PSTR("button=%S%S%S%S%S, wheel=%d, wheel_rollover=%u\n"),
                 data[0] & 0x80 ? PSTR("NEXT ") : emptyStr,
                 data[0] & 0x40 ? PSTR("PREV ") : emptyStr,
@@ -563,22 +561,22 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // Examples:
             // Raw: #1987 (12/15) 16 0E 4FC WA0 90-00-01-AE-F0-00-FF-FF-22-48-FF-7A-56 ACK OK 7A56 CRC_OK
 
-            SERIAL.print(F("--> Lights status: "));
+            Serial.print(F("--> Lights status: "));
 
             if (dataLen != 11 && dataLen != 14)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
             // Vehicles made until 2002?
 
-            SERIAL.printf_P(PSTR("\n    - Instrument cluster: %SENABLED\n"), data[0] & 0x80 ? emptyStr : PSTR("NOT "));
-            SERIAL.printf_P(PSTR("    - Speed regulator wheel: %S\n"), data[0] & 0x40 ? onStr : offStr);
-            SERIAL.printf_P(PSTR("%S"), data[0] & 0x20 ? PSTR("    - Warning LED ON\n") : emptyStr);
-            SERIAL.printf_P(PSTR("%S"), data[0] & 0x04 ? PSTR("    - Diesel glow plugs ON\n") : emptyStr);  // TODO - check
-            SERIAL.printf_P(PSTR("%S"), data[1] & 0x01 ? PSTR("    - Door OPEN\n") : emptyStr);
-            SERIAL.printf_P(
+            Serial.printf_P(PSTR("\n    - Instrument cluster: %SENABLED\n"), data[0] & 0x80 ? emptyStr : PSTR("NOT "));
+            Serial.printf_P(PSTR("    - Speed regulator wheel: %S\n"), data[0] & 0x40 ? onStr : offStr);
+            Serial.printf_P(PSTR("%S"), data[0] & 0x20 ? PSTR("    - Warning LED ON\n") : emptyStr);
+            Serial.printf_P(PSTR("%S"), data[0] & 0x04 ? PSTR("    - Diesel glow plugs ON\n") : emptyStr);  // TODO - check
+            Serial.printf_P(PSTR("%S"), data[1] & 0x01 ? PSTR("    - Door OPEN\n") : emptyStr);
+            Serial.printf_P(
                 PSTR("    - Remaing km to service: %u (dashboard shows: %u)\n"),
                 ((uint16_t)data[2] << 8 | data[3]) * 20,
                 (((uint16_t)data[2] << 8 | data[3]) * 20) / 100 * 100
@@ -586,7 +584,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (data[5] & 0x02)
             {
-                SERIAL.printf_P(
+                Serial.printf_P(
                     PSTR("    - Automatic gearbox: %S%S%S%S\n"),
 
                     (data[4] & 0x70) == 0x00 ? PSTR("P") :
@@ -605,7 +603,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 );
             } // if
 
-            SERIAL.printf_P(
+            Serial.printf_P(
                 PSTR("    - Lights: %S%S%S%S%S%S\n"),
                 data[5] & 0x80 ? PSTR("DIPPED_BEAM ") : emptyStr,
                 data[5] & 0x40 ? PSTR("HIGH_BEAM ") : emptyStr,
@@ -619,16 +617,16 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             {
                 // If you see "29.2 Â°C", then set 'Remote character set' to 'UTF-8' in
                 // PuTTY setting 'Window' --> 'Translation'
-                SERIAL.printf_P(PSTR("    - Oil temperature: %d °C\n"), (int)data[6] - 40);  // Never seen this
+                Serial.printf_P(PSTR("    - Oil temperature: %d °C\n"), (int)data[6] - 40);  // Never seen this
             } // if
-            //SERIAL.printf("    - Oil temperature (2): %d °C\n", (int)data[9] - 50);  // Other possibility?
+            //Serial.printf("    - Oil temperature (2): %d °C\n", (int)data[9] - 50);  // Other possibility?
 
             if (data[7] != 0xFF)
             {
-                SERIAL.printf_P(PSTR("Fuel level: %u %%\n"), data[7]);  // Never seen this
+                Serial.printf_P(PSTR("Fuel level: %u %%\n"), data[7]);  // Never seen this
             } // if
 
-            SERIAL.printf_P(PSTR("    - Oil level: raw=%u,dash=%S\n"),
+            Serial.printf_P(PSTR("    - Oil level: raw=%u,dash=%S\n"),
                 data[8],
                 data[8] <= 0x0B ? PSTR("------") :
                 data[8] <= 0x19 ? PSTR("O-----") :
@@ -642,7 +640,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             if (data[10] != 0xFF)
             {
                 // Never seen this; I don't have LPG
-                SERIAL.printf_P(PSTR("LPG fuel level: %S\n"),
+                Serial.printf_P(PSTR("LPG fuel level: %S\n"),
                     data[10] <= 0x08 ? PSTR("1") :
                     data[10] <= 0x11 ? PSTR("2") :
                     data[10] <= 0x21 ? PSTR("3") :
@@ -659,7 +657,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
                 // http://pinterpeti.hu/psavanbus/PSA-VAN.html#4FC_2
 
-                SERIAL.printf_P(PSTR("Cruise control: %S\n"),
+                Serial.printf_P(PSTR("Cruise control: %S\n"),
                     data[11] == 0x41 ? offStr :
                     data[11] == 0x49 ? PSTR("Cruise") :
                     data[11] == 0x59 ? PSTR("Cruise - speed") :
@@ -668,7 +666,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     ToHexStr(data[11])
                 );
 
-                SERIAL.printf_P(PSTR("Cruise control speed: %u\n"), data[12]);
+                Serial.printf_P(PSTR("Cruise control speed: %u\n"), data[12]);
             } // if
         }
         break;
@@ -680,11 +678,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen < 1 || dataLen > 3)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
-            SERIAL.print(F("--> Device report: "));
+            Serial.print(F("--> Device report: "));
 
             if (data[0] == 0x8A)
             {
@@ -696,11 +694,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 // Raw: #7820 (10/15)  8 0E 8C4 WA0 8A-21-40-3D-54 ACK OK 3D54 CRC_OK
                 // Raw: #0345 ( 1/15)  8 0E 8C4 WA0 8A-28-40-F9-96 ACK OK F996 CRC_OK
 
-                SERIAL.print("Head unit: ");
+                Serial.print("Head unit: ");
 
                 if (dataLen != 3)
                 {
-                    SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.println(FPSTR(unexpectedPacketLengthStr));
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
@@ -723,7 +721,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 // 0xC4: Searching announcement (source = internal CD)
                 // 0xD0: Track info announcement (source = internal CD)
                 //
-                SERIAL.printf_P(
+                Serial.printf_P(
                     PSTR("%S\n"),
                     data[1] == 0x20 ? PSTR("TUNER_REPLY") :
                     data[1] == 0x21 ? PSTR("AUDIO_SETTINGS_ANNOUNCE") :
@@ -758,7 +756,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 //      - 0xC0 = CD playing
                 //      - 0xD0 = CD track info
                 //
-                // SERIAL.printf(
+                // Serial.printf(
                     // "%s - %s\n",
                     // data[1] == 0x24 ? "TUNER" : // TUNER - STATUS_UPDATE_ANNOUNCE
                         // data[1] == 0x20 ? "TUNER" :  // TUNER - REPLY
@@ -783,7 +781,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 // Button-press announcement?
                 if ((data[1] & 0x0F) == 0x02)
                 {
-                    SERIAL.printf_P(
+                    Serial.printf_P(
                         PSTR("    Head unit button pressed: %S%S\n"),
 
                         (data[2] & 0x1F) == 0x01 ? PSTR("'1'") :
@@ -818,17 +816,17 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
                 if (dataLen != 1)
                 {
-                    SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.println(FPSTR(unexpectedPacketLengthStr));
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
-                SERIAL.print(F("CD-changer: STATUS_UPDATE_ANNOUNCE\n"));
+                Serial.print(F("CD-changer: STATUS_UPDATE_ANNOUNCE\n"));
             }
             else if (data[0] == 0x07)
             {
                 if (dataLen != 3)
                 {
-                    SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.println(FPSTR(unexpectedPacketLengthStr));
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
@@ -863,14 +861,14 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 //
                 // data[2] is usually 0x00, sometimes 0x01 or 0x02
 
-                SERIAL.printf_P(PSTR("%s %s [to be decoded]\n"), ToHexStr(data[0]), ToHexStr(data[1], data[2]));
+                Serial.printf_P(PSTR("%s %s [to be decoded]\n"), ToHexStr(data[0]), ToHexStr(data[1], data[2]));
                 return VAN_PACKET_PARSE_TO_BE_DECODED;
             }
             else if (data[0] == 0x52)
             {
                 if (dataLen != 2)
                 {
-                    SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.println(FPSTR(unexpectedPacketLengthStr));
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
@@ -889,12 +887,12 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 //  & 0x08 - Contact key in "ON" position?
                 //  & 0x20 - Economy mode ON?
 
-                SERIAL.printf_P(PSTR("%s [to be decoded]\n"), ToHexStr(data[0], data[1]));
+                Serial.printf_P(PSTR("%s [to be decoded]\n"), ToHexStr(data[0], data[1]));
                 return VAN_PACKET_PARSE_TO_BE_DECODED;
             }
             else
             {
-                SERIAL.printf_P(PSTR("%s [to be decoded]\n"), ToHexStr(data[0]));
+                Serial.printf_P(PSTR("%s [to be decoded]\n"), ToHexStr(data[0]));
                 return VAN_PACKET_PARSE_TO_BE_DECODED;
             } // if
         }
@@ -910,16 +908,16 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             if (memcmp(data + 1, packetData, dataLen - 2) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data + 1, dataLen - 2);
 
-            SERIAL.print(F("--> Car status 1: "));
+            Serial.print(F("--> Car status 1: "));
 
             if (dataLen != 27)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
             char floatBuf[3][MAX_FLOAT_SIZE];
-            SERIAL.printf_P(
+            Serial.printf_P(
                 PSTR(
                     "seq=%u; doors=%S%S%S%S%S; right_stalk_button=%S; avg_speed_1=%u; avg_speed_2=%u; "
                     "exp_moving_avg_speed=%u;\n"
@@ -974,11 +972,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
-            SERIAL.print(F("--> Car status 2: "));
+            Serial.print(F("--> Car status 2: "));
 
             if (dataLen != 14 && dataLen != 16)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -1161,7 +1159,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 msg_15_0, msg_15_1, msg_15_2, msg_15_3, msg_15_4, msg_15_5, msg_15_6, msg_15_7
             };
 
-            SERIAL.print(F("Message bits present:\n"));
+            Serial.print(F("Message bits present:\n"));
             for (int byte = 0; byte < 16; byte++)
             {
                 if (byte == 9) byte++;
@@ -1172,14 +1170,14 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                         char alarmText[80];  // Make sure this is large enough for the largest string it must hold
                         strncpy_P(alarmText, (char *)pgm_read_dword(&(msgTable[byte * 8 + bit])), sizeof(alarmText) - 1);
                         alarmText[sizeof(alarmText) - 1] = 0;
-                        SERIAL.print("    - ");
-                        SERIAL.println(alarmText);
+                        Serial.print("    - ");
+                        Serial.println(alarmText);
                     } // if
                 } // for
             } // for
 
             uint8_t currentMsg = data[9];
-            SERIAL.printf_P(PSTR("Message displayed on MFD: \"%S\"\n"), msgTable[currentMsg]);
+            Serial.printf_P(PSTR("Message displayed on MFD: \"%S\"\n"), msgTable[currentMsg]);
         }
         break;
 
@@ -1193,16 +1191,16 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
-            SERIAL.print(F("--> Dashboard: "));
+            Serial.print(F("--> Dashboard: "));
 
             if (dataLen != 7)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
             char floatBuf[2][MAX_FLOAT_SIZE];
-            SERIAL.printf_P(
+            Serial.printf_P(
                 PSTR("rpm=%S /min; speed=%S km/h; seq=%lu\n"),
                 data[0] == 0xFF && data[1] == 0xFF ?
                     PSTR("---.-") :
@@ -1225,18 +1223,18 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
-            SERIAL.print(F("--> Dashboard buttons: "));
+            Serial.print(F("--> Dashboard buttons: "));
 
             if (dataLen != 11 && dataLen != 12)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
             // data[6..10] - always 00-FF-00-FF-00
 
             char floatBuf[2][MAX_FLOAT_SIZE];
-            SERIAL.printf_P(
+            Serial.printf_P(
                 PSTR(
                     "hazard_lights=%S; door=%S; dashboard_programmed_brightness=%u, esp=%S,\n"
                     "    fuel_level_filtered=%s litre, fuel_level_raw=%s litre\n"
@@ -1247,8 +1245,8 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 data[3] & 0x02 ? onStr : offStr,
 
                 // Surely fuel level. Test with tank full shows definitely level is in litres.
-                FloatToStr(floatBuf[0], data[4] / 2.0, 1),
-                FloatToStr(floatBuf[1], data[5] / 2.0, 1)
+                data[4] == 0xFF ? PSTR("---.-") : FloatToStr(floatBuf[0], data[4] / 2.0, 1),
+                data[5] == 0xFF ? PSTR("---.-") : FloatToStr(floatBuf[1], data[5] / 2.0, 1)
             );
         }
         break;
@@ -1290,12 +1288,12 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
                     memcpy(packetData, data, dataLen);
 
-                    SERIAL.print(F("--> Tuner info: "));
+                    Serial.print(F("--> Tuner info: "));
 
                     // TODO - some web pages show 22 bytes data, some 23
                     if (dataLen != 22)
                     {
-                        SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                        Serial.println(FPSTR(unexpectedPacketLengthStr));
                         return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                     } // if
 
@@ -1339,7 +1337,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     sprintf_P(signalStrengthBuffer, PSTR("%u"), signalStrength);
 
                     char floatBuf[MAX_FLOAT_SIZE];
-                    SERIAL.printf_P(
+                    Serial.printf_P(
                         PSTR(
                             "band=%S%S, %S %S, signal_strength=%S,\n"
                             "    search_mode=%S%S%S,\n"
@@ -1417,7 +1415,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                         strncpy(rdsTxt, (const char*) data + 12, 8);
                         rdsTxt[8] = 0;
 
-                        SERIAL.printf_P(
+                        Serial.printf_P(
                             PSTR(
                                 "    pty_selection_menu=%S, selected_pty=%s, pty_standby_mode=%S, pty_match=%S, pty=%S,\n"
                                 "    pi=%S, regional=%S, ta=%S %S, rds=%S %S, rds_text=\"%s\"%S\n"
@@ -1446,17 +1444,17 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 {
                     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#554_2
 
-                    SERIAL.print(F("--> Cassette tape info: "));
+                    Serial.print(F("--> Cassette tape info: "));
 
                     if (dataLen != 5)
                     {
-                        SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                        Serial.println(FPSTR(unexpectedPacketLengthStr));
                         return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                     } // if
 
                     uint8_t status = data[2] & 0x3C;
 
-                    SERIAL.printf_P(PSTR("status=%S, side=%S\n"),
+                    Serial.printf_P(PSTR("status=%S, side=%S\n"),
                         status == 0x00 ? PSTR("STOPPED") :
                         status == 0x04 ? PSTR("LOADING") :
                         status == 0x0C ? PSTR("PLAYING") :
@@ -1474,11 +1472,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 {
                     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#554_3
 
-                    SERIAL.print(F("--> Tuner preset info: "));
+                    Serial.print(F("--> Tuner preset info: "));
 
                     if (dataLen != 12)
                     {
-                        SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                        Serial.println(FPSTR(unexpectedPacketLengthStr));
                         return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                     } // if
 
@@ -1489,7 +1487,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     strncpy(rdsOrFreqTxt, (const char*) data + 3, 8);
                     rdsOrFreqTxt[8] = 0;
 
-                    SERIAL.printf_P(PSTR("band=%S, memory=%u, \"%s%S\"\n"),
+                    Serial.printf_P(PSTR("band=%S, memory=%u, \"%s%S\"\n"),
                         TunerBandStr(tunerBand),
                         tunerMemory,
                         rdsOrFreqTxt,
@@ -1502,12 +1500,12 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 {
                     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#554_6
 
-                    SERIAL.print(F("--> CD track info: "));
+                    Serial.print(F("--> CD track info: "));
 
                     // TODO - do we know the fixed numbers? Seems like this can only be 10 or 12.
                     if (dataLen < 10)
                     {
-                        SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                        Serial.println(FPSTR(unexpectedPacketLengthStr));
                         return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                     } // if
 
@@ -1531,7 +1529,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                         if (! totalTimeInvalid) sprintf_P(totalTimeStr, PSTR("%X:%02X"), totalTimeMin, totalTimeSec);
                     } // if
 
-                    SERIAL.printf_P(
+                    Serial.printf_P(
                         PSTR(
                             "status=%S; cd_loading_changing_to_cd_source=%S; pause=%S; play=%S; fast_forward=%S; "
                             "rewind=%S;\n"
@@ -1565,16 +1563,16 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
                 case INFO_TYPE_CDCHANGER:
                 {
-                    SERIAL.print(F("--> CD changer info: "));
-                    SERIAL.println(FPSTR(toBeDecodedStr));
+                    Serial.print(F("--> CD changer info: "));
+                    Serial.println(FPSTR(toBeDecodedStr));
                     return VAN_PACKET_PARSE_TO_BE_DECODED;
                 }
                 break;
 
                 default:
                 {
-                    SERIAL.printf_P(PSTR("--> Unknown head unit info type 0x%02X: "), infoType);
-                    SERIAL.println(FPSTR(toBeDecodedStr));
+                    Serial.printf_P(PSTR("--> Unknown head unit info type 0x%02X: "), infoType);
+                    Serial.println(FPSTR(toBeDecodedStr));
                     return VAN_PACKET_PARSE_TO_BE_DECODED;
                 }
                 break;
@@ -1591,15 +1589,15 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             //   Raw: #2692 ( 7/15) 10 0E 984 W-0 00-00-00-06-08-D0-C8 NO_ACK OK D0C8 CRC_OK
             // regardless of the time.
 
-            SERIAL.print(F("--> Time: "));
+            Serial.print(F("--> Time: "));
 
             if (dataLen != 5)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
-            SERIAL.printf_P(PSTR("uptime battery=%u days, time=%uh%um\n"),
+            Serial.printf_P(PSTR("uptime battery=%u days, time=%uh%um\n"),
                 (uint16_t)data[0] << 8 | data[1],
                 data[3],
                 data[4]
@@ -1628,18 +1626,18 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
-            SERIAL.print(F("--> Audio settings: "));
+            Serial.print(F("--> Audio settings: "));
 
             if (dataLen != 11)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
             // data[0] & 0x07: sequence number
             // data[4] & 0x10: TODO
 
-            SERIAL.printf_P(
+            Serial.printf_P(
                 PSTR(
                     "power=%S, tape=%S, cd=%S, source=%S, ext_mute=%S, mute=%S,\n"
                     "    volume=%u%S, audio_menu=%S, bass=%d%S, treble=%d%S, loudness=%S, fader=%d%S, balance=%d%S, "
@@ -1702,11 +1700,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
-            SERIAL.print(F("--> MFD status: "));
+            Serial.print(F("--> MFD status: "));
 
             if (dataLen != 2)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -1716,7 +1714,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // must also be a specific packet that triggers this bit to be set to '0', because this happens e.g. when
             // the contact key is removed.
 
-            SERIAL.printf(
+            Serial.printf(
                 "MFD_SCREEN_%S\n",
 
                 // hmmm... MFD can also be ON if this is reported; this happens e.g. in the "minimal VAN network" test
@@ -1751,11 +1749,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
-            SERIAL.print(F("--> Aircon 1: "));
+            Serial.print(F("--> Aircon 1: "));
 
             if (dataLen != 5)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -1841,7 +1839,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 setFanSpeed == 3 ? 1 : // All empty blades (1)
                 0; // Fan icon not visible at all
 
-            SERIAL.printf_P(
+            Serial.printf_P(
                 PSTR("ac_icon=%S; recirc=%S, rear_heater=%S, reported_fan_speed=%u, set_fan_speed=%u\n"),
                 ac_icon ? onStr : offStr,
                 data[0] & 0x04 ? onStr : offStr,
@@ -1868,16 +1866,16 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             memcpy(packetData[0], packetData[1], dataLen);
             memcpy(packetData[1], data, dataLen);
 
-            SERIAL.print(F("--> Aircon 2: "));
+            Serial.print(F("--> Aircon 2: "));
 
             if (dataLen != 7)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
             char floatBuf[2][MAX_FLOAT_SIZE];
-            SERIAL.printf_P(
+            Serial.printf_P(
                 PSTR(
                     "contact_key_on=%S; enabled=%S; rear_heater=%S; aircon_compressor=%S; contact_key_position=%S;\n"
                     "    condenser_temperature=%S, evaporator_temperature=%s\n"
@@ -1923,7 +1921,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 0 && dataLen != 12)
             {
-                SERIAL.printf_P(PSTR("%S[unexpected packet length]\n"), intro);
+                Serial.printf_P(PSTR("%S[unexpected packet length]\n"), intro);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -1935,15 +1933,15 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 static bool seen = false;
                 if (seen) return VAN_PACKET_DUPLICATE;
                 seen = true;
-                SERIAL.printf_P(PSTR("%Srequest\n"), intro);
+                Serial.printf_P(PSTR("%Srequest\n"), intro);
                 break;
             } // if
 
-            SERIAL.printf_P(intro);
+            Serial.printf_P(intro);
 
             bool searching = data[2] & 0x10;
 
-            SERIAL.printf_P(
+            Serial.printf_P(
                 PSTR(
                     "random=%S; operational=%S; present=%S; searching=%S; loading=%S; state=%S;\n"
                     "    pause=%S; play=%S; fast_forward=%S; rewind=%S;\n"
@@ -1987,7 +1985,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             char totalTracksStr[3];
             if (! totalTracksInvalid) sprintf_P(totalTracksStr, PSTR("%X"), totalTracks);
 
-            SERIAL.printf_P(
+            Serial.printf_P(
                 PSTR(
                     "    cartridge=%S; %S in track %X/%S on disc %X; presence=%S-%S-%S-%S-%S-%S\n"
                 ),
@@ -2020,11 +2018,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // Raw: #0974 (14/15) 11 0E 54E RA0 80-00-80-00-00-80-95-06 ACK OK 9506 CRC_OK
             // Raw: #1058 ( 8/15) 11 0E 54E RA0 81-02-00-00-00-81-B2-6C ACK OK B26C CRC_OK
 
-            SERIAL.print(F("--> SatNav status 1: "));
+            Serial.print(F("--> SatNav status 1: "));
 
             if (dataLen != 6)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -2041,7 +2039,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             //
             uint16_t status = (uint16_t)data[1] << 8 | data[2];
 
-            SERIAL.printf_P(
+            Serial.printf_P(
                 PSTR("status=%S%S\n"),
 
                 // TODO - check; total guess
@@ -2104,7 +2102,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 0 && dataLen != 20)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -2116,11 +2114,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 static bool seen = false;
                 if (seen) return VAN_PACKET_DUPLICATE;
                 seen = true;
-                SERIAL.printf_P(PSTR("%Srequest\n"), intro);
+                Serial.printf_P(PSTR("%Srequest\n"), intro);
                 break;
             } // if
 
-            SERIAL.printf_P(intro);
+            Serial.printf_P(intro);
 
             // Possible meanings of data:
 
@@ -2187,7 +2185,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // char buffer[12];
             // sprintf_P(buffer, PSTR("0x%04X-0x%02X"), status, data[17]);
 
-            // SERIAL.printf(
+            // Serial.printf(
                 // "status=%s",
                 // status == 0x2038 ? "CD_ROM_FOUND" :
                     // status == 0x203C ? "INITIALIZING" :  // data[17] == 0x28
@@ -2203,7 +2201,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     // buffer
             // );
 
-            SERIAL.printf_P(PSTR("status=%S"),
+            Serial.printf_P(PSTR("status=%S"),
 
                 data[1] == 0x11 ? PSTR("STOPPING_GUIDANCE") :
                 data[1] == 0x15 ? PSTR("IN_GUIDANCE_MODE") :
@@ -2215,7 +2213,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 ToHexStr(data[1])
             );
 
-            SERIAL.printf_P(PSTR(", disc=%S, gps_fix=%S, gps_fix_lost=%S, gps_scanning=%S"),
+            Serial.printf_P(PSTR(", disc=%S, gps_fix=%S, gps_fix_lost=%S, gps_scanning=%S"),
 
                 (data[2] & 0x70) == 0x70 ? PSTR("NONE_PRESENT") :
                 (data[2] & 0x70) == 0x30 ? PSTR("RECOGNIZED") :
@@ -2228,7 +2226,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (data[17] != 0x00)
             {
-                SERIAL.printf_P(PSTR(", disc_status=%S%S%S%S%S%S%S"),
+                Serial.printf_P(PSTR(", disc_status=%S%S%S%S%S%S%S"),
                     data[17] & 0x01 ? PSTR("LOADING_AUDIO_FRAGMENT ") : emptyStr,
                     data[17] & 0x02 ? PSTR("AUDIO_OUTPUT ") : emptyStr,
                     data[17] & 0x04 ? PSTR("NEW_GUIDANCE_INSTRUCTION ") : emptyStr,
@@ -2241,9 +2239,9 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             // TODO - what is this?
             uint16_t zzz = (uint16_t)data[9] << 8 | data[10];
-            if (zzz != 0x00) SERIAL.printf_P(PSTR(", zzz=%u"), zzz);
+            if (zzz != 0x00) Serial.printf_P(PSTR(", zzz=%u"), zzz);
 
-            SERIAL.printf_P(PSTR(", gps_speed=%u km/h%S"),
+            Serial.printf_P(PSTR(", gps_speed=%u km/h%S"),
 
                 // 0xE0 as boundary for "reverse": just guessing. Do we ever drive faster than 224 km/h?
                 data[16] < 0xE0 ? data[16] : 0xFF - data[16] + 1,
@@ -2251,7 +2249,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 data[16] >= 0xE0 ? PSTR(" (reverse)") : emptyStr
             );
 
-            SERIAL.println();
+            Serial.println();
         }
         break;
 
@@ -2272,11 +2270,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             // Possible meanings of data:
 
-            SERIAL.print(F("--> SatNav status 3: "));
+            Serial.print(F("--> SatNav status 3: "));
 
             if (dataLen != 2 && dataLen != 3 && dataLen != 17)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -2285,7 +2283,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 uint16_t status = (uint16_t)data[0] << 8 | data[1];
 
                 // TODO - check; total guess
-                SERIAL.printf_P(
+                Serial.printf_P(
                     PSTR("status=%S\n"),
                     status == 0x0000 ? PSTR("CALCULATING_ROUTE") :
                     status == 0x0001 ? PSTR("STOPPING_NAVIGATION") :
@@ -2305,7 +2303,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             {
                 // Navigation preference
 
-                SERIAL.printf_P(
+                Serial.printf_P(
                     PSTR("satnav_navigation_preference=%S\n"),
                     data[1] == 0x01 ? PSTR("FASTEST_ROUTE") :
                     data[1] == 0x04 ? PSTR("SHORTEST_DISTANCE") :
@@ -2317,7 +2315,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             else if (dataLen == 17 && data[0] == 0x20)
             {
                 // Some set of ID strings. Stays the same even when the navigation CD is changed.
-                SERIAL.print(F("system_id="));
+                Serial.print(F("system_id="));
 
                 char txt[VAN_MAX_DATA_BYTES - 1 + 1];  // Max 28 data bytes, minus header (1), plus terminating '\0'
 
@@ -2326,11 +2324,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 {
                     strncpy(txt, (const char*) data + at, dataLen - at);
                     txt[dataLen - at] = 0;
-                    SERIAL.printf_P(PSTR("'%s' - "), txt);
+                    Serial.printf_P(PSTR("'%s' - "), txt);
                     at += strlen(txt) + 1;
                 } // while
 
-                SERIAL.println();
+                Serial.println();
             } // if
         }
         break;
@@ -2340,11 +2338,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // http://graham.auld.me.uk/projects/vanbus/packets.html#9CE
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#9CE
 
-            SERIAL.print(F("--> SatNav guidance data: "));
+            Serial.print(F("--> SatNav guidance data: "));
 
             if (dataLen != 16)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -2389,7 +2387,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             uint16_t minutesToTravel = (uint16_t)data[13] << 8 | data[14];
 
             char floatBuf[MAX_FLOAT_SIZE];
-            SERIAL.printf_P(
+            Serial.printf_P(
                 PSTR(
                     "curr_heading=%u deg, heading_to_dest=%u deg, distance_to_dest=%u %S,"
                     " distance_to_dest_straight_line=%u %S, turn_at=%u %S,\n"
@@ -2414,11 +2412,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // http://graham.auld.me.uk/projects/vanbus/packets.html#64E
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#64E
 
-            SERIAL.print(F("--> SatNav guidance: "));
+            Serial.print(F("--> SatNav guidance: "));
 
             if (dataLen != 3 && dataLen != 4 && dataLen != 6 && dataLen != 13 && dataLen != 23)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -2620,7 +2618,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             //       (next instruction: turn left 90 deg; no ahead; right = 270 deg)
             //
 
-            SERIAL.printf_P(PSTR("guidance_instruction=%S\n"),
+            Serial.printf_P(PSTR("guidance_instruction=%S\n"),
                 data[1] == 0x01 ? PSTR("SINGLE_TURN") :
                 data[1] == 0x03 ? PSTR("DOUBLE_TURN") :
                 data[1] == 0x04 ? PSTR("TURN_AROUND_IF_POSSIBLE") :
@@ -2635,26 +2633,26 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 {
                     if (dataLen != 13)
                     {
-                        SERIAL.print(FPSTR(indentStr));
-                        SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                        Serial.print(FPSTR(indentStr));
+                        Serial.println(FPSTR(unexpectedPacketLengthStr));
                         return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                     } // if
 
                     // One "detailed instruction" in data[4...11]
-                    SERIAL.print(F("    current_instruction=\n"));
+                    Serial.print(F("    current_instruction=\n"));
                     PrintGuidanceInstruction(data + 4);
                 }
                 else if (data[2] == 0x02)
                 {
                     if (dataLen != 6)
                     {
-                        SERIAL.print(FPSTR(indentStr));
-                        SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                        Serial.print(FPSTR(indentStr));
+                        Serial.println(FPSTR(unexpectedPacketLengthStr));
                         return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                     } // if
 
                     // Fork or exit instruction
-                    SERIAL.printf_P(PSTR("    current_instruction=%S\n"),
+                    Serial.printf_P(PSTR("    current_instruction=%S\n"),
 
                         // Pretty sure there are more values
                         data[4] == 0x41 ? PSTR("KEEP_LEFT_ON_FORK") :
@@ -2666,45 +2664,45 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 }
                 else
                 {
-                    SERIAL.printf("    unknown(%s)\n", ToHexStr(data[2]));
+                    Serial.printf("    unknown(%s)\n", ToHexStr(data[2]));
                 } // if
             }
             else if (data[1] == 0x03)  // Double turn
             {
                 if (dataLen != 23)
                 {
-                    SERIAL.print(FPSTR(indentStr));
-                    SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.print(FPSTR(indentStr));
+                    Serial.println(FPSTR(unexpectedPacketLengthStr));
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
                 // Two "detailed instructions": current in data[6...13], next in data[14...21]
-                SERIAL.print(F("    current_instruction=\n"));
+                Serial.print(F("    current_instruction=\n"));
                 PrintGuidanceInstruction(data + 6);
-                SERIAL.print(F("    next_instruction=\n"));
+                Serial.print(F("    next_instruction=\n"));
                 PrintGuidanceInstruction(data + 14);
             }
             else if (data[1] == 0x04)  // Turn around if possible
             {
                 if (dataLen != 3)
                 {
-                    SERIAL.print(FPSTR(indentStr));
-                    SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.print(FPSTR(indentStr));
+                    Serial.println(FPSTR(unexpectedPacketLengthStr));
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
-                SERIAL.print(F("    current_instruction=TURN_AROUND_IF_POSSIBLE\n"));
+                Serial.print(F("    current_instruction=TURN_AROUND_IF_POSSIBLE\n"));
             } // if
             else if (data[1] == 0x05)  // Follow road
             {
                 if (dataLen != 4)
                 {
-                    SERIAL.print(FPSTR(indentStr));
-                    SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.print(FPSTR(indentStr));
+                    Serial.println(FPSTR(unexpectedPacketLengthStr));
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
-                SERIAL.printf_P(PSTR("    follow_road_next_instruction=%S\n"),
+                Serial.printf_P(PSTR("    follow_road_next_instruction=%S\n"),
                     data[2] == 0x00 ? noneStr :
                     data[2] == 0x01 ? PSTR("TURN_RIGHT") :
                     data[2] == 0x02 ? PSTR("TURN_LEFT") :
@@ -2718,12 +2716,12 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             {
                 if (dataLen != 4)
                 {
-                    SERIAL.print(FPSTR(indentStr));
-                    SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.print(FPSTR(indentStr));
+                    Serial.println(FPSTR(unexpectedPacketLengthStr));
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
-                SERIAL.printf_P(PSTR("    not_on_map_follow_heading=%u\n"), data[2]);
+                Serial.printf_P(PSTR("    not_on_map_follow_heading=%u\n"), data[2]);
             } // if
         }
         break;
@@ -2733,11 +2731,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // http://graham.auld.me.uk/projects/vanbus/packets.html#6CE
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#6CE
 
-            SERIAL.print(F("--> SatNav report: "));
+            Serial.print(F("--> SatNav report: "));
 
             if (dataLen < 3)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -2815,7 +2813,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 offsetInPacket = 2;
                 offsetInBuffer = 0;
 
-                SERIAL.printf_P(PSTR("report=%S:\n    "), SatNavRequestStr(data[1]));
+                Serial.printf_P(PSTR("report=%S:\n    "), SatNavRequestStr(data[1]));
             }
             else
             {
@@ -2824,7 +2822,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 // If it has incremented by 2 or more, then we have obviously missed a packet, so
                 // appending the text of the current packet to that of the previous packet would be incorrect.
 
-                SERIAL.print(F("\n    "));
+                Serial.print(F("\n    "));
             } // if
 
             while (offsetInPacket < dataLen - 1)
@@ -2834,7 +2832,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 {
                     offsetInPacket++;
                     offsetInBuffer = 0;
-                    SERIAL.print(F("\n    "));
+                    Serial.print(F("\n    "));
                 } // if
 
                 int maxLen = dataLen - 1 - offsetInPacket;
@@ -2849,7 +2847,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 offsetInPacket += strlen(buffer) + 1 - offsetInBuffer;
                 if (offsetInPacket <= dataLen - 1)
                 {
-                    SERIAL.printf_P(PSTR("'%s' - "), buffer);
+                    Serial.printf_P(PSTR("'%s' - "), buffer);
                     offsetInBuffer = 0;
                 }
                 else
@@ -2859,8 +2857,8 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             } // while
 
             // Last packet in report sequence?
-            if (lastPacket) SERIAL.print(F("--LAST--"));
-            SERIAL.println();
+            if (lastPacket) Serial.print(F("--LAST--"));
+            Serial.println();
         }
         break;
 
@@ -2869,11 +2867,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // http://graham.auld.me.uk/projects/vanbus/packets.html#94E
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#94E
 
-            SERIAL.print(F("--> MFD to SatNav: "));
+            Serial.print(F("--> MFD to SatNav: "));
 
             if (dataLen != 4 && dataLen != 9 && dataLen != 11)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -2920,7 +2918,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             uint8_t param = data[1];
             uint8_t type = data[2];
 
-            SERIAL.printf_P(
+            Serial.printf_P(
                 PSTR("request=%S, param=%S, type=%S, effective_command=%S"),
 
                 SatNavRequestStr(request),
@@ -3148,7 +3146,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             {
                 char buffer[2];
                 sprintf_P(buffer, PSTR("%c"), data[3]);
-                SERIAL.printf_P(
+                Serial.printf_P(
                     PSTR(", letter=%s"),
                     (data[3] >= 'A' && data[3] <= 'Z') || (data[3] >= '0' && data[3] <= '9') || data[3] == '\'' ? buffer :
                     data[3] == ' ' ? "_" : // Space
@@ -3165,16 +3163,16 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 //if (selectionOrOffset > 0 && length > 0)
                 if (length > 0)
                 {
-                    SERIAL.printf_P(PSTR(", offset=%u, length=%u"), selectionOrOffset, length);
+                    Serial.printf_P(PSTR(", offset=%u, length=%u"), selectionOrOffset, length);
                 }
                 //else if (selectionOrOffset > 0)
                 else
                 {
-                    SERIAL.printf_P(PSTR(", selection=%u"), selectionOrOffset);
+                    Serial.printf_P(PSTR(", selection=%u"), selectionOrOffset);
                 } // if
             } // if
 
-            SERIAL.println();
+            Serial.println();
         }
         break;
 
@@ -3183,11 +3181,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // http://graham.auld.me.uk/projects/vanbus/packets.html#74E
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#74E
 
-            SERIAL.print(F("--> SatNav to MFD: "));
+            Serial.print(F("--> SatNav to MFD: "));
 
             if (dataLen != 27)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -3198,7 +3196,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // data[4] << 8 | data[5]: number of items
             // data[17...22]: bits indicating available letters, numbers, single quote (') or space
 
-            SERIAL.printf_P(
+            Serial.printf_P(
                 PSTR("response=%S; list_size=%d, "),
                 SatNavRequestStr(data[1]),
                 (sint16_t)(data[4] << 8 | data[5])
@@ -3210,12 +3208,12 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             {
                 for (int bit = 0; bit < (byte == 3 ? 2 : 8); bit++)
                 {
-                    SERIAL.printf_P(PSTR("%c"), data[byte + 17] >> bit & 0x01 ? 65 + 8 * byte + bit : '.');
+                    Serial.printf_P(PSTR("%c"), data[byte + 17] >> bit & 0x01 ? 65 + 8 * byte + bit : '.');
                 } // for
             } // for
 
             // Special character '
-            SERIAL.printf_P(PSTR("%c"), data[21] >> 6 & 0x01 ? '\'' : '.');
+            Serial.printf_P(PSTR("%c"), data[21] >> 6 & 0x01 ? '\'' : '.');
 
             // Available numbers are bit-coded in bytes 20...21, starting with '0' at bit 2 of byte 20, ending
             // with '9' at bit 3 of byte 21. Print the number if it is available, print a '.' if not.
@@ -3223,14 +3221,14 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             {
                 for (int bit = (byte == 0 ? 2 : 0); bit < (byte == 1 ? 4 : 8); bit++)
                 {
-                    SERIAL.printf_P(PSTR("%c"), data[byte + 20] >> bit & 0x01 ? 48 + 8 * byte + bit - 2 : '.');
+                    Serial.printf_P(PSTR("%c"), data[byte + 20] >> bit & 0x01 ? 48 + 8 * byte + bit - 2 : '.');
                 } // for
             } // for
 
             // <Space>, printed here as '_'
-            SERIAL.printf_P(PSTR("%c"), data[22] >> 1 & 0x01 ? '_' : '.');
+            Serial.printf_P(PSTR("%c"), data[22] >> 1 & 0x01 ? '_' : '.');
 
-            SERIAL.println();
+            Serial.println();
         }
         break;
 
@@ -3242,15 +3240,15 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // Examples:
             // Raw: #1593 ( 3/15)  5 0E 6F4 RA1 3A-3E NO_ACK OK 3A3E CRC_OK
 
-            SERIAL.print(F("--> SatNav is DOWNLOADING: "));
+            Serial.print(F("--> SatNav is DOWNLOADING: "));
 
             if (dataLen != 0)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
-            SERIAL.println();
+            Serial.println();
         }
         break;
 
@@ -3263,15 +3261,15 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // Raw: #2894 (14/15)  7 0E A44 WA0 21-80-74-A4 ACK OK 74A4 CRC_OK
             // Raw: #2932 ( 7/15)  6 0E A44 WA0 82-D5-86 ACK OK D586 CRC_OK
 
-            SERIAL.print(F("--> SatNav DOWNLOADING finished 1: "));
+            Serial.print(F("--> SatNav DOWNLOADING finished 1: "));
 
             if (dataLen != 1 && dataLen != 2)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
-            SERIAL.println();
+            Serial.println();
         }
         break;
 
@@ -3286,15 +3284,15 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // Raw: #2898 ( 3/15) 31 0E AC4 RA0 89-61-80-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-00-89-ED-C0 ACK OK EDC0 CRC_OK
             // Raw: #2933 ( 8/15)  8 0E AC4 RA0 8A-C2-8A-21-04 ACK OK 2104 CRC_OK
 
-            SERIAL.print(F("--> SatNav DOWNLOADING finished 2: "));
+            Serial.print(F("--> SatNav DOWNLOADING finished 2: "));
 
             if (dataLen != 0 && dataLen != 3 && dataLen != 26)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
-            SERIAL.println();
+            Serial.println();
         }
         break;
 
@@ -3302,16 +3300,16 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
         {
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#744
 
-            SERIAL.print(F("--> Wheel speed: "));
+            Serial.print(F("--> Wheel speed: "));
 
             if (dataLen != 5)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
             char floatBuf[2][MAX_FLOAT_SIZE];
-            SERIAL.printf_P(
+            Serial.printf_P(
                 PSTR("rear right=%s km/h, rear left=%s km/h, rear right pulses=%u, rear left pulses=%u\n"),
                 FloatToStr(floatBuf[0], ((uint16_t)data[0] << 8 | data[1]) / 100.0, 2),
                 FloatToStr(floatBuf[1], ((uint16_t)data[2] << 8 | data[3]) / 100.0, 2),
@@ -3331,16 +3329,16 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
-            SERIAL.print(F("--> Odometer: "));
+            Serial.print(F("--> Odometer: "));
 
             if (dataLen != 5)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
             char floatBuf[MAX_FLOAT_SIZE];
-            SERIAL.printf_P(
+            Serial.printf_P(
                 PSTR("kms=%s\n"),
                 FloatToStr(floatBuf, ((uint32_t)data[1] << 16 | (uint32_t)data[2] << 8 | data[3]) / 10.0, 1)
             );
@@ -3351,15 +3349,15 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
         {
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#450
 
-            SERIAL.print(F("--> COM2000: "));
+            Serial.print(F("--> COM2000: "));
 
             if (dataLen != 10)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
-            SERIAL.printf_P(PSTR("\nLight switch: %S%S%S%S%S%S%S%S\n"),
+            Serial.printf_P(PSTR("\nLight switch: %S%S%S%S%S%S%S%S\n"),
                 data[1] & 0x02 ? PSTR("Fog light switch turned FORWARD, ") : emptyStr,
                 data[1] & 0x01 ? PSTR("Auto light button pressed, ") : emptyStr,
                 data[1] & 0x04 ? PSTR("Fog light switch turned BACKWARD, ") : emptyStr,
@@ -3370,7 +3368,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 data[1] & 0x80 ? PSTR("Low beam ON, ") : emptyStr
             );
 
-            SERIAL.printf_P(PSTR("Right stalk: %S%S%S%S%S%S%S%S\n"),
+            Serial.printf_P(PSTR("Right stalk: %S%S%S%S%S%S%S%S\n"),
                 data[2] & 0x01 ? PSTR("Trip computer button pressed, ") : emptyStr,
                 data[2] & 0x02 ? PSTR("Rear wiper switched turned to screen wash position, ") : emptyStr,
                 data[2] & 0x04 ? PSTR("Rear wiper switched turned to position 1, ") : emptyStr,
@@ -3381,12 +3379,12 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 data[2] & 0x80 ? PSTR("Screen wipe speed 3, ") : emptyStr
             );
 
-            SERIAL.printf_P(PSTR("Turn signal indicator: %S%S\n"),
+            Serial.printf_P(PSTR("Turn signal indicator: %S%S\n"),
                 data[3] & 0x40 ? PSTR("Left signal ON, ") : emptyStr,
                 data[3] & 0x80 ? PSTR("Right signal ON, ") : emptyStr
             );
 
-            SERIAL.printf_P(PSTR("Head unit stalk: %S%S%S%S%S\n"),
+            Serial.printf_P(PSTR("Head unit stalk: %S%S%S%S%S\n"),
                 data[5] & 0x02 ? PSTR("SRC button pressed, ") : emptyStr,
                 data[5] & 0x03 ? PSTR("Volume down button pressed, ") : emptyStr,
                 data[5] & 0x08 ? PSTR("Volume up button pressed, ") : emptyStr,
@@ -3394,7 +3392,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 data[5] & 0x80 ? PSTR("Seek forward button pressed, ") : emptyStr
             );
 
-            SERIAL.printf_P(PSTR("Head unit stalk wheel position: %d\n"),
+            Serial.printf_P(PSTR("Head unit stalk wheel position: %d\n"),
                 (sint8_t)data[6]);
         }
         break;
@@ -3411,17 +3409,17 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
-            SERIAL.print(F("--> CD changer command: "));
+            Serial.print(F("--> CD changer command: "));
 
             if (dataLen != 2)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
             uint16_t cdcCommand = (uint16_t)data[0] << 8 | data[1];
 
-            SERIAL.printf_P(PSTR("%S\n"),
+            Serial.printf_P(PSTR("%S\n"),
                 cdcCommand == 0x1101 ? PSTR("POWER_OFF") :
                 cdcCommand == 0x2101 ? PSTR("POWER_OFF") :
                 cdcCommand == 0x1181 ? PSTR("PAUSE") :
@@ -3452,17 +3450,17 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             memcpy(packetData, data, dataLen);
 
             // Maybe this is in fact "Head unit to MFD"??
-            SERIAL.print(F("--> MFD to head unit: "));
+            Serial.print(F("--> MFD to head unit: "));
 
             if (data[0] == 0x11)
             {
                 if (dataLen != 2)
                 {
-                    SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.println(FPSTR(unexpectedPacketLengthStr));
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
-                SERIAL.printf_P(
+                Serial.printf_P(
                     PSTR(
                         "command=HEAD_UNIT_UPDATE_AUDIO_BITS, mute=%S, auto_volume=%S, loudness=%S, audio_menu=%S,\n"
                         "    power=%S, contact_key=%S\n"
@@ -3482,11 +3480,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             {
                 if (dataLen != 2 && dataLen != 11)
                 {
-                    SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.println(FPSTR(unexpectedPacketLengthStr));
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
-                SERIAL.printf_P(PSTR("command=HEAD_UNIT_SWITCH_TO, param=%S\n"),
+                Serial.printf_P(PSTR("command=HEAD_UNIT_SWITCH_TO, param=%S\n"),
                     data[1] == 0x01 ? PSTR("TUNER") :
                     data[1] == 0x02 ? PSTR("INTERNAL_CD_OR_TAPE") :
                     data[1] == 0x03 ? PSTR("CD_CHANGER") :
@@ -3501,7 +3499,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
                 if (dataLen == 11)
                 {
-                    SERIAL.printf_P(
+                    Serial.printf_P(
                         PSTR(
                             "    power=%S, source=%S,\n"
                             "    volume=%u%S, balance=%d%S, fader=%d%S, bass=%d%S, treble=%d%S\n"
@@ -3540,11 +3538,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             {
                 if (dataLen != 2)
                 {
-                    SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.println(FPSTR(unexpectedPacketLengthStr));
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
-                SERIAL.printf_P(PSTR("command=HEAD_UNIT_UPDATE_VOLUME, param=%u(%S%S)\n"),
+                Serial.printf_P(PSTR("command=HEAD_UNIT_UPDATE_VOLUME, param=%u(%S%S)\n"),
                     data[1] & 0x1F,
                     data[1] & 0x40 ? PSTR("relative: ") : PSTR("absolute"),
                     data[1] & 0x40 ?
@@ -3564,13 +3562,13 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
                 if (dataLen != 5)
                 {
-                    SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.println(FPSTR(unexpectedPacketLengthStr));
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
                 // TODO - bit 7 of data[1] is always 1 ?
 
-                SERIAL.printf_P(PSTR("command=HEAD_UNIT_UPDATE_AUDIO_LEVELS, balance=%d, fader=%d, bass=%d, treble=%d\n"),
+                Serial.printf_P(PSTR("command=HEAD_UNIT_UPDATE_AUDIO_LEVELS, balance=%d, fader=%d, bass=%d, treble=%d\n"),
                     (sint8_t)(0x3F) - (data[1] & 0x7F),
                     (sint8_t)(0x3F) - data[2],
                     (sint8_t)data[3] - 0x3F,
@@ -3581,23 +3579,23 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             {
                 if (dataLen != 2)
                 {
-                    SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.println(FPSTR(unexpectedPacketLengthStr));
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
                 // TODO - Not sure what this is. Seen just before a trafic announcement was issued by the tuner.
 
-                SERIAL.printf_P(PSTR("traffic_announcement=%s\n"), ToHexStr(data[1]));
+                Serial.printf_P(PSTR("traffic_announcement=%s\n"), ToHexStr(data[1]));
             }
             else if (data[0] == 0x27)
             {
                 if (dataLen != 2)
                 {
-                    SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.println(FPSTR(unexpectedPacketLengthStr));
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
-                SERIAL.printf_P(PSTR("preset_request band=%S, preset=%u\n"),
+                Serial.printf_P(PSTR("preset_request band=%S, preset=%u\n"),
                     TunerBandStr(data[1] >> 4 & 0x07),
                     data[1] & 0x0F
                 );
@@ -3606,11 +3604,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             {
                 if (dataLen != 4)
                 {
-                    SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.println(FPSTR(unexpectedPacketLengthStr));
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
-                SERIAL.printf_P(PSTR("command=REQUEST_CD, param=%S\n"),
+                Serial.printf_P(PSTR("command=REQUEST_CD, param=%S\n"),
                     data[1] == 0x02 ? PSTR("PAUSE") :
                     data[1] == 0x03 ? PSTR("PLAY") :
                     data[3] == 0xFF ? PSTR("NEXT") :
@@ -3622,35 +3620,35 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             {
                 if (dataLen != 1)
                 {
-                    SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.println(FPSTR(unexpectedPacketLengthStr));
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
-                SERIAL.print(F("command=REQUEST_TUNER_INFO\n"));
+                Serial.print(F("command=REQUEST_TUNER_INFO\n"));
             }
             else if (data[0] == 0xD2)
             {
                 if (dataLen != 1)
                 {
-                    SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.println(FPSTR(unexpectedPacketLengthStr));
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
-                SERIAL.print(F("command=REQUEST_TAPE_INFO\n"));
+                Serial.print(F("command=REQUEST_TAPE_INFO\n"));
             }
             else if (data[0] == 0xD6)
             {
                 if (dataLen != 1)
                 {
-                    SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.println(FPSTR(unexpectedPacketLengthStr));
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
-                SERIAL.print(F("command=REQUEST_CD_TRACK_INFO\n"));
+                Serial.print(F("command=REQUEST_CD_TRACK_INFO\n"));
             }
             else
             {
-                SERIAL.printf("%s [to be decoded]\n", ToHexStr(data[0]));
+                Serial.printf("%s [to be decoded]\n", ToHexStr(data[0]));
 
                 return VAN_PACKET_PARSE_TO_BE_DECODED;
             } // if
@@ -3659,27 +3657,27 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
         case AIR_CONDITIONER_DIAG_IDEN:
         {
-            SERIAL.print(F("--> Aircon diag: "));
-            SERIAL.println(FPSTR(toBeDecodedStr));
+            Serial.print(F("--> Aircon diag: "));
+            Serial.println(FPSTR(toBeDecodedStr));
             return VAN_PACKET_PARSE_TO_BE_DECODED;
         }
         break;
 
         case AIR_CONDITIONER_DIAG_COMMAND_IDEN:
         {
-            SERIAL.print(F("--> Aircon diag command: "));
-            SERIAL.println(FPSTR(toBeDecodedStr));
+            Serial.print(F("--> Aircon diag command: "));
+            Serial.println(FPSTR(toBeDecodedStr));
             return VAN_PACKET_PARSE_TO_BE_DECODED;
         }
         break;
 
         case ECU_IDEN:
         {
-            SERIAL.print(F("--> ECU status(?): "));
+            Serial.print(F("--> ECU status(?): "));
 
             if (dataLen != 15)
             {
-                SERIAL.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -3711,7 +3709,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // data[9] << 16 | data[10] << 8 | data[11]: Counter incrementing by 1 per second?
             //     Counting is regardless of engine running or not.
 
-            SERIAL.printf_P(PSTR("counter=%lu\n"),
+            Serial.printf_P(PSTR("counter=%lu\n"),
                 (uint32_t)data[9] << 16 | (uint32_t)data[10] << 8 | data[11]
             );
 
@@ -3732,8 +3730,8 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 void setup()
 {
     delay(1000);
-    SERIAL.begin(115200);
-    SERIAL.println(F("Starting VAN bus packet parser"));
+    Serial.begin(115200);
+    Serial.println(F("Starting VAN bus packet parser"));
 
     // Disable Wi-Fi altogether to get rid of long and variable interrupt latency, causing packet CRC errors
     // From: https://esp8266hints.wordpress.com/2017/06/29/save-power-by-reliably-switching-the-esp-wifi-on-and-off/
@@ -3769,7 +3767,7 @@ void loop()
         bool isQueueOverrun = false;
         VanBusRx.Receive(pkt, &isQueueOverrun);
 
-        if (isQueueOverrun) SERIAL.print(F("QUEUE OVERRUN!\n"));
+        if (isQueueOverrun) Serial.print(F("QUEUE OVERRUN!\n"));
 
         pkt.CheckCrcAndRepair();
 
@@ -3781,7 +3779,7 @@ void loop()
         VanPacketParseResult_t parseResult = ParseVanPacket(&pkt);
 
         // Show byte content only for packets that are not a duplicate of a previously received packet
-        if (parseResult != VAN_PACKET_DUPLICATE) pkt.DumpRaw(SERIAL);
+        if (parseResult != VAN_PACKET_DUPLICATE) pkt.DumpRaw(Serial);
 
         // Process at most 30 packets at a time
         if (++n >= 30) break;
@@ -3792,6 +3790,6 @@ void loop()
     if (millis() - lastUpdate >= 5000UL) // Arithmetic has safe roll-over
     {
         lastUpdate = millis();
-        VanBusRx.DumpStats(SERIAL);
+        VanBusRx.DumpStats(Serial);
     } // if
 } // loop
