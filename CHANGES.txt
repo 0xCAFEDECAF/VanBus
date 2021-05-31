@@ -1,5 +1,11 @@
 0.2.2
+    VanBusRx.cpp: added methods Disable() and Enable(), to be used when other timing-critical / interrupt-driven
+    tasks need to be done, like e.g. writing to SPIFFS (SPI Flash File System).
 
+    LiveWebPage.ino:
+    * Various bugfixes and updates on parsing sat nav data structures
+    * Small update in parsing FM tuner data
+    * "cd_changer_current_disc": set to "---" if no discs present
 
 0.2.1
     VanBusRx.cpp: various changes that seem to decrease the number of packets with CRC errors
