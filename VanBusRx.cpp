@@ -3,7 +3,7 @@
  *
  * Written by Erik Tromp
  *
- * Version 0.2.1 - April, 2021
+ * Version 0.2.2 - June, 2021
  *
  * MIT license, all text above must be included in any redistribution.
  */
@@ -205,84 +205,6 @@ void TVanPacketRxDesc::DumpRaw(Stream& s, char last) const
 
     s.print(last);
 } // TVanPacketRxDesc::DumpRaw
-
-// Copy a VAN packet out of the receive queue, if available. Otherwise, returns false.
-// If a valid pointer is passed to 'isQueueOverrun', will report then clear any queue overrun condition.
-bool TVanPacketRxQueue::Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun)
-{
-    if (! Available()) return false;
-
-    // Copy the whole packet descriptor out (including the debug info)
-    // Note:
-    // Instead of copying out, we could also just pass the pointer to the descriptor. However, then we would have to
-    // wait with freeing the descriptor, thus keeping one precious queue slot allocated. It is better to copy the
-    // packet into the (usually stack-allocated) memory of 'pkt' and free the queue slot as soon as possible. The
-    // caller can now keep the packet as long as needed.
-    pkt = *tail;
-
-    if (isQueueOverrun)
-    {
-        *isQueueOverrun = IsQueueOverrun();
-        ClearQueueOverrun();
-    } // if
-
-    // Indicate packet buffer is available for next packet
-    tail->Init();
-
-    AdvanceTail();
-
-    return true;
-} // TVanPacketRxQueue::Receive
-
-// Simple function to generate a string representation of a float value.
-// Note: passed buffer size must be (at least) MAX_FLOAT_SIZE bytes, e.g. declare like this:
-//   char buffer[MAX_FLOAT_SIZE];
-char* FloatToStr(char* buffer, float f, int prec)
-{
-    dtostrf(f, MAX_FLOAT_SIZE - 1, prec, buffer);
-
-    // Strip leading spaces
-    char* strippedStr = buffer;
-    while (isspace(*strippedStr)) strippedStr++;
-
-    return strippedStr;
-} // FloatToStr
-
-// Dumps packet statistics
-void TVanPacketRxQueue::DumpStats(Stream& s) const
-{
-    uint32_t pktCount = GetCount();
-
-   char floatBuf[MAX_FLOAT_SIZE];
-
-    // Using shared buffer floatBuf, so only one invocation per printf
-    s.printf_P(
-        PSTR("received pkts: %lu, corrupt: %lu (%s%%)"),
-        pktCount,
-        nCorrupt,
-        pktCount == 0
-            ? "-.---"
-            : FloatToStr(floatBuf, 100.0 * nCorrupt / pktCount, 3));
-
-    s.printf_P(
-        PSTR(", repaired: %lu (%s%%)"),
-        nRepaired,
-        nCorrupt == 0
-            ? "---" 
-            : FloatToStr(floatBuf, 100.0 * nRepaired / nCorrupt, 0));
-
-    s.printf_P(PSTR(" [SB_err: %lu, DCB_err: %lu"), nOneBitError, nTwoConsecutiveBitErrors);
-    if (nTwoSeparateBitErrors > 0) s.printf_P(PSTR(", DSB_err: %lu"), nTwoSeparateBitErrors);
-    s.print(F("]"));
-
-    uint32_t overallCorrupt = nCorrupt - nRepaired;
-    s.printf_P(
-        PSTR(", overall: %lu (%s%%)\n"),
-        overallCorrupt,
-        pktCount == 0
-            ? "-.---" 
-            : FloatToStr(floatBuf, 100.0 * overallCorrupt / pktCount, 3));
-} // TVanPacketRxQueue::DumpStats
 
 // Calculate number of bits from a number of elapsed CPU cycles
 // TODO - does ICACHE_RAM_ATTR have any effect on an inline function?
@@ -664,6 +586,100 @@ void TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
     timer1_isr_init();
     timer1_disable();
 } // TVanPacketRxQueue::Setup
+
+// Copy a VAN packet out of the receive queue, if available. Otherwise, returns false.
+// If a valid pointer is passed to 'isQueueOverrun', will report then clear any queue overrun condition.
+bool TVanPacketRxQueue::Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun)
+{
+    if (pin == VAN_NO_PIN_ASSIGNED) return false; // Call Setup first!
+
+    if (! Available()) return false;
+
+    // Copy the whole packet descriptor out (including the debug info)
+    // Note:
+    // Instead of copying out, we could also just pass the pointer to the descriptor. However, then we would have to
+    // wait with freeing the descriptor, thus keeping one precious queue slot allocated. It is better to copy the
+    // packet into the (usually stack-allocated) memory of 'pkt' and free the queue slot as soon as possible. The
+    // caller can now keep the packet as long as needed.
+    pkt = *tail;
+
+    if (isQueueOverrun)
+    {
+        *isQueueOverrun = IsQueueOverrun();
+        ClearQueueOverrun();
+    } // if
+
+    // Indicate packet buffer is available for next packet
+    tail->Init();
+
+    AdvanceTail();
+
+    return true;
+} // TVanPacketRxQueue::Receive
+
+// Disable VAN packet receiver
+void TVanPacketRxQueue::Disable()
+{
+    if (pin == VAN_NO_PIN_ASSIGNED) return; // Call Setup first!
+    detachInterrupt(digitalPinToInterrupt(VanBusRx.pin));
+} // TVanPacketRxQueue::Disable
+
+// Enable VAN packet receiver
+void TVanPacketRxQueue::Enable()
+{
+    if (pin == VAN_NO_PIN_ASSIGNED) return; // Call Setup first!
+    attachInterrupt(digitalPinToInterrupt(VanBusRx.pin), RxPinChangeIsr, CHANGE);
+} // TVanPacketRxQueue::Enable
+
+// Simple function to generate a string representation of a float value.
+// Note: passed buffer size must be (at least) MAX_FLOAT_SIZE bytes, e.g. declare like this:
+//   char buffer[MAX_FLOAT_SIZE];
+char* FloatToStr(char* buffer, float f, int prec)
+{
+    dtostrf(f, MAX_FLOAT_SIZE - 1, prec, buffer);
+
+    // Strip leading spaces
+    char* strippedStr = buffer;
+    while (isspace(*strippedStr)) strippedStr++;
+
+    return strippedStr;
+} // FloatToStr
+
+// Dumps packet statistics
+void TVanPacketRxQueue::DumpStats(Stream& s) const
+{
+    uint32_t pktCount = GetCount();
+
+   char floatBuf[MAX_FLOAT_SIZE];
+
+    // Using shared buffer floatBuf, so only one invocation per printf
+    s.printf_P(
+        PSTR("received pkts: %lu, corrupt: %lu (%s%%)"),
+        pktCount,
+        nCorrupt,
+        pktCount == 0
+            ? "-.---"
+            : FloatToStr(floatBuf, 100.0 * nCorrupt / pktCount, 3));
+
+    s.printf_P(
+        PSTR(", repaired: %lu (%s%%)"),
+        nRepaired,
+        nCorrupt == 0
+            ? "---" 
+            : FloatToStr(floatBuf, 100.0 * nRepaired / nCorrupt, 0));
+
+    s.printf_P(PSTR(" [SB_err: %lu, DCB_err: %lu"), nOneBitError, nTwoConsecutiveBitErrors);
+    if (nTwoSeparateBitErrors > 0) s.printf_P(PSTR(", DSB_err: %lu"), nTwoSeparateBitErrors);
+    s.print(F("]"));
+
+    uint32_t overallCorrupt = nCorrupt - nRepaired;
+    s.printf_P(
+        PSTR(", overall: %lu (%s%%)\n"),
+        overallCorrupt,
+        pktCount == 0
+            ? "-.---" 
+            : FloatToStr(floatBuf, 100.0 * overallCorrupt / pktCount, 3));
+} // TVanPacketRxQueue::DumpStats
 
 #ifdef VAN_RX_ISR_DEBUGGING
 

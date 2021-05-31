@@ -3,7 +3,7 @@
  *
  * Written by Erik Tromp
  *
- * Version 0.2.1 - April, 2021
+ * Version 0.2.2 - June, 2021
  *
  * MIT license, all text above must be included in any redistribution.
  */
@@ -226,8 +226,8 @@ class TVanPacketRxQueue
     TVanPacketRxQueue()
         : pin(VAN_NO_PIN_ASSIGNED)
         , _overrun(false)
-        , txTimerIsr(NULL)
         , txTimerTicks(0)
+        , txTimerIsr(NULL)
         , lastMediaAccessAt(0)
         , count(0)
         , nCorrupt(0)
@@ -240,6 +240,8 @@ class TVanPacketRxQueue
     void Setup(uint8_t rxPin, int queueSize = VAN_DEFAULT_RX_QUEUE_SIZE);
     bool Available() const { ISR_SAFE_GET(bool, tail->state == VAN_RX_DONE); }
     bool Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun = NULL);
+    void Disable();
+    void Enable();
     uint32_t GetCount() const { ISR_SAFE_GET(uint32_t, count); }
     void DumpStats(Stream& s) const;
     int QueueSize() const { return size; }
@@ -285,7 +287,7 @@ class TVanPacketRxQueue
     void AdvanceTail()
     {
         if (++tail == end) tail = pool;  // roll over if needed
-    } // _AdvanceTail
+    } // AdvanceTail
 
     friend void FinishPacketTransmission(TVanPacketTxDesc* txDesc);
     friend void SendBitIsr();

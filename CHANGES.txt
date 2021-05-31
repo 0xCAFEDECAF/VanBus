@@ -1,3 +1,6 @@
+0.2.2
+
+
 0.2.1
     VanBusRx.cpp: various changes that seem to decrease the number of packets with CRC errors
 
