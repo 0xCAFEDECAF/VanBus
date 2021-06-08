@@ -1,9 +1,9 @@
 /*
- * VanBus: DisplayNotifications - send all MFD warnings, one by one
+ * VanBus: DisplayNotifications - send all MFD notifications (information, warning), one by one
  *
  * Written by Erik Tromp
  *
- * Version 0.2.1 - April, 2021
+ * Version 0.2.2 - June, 2021
  *
  * MIT license, all text above must be included in any redistribution.
  *
@@ -38,11 +38,85 @@
 const int TX_PIN = D3; // Set to GPIO pin connected to VAN bus transceiver input
 const int RX_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
 
+// Send exterior temperature 8 deg C to the multifunction display (MFD)
+void SendExteriorTemperatureMessage()
+{
+    uint8_t rmtTemperatureBytes[] = {0x0F, 0x07, 0x00, 0x00, 0x00, 0x00, 0x60};
+    VanBus.SyncSendPacket(0x8A4, 0x08, rmtTemperatureBytes, sizeof(rmtTemperatureBytes));
+} // SendExteriorTemperatureMessage
+
+// Trigger a notification message on the MFD
+void SendMfdNotificationMessage(uint8_t msgIdx)
+{
+    uint8_t rmtMessageBytes[] =
+        {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, msgIdx, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    VanBus.SyncSendPacket(0x524, 0x08, rmtMessageBytes, sizeof(rmtMessageBytes));
+} // SendMfdNotificationMessage
+
+#define MSG_ID_START (0x00)
+#define MSG_ID_END (0x7F)
+
+// Return the next notification message ID
+uint8_t NextMfdNotificationMessageIndex(uint8_t msgIdx)
+{
+    ++msgIdx;
+    if (msgIdx == 0x48) msgIdx = 0x50;  // Skip 0x48 ... 0x4F; those bit indexes never occur
+    if (msgIdx > MSG_ID_END) return MSG_ID_START;
+    return msgIdx;
+} // NextMfdNotificationMessageIndex
+
+// Return the previous notification message ID
+uint8_t PreviousMfdNotificationMessageIndex(uint8_t msgIdx)
+{
+    if (msgIdx == MSG_ID_START) return MSG_ID_END;
+    --msgIdx;
+    if (msgIdx == 0x4F) msgIdx = 0x47;  // Skip 0x48 ... 0x4F; those bit indexes never occur
+    return msgIdx;
+} // PreviousMfdNotificationMessageIndex
+
+void CycleMessage(bool restart = false)
+{
+    static unsigned long lastSentAt = 0;
+
+    // Write packet every second
+    if (millis() - lastSentAt >= 1000UL) // Arithmetic has safe roll-over
+    {
+        lastSentAt = millis();
+
+        // One by one, trigger each message on the MFD
+
+        static uint8_t msgIdx = MSG_ID_START;
+        if (restart) msgIdx = MSG_ID_START;
+
+        Serial.printf("Sending MFD notification ID: 0x%02X\n", msgIdx);
+        SendMfdNotificationMessage(msgIdx);
+
+        msgIdx = NextMfdNotificationMessageIndex(msgIdx);
+    } // if
+} // CycleMessage
+
+char RecvOneChar()
+{
+    if (Serial.available() > 0) return Serial.read();
+    return 0;
+} // RecvOneChar
+
+void printUsage()
+{
+    Serial.println("Type one of the following letters, then hit <Enter> (or click the 'Send' button):");
+    Serial.println("-> n = send Next message");
+    Serial.println("-> p = send Previous message");
+    Serial.println("-> c = Cycle through all messages");
+    Serial.println("-> s = Stop cycling through all messages");
+    Serial.println("-> h = show this Help text");
+} // printUsage
+
 void setup()
 {
     delay(1000);
     Serial.begin(115200);
-    Serial.println("Starting to send all MFD notifications, one by one");
+    Serial.println("Sketch to demonstrate the sending of MFD notification messages");
+    Serial.println();
 
     // Disable Wi-Fi altogether to get rid of long and variable interrupt latency, causing packet CRC errors
     // From: https://esp8266hints.wordpress.com/2017/06/29/save-power-by-reliably-switching-the-esp-wifi-on-and-off/
@@ -54,33 +128,67 @@ void setup()
     delay(1);
 
     VanBus.Setup(RX_PIN, TX_PIN);
+
+    printUsage();
 } // setup
 
 void loop()
 {
-    static unsigned long lastSentAt = 0;
+    static bool cycling = false;
+    static uint8_t msgIdx = MSG_ID_END;
 
-    // Write packet every 1 second
+    char c = RecvOneChar();
+
+    switch (c)
+    {
+        case 'n':
+        {
+            msgIdx = NextMfdNotificationMessageIndex(msgIdx);
+            Serial.printf("Sending MFD notification ID: 0x%02X\n", msgIdx);
+            SendMfdNotificationMessage(msgIdx);
+        }
+        break;
+
+        case 'p':
+        {
+            msgIdx = PreviousMfdNotificationMessageIndex(msgIdx);
+            Serial.printf("Sending MFD notification ID: 0x%02X\n", msgIdx);
+            SendMfdNotificationMessage(msgIdx);
+        }
+        break;
+
+        case 'c':
+        {
+            Serial.println("Starting to send all MFD notifications, one by one");
+            cycling = true;
+            CycleMessage(true);
+        }
+        break;
+
+        case 's':
+        {
+            cycling = false;
+            Serial.println("Stopped sending all MFD notifications");
+        }
+        break;
+
+        case 'h':
+        {
+            printUsage();
+        }
+        break;
+    } // switch
+
+    if (cycling) CycleMessage();
+
+    // Write exterior temperature packet every second (causes the MFD to light its backlight)
+    static unsigned long lastSentAt = 0;
     if (millis() - lastSentAt >= 1000UL) // Arithmetic has safe roll-over
     {
         lastSentAt = millis();
 
         // Send exterior temperature 8 deg C to the multifunction display (MFD)
-        uint8_t rmtTemperatureBytes[] = {0x0F, 0x07, 0x00, 0x00, 0x00, 0x00, 0x60};
-        VanBus.SyncSendPacket(0x8A4, 0x08, rmtTemperatureBytes, sizeof(rmtTemperatureBytes));
-
-        // One by one, trigger each message on the MFD
-        #define MSG_ID_START (0x00)
-        static uint8_t msgIdx = MSG_ID_START;
-        uint8_t rmtMessageBytes[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, msgIdx, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-
-        Serial.printf("Sending MFD warning ID: 0x%02X\n", msgIdx);
-
-        VanBus.SyncSendPacket(0x524, 0x08, rmtMessageBytes, sizeof(rmtMessageBytes));
-
-        ++msgIdx;
-        if (msgIdx == 0x48) msgIdx = 0x50;  // Skip 0x48 ... 0x4F; those bit indexes never occur
-        if (msgIdx > 0x7F) msgIdx = MSG_ID_START;
+        SendExteriorTemperatureMessage();
     } // if
 
     // Print some boring statistics every minute or so
