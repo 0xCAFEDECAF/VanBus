@@ -1533,7 +1533,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                         PSTR(
                             "status=%S; cd_loading_changing_to_cd_source=%S; pause=%S; play=%S; fast_forward=%S; "
                             "rewind=%S;\n"
-                            "    searching=%S; track_time=%S; current_track=%X; total_tracks=%S; total_time=%S\n"
+                            "    searching=%S; track_time=%S; current_track=%X; total_tracks=%S; total_time=%S, random=%S\n"
                         ),
 
                         data[3] == 0x11 ? PSTR("LOADING_CD_AND_CHANGING_TO_CD_AUDIO_SOURCE") :
@@ -1556,7 +1556,9 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                         searching ? PSTR("--:--") : trackTimeStr,
                         data[7],
                         totalTracksInvalid ? notApplicable2Str : totalTracksStr,
-                        totalTimeInvalid ? PSTR("--:--") : totalTimeStr
+                        totalTimeInvalid ? PSTR("--:--") : totalTimeStr,
+
+                        data[2] & 0x01 ? yesStr : noStr // CD track shuffle: long-press "CD" button
                     );
                 }
                 break;
@@ -1947,7 +1949,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     "    pause=%S; play=%S; fast_forward=%S; rewind=%S;\n"
                 ),
 
-                data[1] == 0x01 ? onStr : offStr,
+                data[1] == 0x01 ? onStr : offStr,  // CD track shuffle: long-press "CD-changer" button
 
                 // Head unit powered on; CD changer operational (either standby or selected as audio source)
                 data[2] & 0x80 ? yesStr : noStr,
