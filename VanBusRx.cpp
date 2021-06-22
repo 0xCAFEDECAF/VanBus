@@ -511,7 +511,10 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         if (state == VAN_RX_SEARCHING)
         {
             // First 10 bits must be 00 0011 1101 (0x03D) (SOF, Start Of Frame)
-            if (currentByte != 0x03D)
+            // Accept also 00 0001 1101 (0x01D): as with all other interrupts, even the first interrupt (0->1)
+            // might be slightly late.
+            // TODO - test this. Maybe accept also other "slightly-off" patterns?
+            if (currentByte != 0x03D && currentByte != 0x01D)
             {
                 rxDesc->state = VAN_RX_VACANT;
                 //SetTxBitTimer();

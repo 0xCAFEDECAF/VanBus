@@ -1,4 +1,4 @@
-<h3 align="center">PSA VAN bus reader/writer for Arduino-ESP8266</h3>
+<h3 align="center">PSA (Peugeot, Citroën) VAN bus reader/writer for Arduino-ESP8266</h3>
 
 ---
 
