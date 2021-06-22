@@ -310,16 +310,18 @@ enum SatNavRequest_t
     SR_ENTER_STREET = 0x05,
     SR_ENTER_HOUSE_NUMBER = 0x06,  // Range of house numbers to choose from
     SR_ENTER_HOUSE_NUMBER_LETTER = 0x07,  // Never seen, just guessing
-    SR_PLACE_OF_INTEREST_CATEGORY = 0x08,
-    SR_PLACE_OF_INTEREST = 0x09,
+    SR_SERVICE_LIST = 0x08,
+    SR_SERVICE_ADDRESS = 0x09,
+    SR_ARCHIVE_IN_DIRECTORY = 0x0B,
+    SR_RENAME_DIRECTORY_ENTRY = 0x0D,
     SR_LAST_DESTINATION = 0x0E,
     SR_NEXT_STREET = 0x0F,  // Shown during SatNav guidance in the (solid line) top box
     SR_CURRENT_STREET = 0x10,  // Shown during SatNav guidance in the (dashed line) bottom box
-    SR_PRIVATE_ADDRESS = 0x11,
-    SR_BUSINESS_ADDRESS = 0x12,
+    SR_PERSONAL_ADDRESS = 0x11,
+    SR_PROFESSIONAL_ADDRESS = 0x12,
     SR_SOFTWARE_MODULE_VERSIONS = 0x13,
-    SR_PRIVATE_ADDRESS_LIST = 0x1B,
-    SR_BUSINESS_ADDRESS_LIST = 0x1C,
+    SR_PERSONAL_ADDRESS_LIST = 0x1B,
+    SR_PROFESSIONAL_ADDRESS_LIST = 0x1C,
     SR_DESTINATION = 0x1D
 }; // enum SatNavRequest_t
 
@@ -335,21 +337,61 @@ const char* SatNavRequestStr(uint8_t data)
         data == SR_ENTER_STREET ? PSTR("ENTER_STREET") :
         data == SR_ENTER_HOUSE_NUMBER ? PSTR("ENTER_HOUSE_NUMBER") :
         data == SR_ENTER_HOUSE_NUMBER_LETTER ? PSTR("ENTER_HOUSE_NUMBER_LETTER") :
-        data == SR_PLACE_OF_INTEREST_CATEGORY ? PSTR("PLACE_OF_INTEREST_CATEGORY") :
-        data == SR_PLACE_OF_INTEREST ? PSTR("PLACE_OF_INTEREST") :
+        data == SR_SERVICE_LIST ? PSTR("SERVICE") :
+        data == SR_SERVICE_ADDRESS ? PSTR("SERVICE_ADDRESS") :
+        data == SR_ARCHIVE_IN_DIRECTORY ? PSTR("ARCHIVE_IN_DIRECTORY") :
+        data == SR_RENAME_DIRECTORY_ENTRY ? PSTR("RENAME_DIRECTORY_ENTRY") :
         data == SR_LAST_DESTINATION ? PSTR("LAST_DESTINATION") :
         data == SR_NEXT_STREET ? PSTR("NEXT_STREET") :
         data == SR_CURRENT_STREET ? PSTR("CURRENT_STREET") :
-        data == SR_PRIVATE_ADDRESS ? PSTR("PRIVATE_ADDRESS") :
-        data == SR_BUSINESS_ADDRESS ? PSTR("BUSINESS_ADDRESS") :
+        data == SR_PERSONAL_ADDRESS ? PSTR("PERSONAL_ADDRESS") :
+        data == SR_PROFESSIONAL_ADDRESS ? PSTR("PROFESSIONAL_ADDRESS") :
         data == SR_SOFTWARE_MODULE_VERSIONS ? PSTR("SOFTWARE_MODULE_VERSIONS") :
-        data == SR_PRIVATE_ADDRESS_LIST ? PSTR("PRIVATE_ADDRESS_LIST") :
-        data == SR_BUSINESS_ADDRESS_LIST ? PSTR("BUSINESS_ADDRESS_LIST") :
-        data == SR_DESTINATION ? PSTR("DESTINATION") :
+        data == SR_PERSONAL_ADDRESS_LIST ? PSTR("PERSONAL_ADDRESS_LIST") :
+        data == SR_PROFESSIONAL_ADDRESS_LIST ? PSTR("PROFESSIONAL_ADDRESS_LIST") :
+        data == SR_DESTINATION ? PSTR("CURRENT_DESTINATION") :
         ToHexStr(data);
 } // SatNavRequestStr
 
-// Attempt to show a detailed SatNav guidance instruction in "Ascii art"
+enum SatNavRequestType_t
+{
+    SRT_REQ_N_ITEMS = 0,  // Request for number of items
+    SRT_REQ_ITEMS = 1,  // Request (single or list of) item(s)
+    SRT_SELECT = 2,  // Select item
+    SRT_SELECT_CITY_CENTER = 3  // Select city center
+}; // enum SatNavRequestType_t
+
+// Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
+const char* SatNavRequestTypeStr(uint8_t data)
+{
+    return
+        data == SRT_REQ_N_ITEMS ? PSTR("REQ_N_ITEMS") :
+        data == SRT_REQ_ITEMS ? PSTR("REQ_ITEMS") :
+        data == SRT_SELECT ? PSTR("SELECT") :
+        data == SRT_SELECT_CITY_CENTER ? PSTR("SELECT_CITY_CENTER") :
+        ToStr(data);
+} // SatNavRequestTypeStr
+
+enum SatNavGuidancePreference_t
+{
+    SGP_FASTEST_ROUTE = 0x01,
+    SGP_SHORTEST_DISTANCE = 0x04,
+    SGP_AVOID_HIGHWAY = 0x12,
+    SGP_COMPROMISE_FAST_SHORT = 0x02
+}; // enum SatNavGuidancePreference_t
+
+// Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
+const char* SatNavGuidancePreferenceStr(uint8_t data)
+{
+    return
+        data == SGP_FASTEST_ROUTE ? PSTR("FASTEST_ROUTE") :
+        data == SGP_SHORTEST_DISTANCE ? PSTR("SHORTEST_DISTANCE") :
+        data == SGP_AVOID_HIGHWAY ? PSTR("AVOID_HIGHWAY") :
+        data == SGP_COMPROMISE_FAST_SHORT ? PSTR("COMPROMISE_FAST_SHORT") :
+        notApplicable3Str;
+} // SatNavGuidancePreferenceStr
+
+// Attempt to show a detailed SatNav guidance instruction in "ASCII art"
 //
 // A detailed SatNav guidance instruction consists of 8 bytes:
 // * 0   : turn angle in increments of 22.5 degrees, measured clockwise, starting with 0 at 6 o-clock.
@@ -511,7 +553,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 data[1] & 0x40 ? presentStr : notPresentStr,
                 data[2] == 0xFF ? notApplicable3Str : FloatToStr(floatBuf[0], data[2] - 39, 0),  // TODO - or: data[2] / 2
                 FloatToStr(floatBuf[1], ((uint32_t)data[3] << 16 | (uint32_t)data[4] << 8 | data[5]) / 10.0, 1),
-                FloatToStr(floatBuf[2], (data[6] - 0x50) / 2.0, 1)
+                FloatToStr(floatBuf[2], (data[6] - 80) / 2.0, 1)
             );
         }
         break;
@@ -558,6 +600,8 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
+            uint16_t remainingKmToService = ((uint16_t)data[2] << 8 | data[3]) * 20;
+
             // Examples:
             // Raw: #1987 (12/15) 16 0E 4FC WA0 90-00-01-AE-F0-00-FF-FF-22-48-FF-7A-56 ACK OK 7A56 CRC_OK
 
@@ -574,12 +618,12 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             Serial.printf_P(PSTR("\n    - Instrument cluster: %SENABLED\n"), data[0] & 0x80 ? emptyStr : PSTR("NOT "));
             Serial.printf_P(PSTR("    - Speed regulator wheel: %S\n"), data[0] & 0x40 ? onStr : offStr);
             Serial.printf_P(PSTR("%S"), data[0] & 0x20 ? PSTR("    - Warning LED ON\n") : emptyStr);
-            Serial.printf_P(PSTR("%S"), data[0] & 0x04 ? PSTR("    - Diesel glow plugs ON\n") : emptyStr);  // TODO - check
+            Serial.printf_P(PSTR("%S"), data[0] & 0x04 ? PSTR("    - Diesel glow plugs ON\n") : emptyStr);
             Serial.printf_P(PSTR("%S"), data[1] & 0x01 ? PSTR("    - Door OPEN\n") : emptyStr);
             Serial.printf_P(
                 PSTR("    - Remaing km to service: %u (dashboard shows: %u)\n"),
-                ((uint16_t)data[2] << 8 | data[3]) * 20,
-                (((uint16_t)data[2] << 8 | data[3]) * 20) / 100 * 100
+                remainingKmToService * 20,
+                (remainingKmToService) / 100 * 100
             );
 
             if (data[5] & 0x02)
@@ -628,12 +672,12 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             Serial.printf_P(PSTR("    - Oil level: raw=%u,dash=%S\n"),
                 data[8],
-                data[8] <= 0x0B ? PSTR("------") :
-                data[8] <= 0x19 ? PSTR("O-----") :
-                data[8] <= 0x27 ? PSTR("OO----") :
-                data[8] <= 0x35 ? PSTR("OOO---") :
-                data[8] <= 0x43 ? PSTR("OOOO--") :
-                data[8] <= 0x51 ? PSTR("OOOOO-") :
+                data[8] <= 11 ? PSTR("------") :
+                data[8] <= 25 ? PSTR("O-----") :
+                data[8] <= 39 ? PSTR("OO----") :
+                data[8] <= 53 ? PSTR("OOO---") :
+                data[8] <= 67 ? PSTR("OOOO--") :
+                data[8] <= 81 ? PSTR("OOOOO-") :
                 PSTR("OOOOOO")
             );
 
@@ -641,12 +685,12 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             {
                 // Never seen this; I don't have LPG
                 Serial.printf_P(PSTR("LPG fuel level: %S\n"),
-                    data[10] <= 0x08 ? PSTR("1") :
-                    data[10] <= 0x11 ? PSTR("2") :
-                    data[10] <= 0x21 ? PSTR("3") :
-                    data[10] <= 0x32 ? PSTR("4") :
-                    data[10] <= 0x43 ? PSTR("5") :
-                    data[10] <= 0x53 ? PSTR("6") :
+                    data[10] <= 8 ? PSTR("1") :
+                    data[10] <= 23 ? PSTR("2") :
+                    data[10] <= 33 ? PSTR("3") :
+                    data[10] <= 50 ? PSTR("4") :
+                    data[10] <= 67 ? PSTR("5") :
+                    data[10] <= 83 ? PSTR("6") :
                     PSTR("7")
                 );
             } // if
@@ -694,7 +738,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 // Raw: #7820 (10/15)  8 0E 8C4 WA0 8A-21-40-3D-54 ACK OK 3D54 CRC_OK
                 // Raw: #0345 ( 1/15)  8 0E 8C4 WA0 8A-28-40-F9-96 ACK OK F996 CRC_OK
 
-                Serial.print("Head unit: ");
+                Serial.print(F("Head unit: "));
 
                 if (dataLen != 3)
                 {
@@ -830,39 +874,79 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
-                // TODO - Unknown what this is. Surely not the head unit. Could be:
-                // - MFD unit - this type of packet is showing often when the MFD is changing to another screen
-                // - Aircon panel
-                // - CD changer (seems unlikely)
-                // - SatNav system - this type of packet is showing often when using the SatNav
-                // - Instrument panel
-
-                // Examples:
-                // Raw: #0408 ( 3/15)  8 0E 8C4 WA0 07-40-00-E6-2C ACK OK E62C CRC_OK
-                // Raw: #1857 (12/15)  8 0E 8C4 WA0 07-41-00-94-C0 ACK OK 94C0 CRC_OK
-                // Raw: #2152 ( 7/15)  8 0E 8C4 WA0 07-10-00-47-E8 ACK OK 47E8 CRC_OK
-                // Raw: #2155 (10/15)  8 0E 8C4 WA0 07-01-00-46-62 ACK OK 4662 CRC_OK
-                // Raw: #3026 (11/15)  8 0E 8C4 WA0 07-20-00-D2-42 ACK OK D242 CRC_OK
-                // Raw: #4199 (14/15)  8 0E 8C4 WA0 07-21-01-BF-94 ACK OK BF94 CRC_OK
-                // Raw: #5039 (14/15)  8 0E 8C4 WA0 07-01-01-59-58 ACK OK 5958 CRC_OK
-                // Raw: #5919 ( 9/15)  8 0E 8C4 WA0 07-00-01-2B-B4 ACK OK 2BB4 CRC_OK
-                // Raw: #7644 ( 9/15)  8 0E 8C4 WA0 07-47-00-A5-92 ACK OK A592 CRC_OK
-                // Raw: #7677 (12/15)  8 0E 8C4 WA0 07-60-00-00-E0 ACK OK 00E0 CRC_OK
-                // Raw: #9471 ( 6/15)  8 0E 8C4 WA0 07-00-02-0A-FA ACK OK 0AFA CRC_OK
-                // Raw: #7386 ( 1/15)  8 0E 8C4 WA0 07-40-02-D8-58 ACK OK D858 CRC_OK
-
-                // data[1] seems a bit pattern. Bits seen:
-                //  & 0x01 - MFD shows SatNav disclaimer screen, Entering new destination in SatNav
-                //  & 0x02
-                //  & 0x04
-                //  & 0x10 - Entering new destination in SatNav
-                //  & 0x20 - Entering new destination in SatNav, SatNav showing direction
-                //  & 0x40 - Contact key in "ACC" position?, SatNav showing direction
+                // MFD request to sat nav (can e.g. be triggered by the user selecting a button on a sat nav selection
+                // screen by using the remote control).
                 //
-                // data[2] is usually 0x00, sometimes 0x01 or 0x02
+                // Found combinations:
+                //
+                // 07-00-01
+                // 07-00-02 - MFD requests "satnav_status_3" ?
+                // 07-00-03 - MFD requests "satnav_status_3" and "satnav_status_2" ?
+                // 07-01-00 - MFD requests "satnav_status_1" ?
+                // 07-01-01 - User selected street from list. MFD requests "satnav_status_1" ?
+                // 07-01-03
+                // 07-10-00 - User pressed "Val" on remote control
+                // 07-20-00 - MFD requests next "satnav_report" packet
+                // 07-21-00 - MFD requests "satnav_status_1" and next "satnav_report" packet ?
+                // 07-21-01 - User selected city from list. MFD requests "satnav_status_1" and next "satnav_report"
+                //            packet ?
+                // 07-40-00 - MFD requests "satnav_status_2" ?
+                // 07-40-02 - MFD requests "satnav_status_2"
+                // 07-41-00 - MFD requests "satnav_status_1" and "satnav_status_2" ?
+                // 07-44-00 - MFD requests "satnav_status_2" and "satnav_guidance_data"
+                // 07-47-00 - MFD requests "satnav_status_1", "satnav_status_2", "satnav_guidance_data" and
+                //            "satnav_guidance" ?
+                // 07-60-00
+                //
+                // So it looks like data[1] and data[2] are in fact bitfields:
+                //
+                // data[1]
+                // & 0x01: Requesting "satnav_status_1" (IDEN 0x54E)
+                // & 0x02: Requesting "satnav_guidance" (IDEN 0x64E)
+                // & 0x04: Requesting "satnav_guidance_data" (IDEN 0x9CE)
+                // & 0x10: User pressing "Val" on remote control, requesting "satnav_to_mfd_response" (IDEN 0x74E)
+                // & 0x20: Requesting next "satnav_report" (IDEN 0x6CE) in sequence
+                // & 0x40: Requesting "satnav_status_2" (IDEN 0x7CE)
+                //
+                // data[2]
+                // & 0x01: User selecting
+                // & 0x02: Requesting "satnav_status_3" (IDEN 0x8CE) ?
 
-                Serial.printf_P(PSTR("%s %s [to be decoded]\n"), ToHexStr(data[0]), ToHexStr(data[1], data[2]));
-                return VAN_PACKET_PARSE_TO_BE_DECODED;
+                uint16_t code = (uint16_t)data[1] << 8 | data[2];
+
+                Serial.printf_P(
+                    PSTR("MFD to sat nav: %S\n"),
+
+                    // User clicks on "Accept" button (usually bottom left of dialog screen)
+                    code == 0x0001 ? PSTR("ACCEPT") :
+
+                    // Always follows 0x1000
+                    code == 0x0100 ? PSTR("END_OF_BUTTON_PRESS") :
+
+                    // User selects street from list
+                    // TODO - also when user selects category from list of services
+                    code == 0x0101 ? PSTR("SELECTED_STREET_FROM_LIST") :
+
+                    // User selects a menu entry or letter? User pressed "Val" (middle button on IR remote control).
+                    // Always followed by 0x0100.
+                    code == 0x1000 ? PSTR("VAL") :
+
+                    // MFD requests sat nav for next report packet (IDEN 0x6CE) in sequence
+                    // (Or: select from list using "Val"?)
+                    code == 0x2000 ? PSTR("REQUEST_NEXT_SAT_NAV_REPORT_PACKET") :
+
+                    // User selects city from list
+                    code == 0x2101 ? PSTR("SELECTED_CITY_FROM_LIST") :
+
+                    code == 0x4000 ? PSTR("REQUEST_STATUS_2") :
+
+                    code == 0x4100 ? PSTR("REQUEST_STATUS_1_AND_2") :
+
+                    // MFD asks for sat nav guidance data packet (IDEN 0x9CE) and satnav_status_2 (IDEN 0x7CE)
+                    code == 0x4400 ? PSTR("REQUEST_SAT_NAV_GUIDANCE_DATA") :
+
+                    ToHexStr(code)
+                );
             }
             else if (data[0] == 0x52)
             {
@@ -921,8 +1005,8 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 PSTR(
                     "seq=%u; doors=%S%S%S%S%S; right_stalk_button=%S; avg_speed_1=%u; avg_speed_2=%u; "
                     "exp_moving_avg_speed=%u;\n"
-                    "    range_1=%u; avg_consumption_1=%s; range_2=%u; avg_consumption_2=%s; inst_consumption=%S; "
-                    "mileage=%u\n"
+                    "    distance_1=%u; avg_consumption_1=%s; distance_2=%u; avg_consumption_2=%s; inst_consumption=%S; "
+                    "distance_to_empty=%u\n"
                 ),
                 data[0] & 0x07,
                 data[7] & 0x80 ? PSTR("FRONT_RIGHT ") : emptyStr,
@@ -983,161 +1067,165 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // PROGMEM array of PROGMEM strings, to save RAM bytes
             // See also: https://arduino-esp8266.readthedocs.io/en/latest/PROGMEM.html
 
+            // All known notifications, as literally retrieved from my vehicle (406 year 2003, DAM number 9586; your
+            // vehicle may have other texts). Retrieving was done with
+            // VanBus/examples/DisplayNotifications/DisplayNotifications.ino .
+
             // TODO - translate into all languages
 
-            // Byte 0
-            static const char msg_0_0[] PROGMEM = "Tyre pressure low";
-            static const char msg_0_1[] PROGMEM = "Door open";
-            static const char msg_0_2[] PROGMEM = "Auto gearbox temperature too high";
-            static const char msg_0_3[] PROGMEM = "Brake system fault"; // and exclamation mark on instrument cluster
-            static const char msg_0_4[] PROGMEM = "Hydraulic suspension fault";
-            static const char msg_0_5[] PROGMEM = "Suspension fault";
-            static const char msg_0_6[] PROGMEM = "Engine oil temperature too high"; // and oil can on instrument cluster
-            static const char msg_0_7[] PROGMEM = "Water temperature too high";
+            // Byte 0, 0x00...0x07
+            static const char msg_0_0[] PROGMEM = "Tyre pressure too low!";
+            static const char msg_0_1[] PROGMEM = "";
+            static const char msg_0_2[] PROGMEM = "Automatic gearbox temperature too high!";
+            static const char msg_0_3[] PROGMEM = "Brake fluid level low!"; // and exclamation mark on instrument cluster
+            static const char msg_0_4[] PROGMEM = "Hydraulic suspension pressure defective!";
+            static const char msg_0_5[] PROGMEM = "Suspension defective!";
+            static const char msg_0_6[] PROGMEM = "Engine oil temperature too high!"; // and oil can on instrument cluster
+            static const char msg_0_7[] PROGMEM = "Engine temperature too high!";
 
-            // Byte 1
-            static const char msg_1_0[] PROGMEM = "Unblock diesel filter"; // and mil icon on instrument cluster
-            static const char msg_1_1[] PROGMEM = "Stop car icon";
-            static const char msg_1_2[] PROGMEM = "Diesel additive too low";
-            static const char msg_1_3[] PROGMEM = "Fuel cap open";
-            static const char msg_1_4[] PROGMEM = "Tyres punctured";
-            static const char msg_1_5[] PROGMEM = "Coolant level low"; // and icon on instrument cluster
-            static const char msg_1_6[] PROGMEM = "Oil pressure too low";
-            static const char msg_1_7[] PROGMEM = "Oil level too low";
+            // Byte 1, 0x08...0x0F
+            static const char msg_1_0[] PROGMEM = "Clear diesel filter (FAP) URGENT"; // and mil icon on instrument cluster
+            static const char msg_1_1[] PROGMEM = "";
+            static const char msg_1_2[] PROGMEM = "Min level additive gasoil!";
+            static const char msg_1_3[] PROGMEM = "Fuel cap open!";
+            static const char msg_1_4[] PROGMEM = "Puncture(s) detected!";
+            static const char msg_1_5[] PROGMEM = "Cooling circuit level too low!"; // and icon on instrument cluster
+            static const char msg_1_6[] PROGMEM = "Oil pressure insufficient!";
+            static const char msg_1_7[] PROGMEM = "Engine oil level too low!";
 
-            // Byte 2
-            static const char msg_2_0[] PROGMEM = "Noooo.... the famous \"Antipollution fault\" :-(";
-            static const char msg_2_1[] PROGMEM = "Brake pads worn";
-            static const char msg_2_2[] PROGMEM = "Diagnosis ok";
-            static const char msg_2_3[] PROGMEM = "Auto gearbox faulty";
-            static const char msg_2_4[] PROGMEM = "ESP"; // and icon on instrument cluster
-            static const char msg_2_5[] PROGMEM = "ABS";
-            static const char msg_2_6[] PROGMEM = "Suspension or steering fault";
-            static const char msg_2_7[] PROGMEM = "Braking system faulty";
+            // Byte 2, 0x10...0x17
+            static const char msg_2_0[] PROGMEM = "Engine antipollution system defective!";
+            static const char msg_2_1[] PROGMEM = "Brake pads worn!";
+            static const char msg_2_2[] PROGMEM = "Check Control OK";  // Wow... bad translation
+            static const char msg_2_3[] PROGMEM = "Automatic gearbox defective!";
+            static const char msg_2_4[] PROGMEM = "ASR / ESP system defective!"; // and icon on instrument cluster
+            static const char msg_2_5[] PROGMEM = "ABS brake system defective!";
+            static const char msg_2_6[] PROGMEM = "Suspension and power steering defective!";
+            static const char msg_2_7[] PROGMEM = "Brake system defective!";
 
-            // Byte 3
-            static const char msg_3_0[] PROGMEM = "Side airbag faulty";
-            static const char msg_3_1[] PROGMEM = "Airbags faulty";
-            static const char msg_3_2[] PROGMEM = "Cruise control faulty";
-            static const char msg_3_3[] PROGMEM = "Engine temperature too high";
-            static const char msg_3_4[] PROGMEM = "Fault: Load shedding in progress"; // RT3 mono
-            static const char msg_3_5[] PROGMEM = "Ambient brightness sensor fault";
-            static const char msg_3_6[] PROGMEM = "Rain sensor fault";
-            static const char msg_3_7[] PROGMEM = "Water in diesel fuel filter"; // and icon on instrument cluster
+            // Byte 3, 0x18...0x1F
+            static const char msg_3_0[] PROGMEM = "Airbag defective!";
+            static const char msg_3_1[] PROGMEM = "Airbag defective!";
+            static const char msg_3_2[] PROGMEM = "";
+            static const char msg_3_3[] PROGMEM = "Engine temperature high!";
+            static const char msg_3_4[] PROGMEM = "";
+            static const char msg_3_5[] PROGMEM = "";
+            static const char msg_3_6[] PROGMEM = "";
+            static const char msg_3_7[] PROGMEM = "Water in Diesel fuel filter"; // and icon on instrument cluster
 
-            // Byte 4
-            static const char msg_4_0[] PROGMEM = "Left rear sliding door faulty";
-            static const char msg_4_1[] PROGMEM = "Headlight corrector fault";
-            static const char msg_4_2[] PROGMEM = "Right rear sliding door faulty";
-            static const char msg_4_3[] PROGMEM = "No broken lamp"; // RT3 mono
-            static const char msg_4_4[] PROGMEM = "Battery low";
-            static const char msg_4_5[] PROGMEM = "Battery charge fault"; // and battery icon on instrument cluster
-            static const char msg_4_6[] PROGMEM = "Diesel particle filter faulty";
-            static const char msg_4_7[] PROGMEM = "Catalytic converter fault"; // MIL icon flashing on instrument cluster
+            // Byte 4, 0x20...0x27
+            static const char msg_4_0[] PROGMEM = "";
+            static const char msg_4_1[] PROGMEM = "Automatic beam adjustment defective!";
+            static const char msg_4_2[] PROGMEM = "";
+            static const char msg_4_3[] PROGMEM = "";
+            static const char msg_4_4[] PROGMEM = "Service battery charge low!";
+            static const char msg_4_5[] PROGMEM = "Battery charge low!"; // and battery icon on instrument cluster
+            static const char msg_4_6[] PROGMEM = "Diesel antipollution system (FAP) defective!";
+            static const char msg_4_7[] PROGMEM = "Engine antipollution system inoperative!"; // MIL icon flashing on instrument cluster
 
-            // Byte 5
-            static const char msg_5_0[] PROGMEM = "Handbrake on";
-            static const char msg_5_1[] PROGMEM = "Seatbelt warning";
-            static const char msg_5_2[] PROGMEM = "Passenger airbag deactivated"; // and icon on instrument cluster
-            static const char msg_5_3[] PROGMEM = "Screen washer liquid level too low";
+            // Byte 5, 0x28...0x2F
+            static const char msg_5_0[] PROGMEM = "Handbrake on!";
+            static const char msg_5_1[] PROGMEM = "Safety belt not fastened!";
+            static const char msg_5_2[] PROGMEM = "Passenger airbag neutralized"; // and icon on instrument cluster
+            static const char msg_5_3[] PROGMEM = "Windshield liquid level too low";
             static const char msg_5_4[] PROGMEM = "Current speed too high";
-            static const char msg_5_5[] PROGMEM = "Ignition key left in";
-            static const char msg_5_6[] PROGMEM = "Sidelights left on";
-            static const char msg_5_7[] PROGMEM = "Hill holder active"; // On RT3 mono: Driver's seatbelt not fastened
+            static const char msg_5_5[] PROGMEM = "Ignition key still inserted";
+            static const char msg_5_6[] PROGMEM = "Lights not on";
+            static const char msg_5_7[] PROGMEM = "";
 
-            // Byte 6
-            static const char msg_6_0[] PROGMEM = "Shock sensor faulty";
-            static const char msg_6_1[] PROGMEM = "Seatbelt warning"; // not sure; there is no message with 0x31 so could not check
-            static const char msg_6_2[] PROGMEM = "Check and re-init tyre pressure";
-            static const char msg_6_3[] PROGMEM = "Remote control battery low";
-            static const char msg_6_4[] PROGMEM = "Left stick button pressed";
-            static const char msg_6_5[] PROGMEM = "Put automatic gearbox in P position";
-            static const char msg_6_6[] PROGMEM = "Stop lights test: brake gently";
-            static const char msg_6_7[] PROGMEM = "Fuel level low";
+            // Byte 6, 0x30...0x37
+            static const char msg_6_0[] PROGMEM = "Impact sensor defective";
+            static const char msg_6_1[] PROGMEM = "";
+            static const char msg_6_2[] PROGMEM = "Tyre pressure sensor battery low";
+            static const char msg_6_3[] PROGMEM = "Plip remote control battery low";
+            static const char msg_6_4[] PROGMEM = "";
+            static const char msg_6_5[] PROGMEM = "Place automatic gearbox in P position";
+            static const char msg_6_6[] PROGMEM = "Testing stop lamps : brake gently";
+            static const char msg_6_7[] PROGMEM = "Fuel level low!";
 
-            // Byte 7
-            static const char msg_7_0[] PROGMEM = "Automatic headlamp lighting deactivated";
-            static const char msg_7_1[] PROGMEM = "Rear LH passenger seatbelt not fastened";
-            static const char msg_7_2[] PROGMEM = "Rear RH passenger seatbelt not fastened";
-            static const char msg_7_3[] PROGMEM = "Front passenger seatbelt not fastened";
-            static const char msg_7_4[] PROGMEM = "Driving school pedals indication";
-            static const char msg_7_5[] PROGMEM = "Tyre pressure monitor sensors X missing";
-            static const char msg_7_6[] PROGMEM = "Tyre pressure monitor sensors Y missing";
-            static const char msg_7_7[] PROGMEM = "Tyre pressure monitor sensors Z missing";
+            // Byte 7, 0x38...0x3F
+            static const char msg_7_0[] PROGMEM = "Automatic headlight activation system disabled";
+            static const char msg_7_1[] PROGMEM = "Turn-headlight defective!";
+            static const char msg_7_2[] PROGMEM = "Turn-headlight disable";
+            static const char msg_7_3[] PROGMEM = "Turn-headlight enable";
+            static const char msg_7_4[] PROGMEM = "";
+            static const char msg_7_5[] PROGMEM = "7 tyre pressure sensors missing!";
+            static const char msg_7_6[] PROGMEM = "7 tyre pressure sensors missing!";
+            static const char msg_7_7[] PROGMEM = "7 tyre pressure sensors missing!";
 
-            // Byte 8
+            // Byte 8, 0x40...0x47
             static const char msg_8_0[] PROGMEM = "Doors locked";
-            static const char msg_8_1[] PROGMEM = "ESP/ASR deactivated";
-            static const char msg_8_2[] PROGMEM = "Child safety activated";
-            static const char msg_8_3[] PROGMEM = "Deadlocking active";
-            static const char msg_8_4[] PROGMEM = "Automatic lighting active";
-            static const char msg_8_5[] PROGMEM = "Automatic wiping active";
-            static const char msg_8_6[] PROGMEM = "Engine immobiliser fault";
-            static const char msg_8_7[] PROGMEM = "Sport suspension mode active";
+            static const char msg_8_1[] PROGMEM = "ASR / ESP system disabled";
+            static const char msg_8_2[] PROGMEM = "Child safety lock enabled";
+            static const char msg_8_3[] PROGMEM = "Door self locking system enabled";
+            static const char msg_8_4[] PROGMEM = "Automatic headlight activation system enabled";
+            static const char msg_8_5[] PROGMEM = "Automatic wiper system enabled";
+            static const char msg_8_6[] PROGMEM = "Electronic anti-theft system defective";
+            static const char msg_8_7[] PROGMEM = "Sport suspension mode enabled";
 
             // Byte 9 is the index of the current message
 
-            // Byte 10
-            static const char msg_10_0[] PROGMEM = "Unknown";
-            static const char msg_10_1[] PROGMEM = "Unknown";
-            static const char msg_10_2[] PROGMEM = "Unknown";
-            static const char msg_10_3[] PROGMEM = "Change of fuel used in progress";
-            static const char msg_10_4[] PROGMEM = "LPG fuel refused";
-            static const char msg_10_5[] PROGMEM = "LPG system faulty";
-            static const char msg_10_6[] PROGMEM = "LPG in use";
-            static const char msg_10_7[] PROGMEM = "Min level LPG";
+            // Byte 10, 0x50...0x57
+            static const char msg_10_0[] PROGMEM = "";
+            static const char msg_10_1[] PROGMEM = "";
+            static const char msg_10_2[] PROGMEM = "";
+            static const char msg_10_3[] PROGMEM = "";
+            static const char msg_10_4[] PROGMEM = "";
+            static const char msg_10_5[] PROGMEM = "";
+            static const char msg_10_6[] PROGMEM = "";
+            static const char msg_10_7[] PROGMEM = "";
 
-            // Byte 11
-            static const char msg_11_0[] PROGMEM = "ADIN fault";
-            static const char msg_11_1[] PROGMEM = "User stop & start";
-            static const char msg_11_2[] PROGMEM = "Stop & start available";
-            static const char msg_11_3[] PROGMEM = "Stop & start activated";
-            static const char msg_11_4[] PROGMEM = "Stop & start deactivated";
-            static const char msg_11_5[] PROGMEM = "Stop & start deferred";
-            static const char msg_11_6[] PROGMEM = "XSARA DYNALTO";
-            static const char msg_11_7[] PROGMEM = "307 DYNALTO";
+            // Byte 11, 0x58...0x5F
+            static const char msg_11_0[] PROGMEM = "";
+            static const char msg_11_1[] PROGMEM = "";
+            static const char msg_11_2[] PROGMEM = "";
+            static const char msg_11_3[] PROGMEM = "";
+            static const char msg_11_4[] PROGMEM = "";
+            static const char msg_11_5[] PROGMEM = "";
+            static const char msg_11_6[] PROGMEM = "";
+            static const char msg_11_7[] PROGMEM = "";
 
-            // Byte 12
-            static const char msg_12_0[] PROGMEM = "Unknown";
-            static const char msg_12_1[] PROGMEM = "Unknown";
-            static const char msg_12_2[] PROGMEM = "Unknown";
-            static const char msg_12_3[] PROGMEM = "Unknown";
-            static const char msg_12_4[] PROGMEM = "Unknown";
-            static const char msg_12_5[] PROGMEM = "Unknown";
-            static const char msg_12_6[] PROGMEM = "Unknown";
-            static const char msg_12_7[] PROGMEM = "Change to neutral";
+            // Byte 12, 0x60...0x67
+            static const char msg_12_0[] PROGMEM = "";
+            static const char msg_12_1[] PROGMEM = "";
+            static const char msg_12_2[] PROGMEM = "";
+            static const char msg_12_3[] PROGMEM = "";
+            static const char msg_12_4[] PROGMEM = "";
+            static const char msg_12_5[] PROGMEM = "";
+            static const char msg_12_6[] PROGMEM = "";
+            static const char msg_12_7[] PROGMEM = "";
 
-            // Byte 13
-            static const char msg_13_0[] PROGMEM = "Unknown";
-            static const char msg_13_1[] PROGMEM = "Unknown";
-            static const char msg_13_2[] PROGMEM = "Unknown";
-            static const char msg_13_3[] PROGMEM = "Unknown";
-            static const char msg_13_4[] PROGMEM = "Unknown";
-            static const char msg_13_5[] PROGMEM = "Unknown";
-            static const char msg_13_6[] PROGMEM = "Unknown";
-            static const char msg_13_7[] PROGMEM = "Unknown";
+            // Byte 13, 0x68...0x6F
+            static const char msg_13_0[] PROGMEM = "";
+            static const char msg_13_1[] PROGMEM = "";
+            static const char msg_13_2[] PROGMEM = "";
+            static const char msg_13_3[] PROGMEM = "";
+            static const char msg_13_4[] PROGMEM = "";
+            static const char msg_13_5[] PROGMEM = "";
+            static const char msg_13_6[] PROGMEM = "";
+            static const char msg_13_7[] PROGMEM = "";
 
             // On vehicles made after 2004
 
-            // Byte 14
-            static const char msg_14_0[] PROGMEM = "Roof operation complete";
-            static const char msg_14_1[] PROGMEM = "Operation impossible screen not in place";
-            static const char msg_14_2[] PROGMEM = "Roof mechanism not locked!";
-            static const char msg_14_3[] PROGMEM = "Operation impossible boot open";
-            static const char msg_14_4[] PROGMEM = "Operation impossible speed too high";
-            static const char msg_14_5[] PROGMEM = "Operation impossible ext temp too low";
-            static const char msg_14_6[] PROGMEM = "Roof mechanism faulty";
-            static const char msg_14_7[] PROGMEM = "Boot mechanism not locked!";
+            // Byte 14, 0x70...0x77
+            static const char msg_14_0[] PROGMEM = "";
+            static const char msg_14_1[] PROGMEM = "";
+            static const char msg_14_2[] PROGMEM = "";
+            static const char msg_14_3[] PROGMEM = "";
+            static const char msg_14_4[] PROGMEM = "";
+            static const char msg_14_5[] PROGMEM = "";
+            static const char msg_14_6[] PROGMEM = "";
+            static const char msg_14_7[] PROGMEM = "";
 
-            // Byte 15
-            static const char msg_15_0[] PROGMEM = "Unknown";
-            static const char msg_15_1[] PROGMEM = "Unknown";
-            static const char msg_15_2[] PROGMEM = "Unknown";
-            static const char msg_15_3[] PROGMEM = "Unknown";
-            static const char msg_15_4[] PROGMEM = "Bow fault";
-            static const char msg_15_5[] PROGMEM = "Operation impossible roof not unlocked";
-            static const char msg_15_6[] PROGMEM = "Unknown";
-            static const char msg_15_7[] PROGMEM = "Roof operation incomplete";
+            // Byte 15, 0x78...0x7F
+            static const char msg_15_0[] PROGMEM = "";
+            static const char msg_15_1[] PROGMEM = "";
+            static const char msg_15_2[] PROGMEM = "";
+            static const char msg_15_3[] PROGMEM = "";
+            static const char msg_15_4[] PROGMEM = "";
+            static const char msg_15_5[] PROGMEM = "";
+            static const char msg_15_6[] PROGMEM = "";
+            static const char msg_15_7[] PROGMEM = "";
 
             static const char *const msgTable[] PROGMEM =
             {
@@ -1160,9 +1248,12 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             };
 
             Serial.print(F("Message bits present:\n"));
-            for (int byte = 0; byte < 16; byte++)
+
+            for (int byte = 0; byte < dataLen; byte++)
             {
+                // Skip byte 9; it is the index of the current message
                 if (byte == 9) byte++;
+
                 for (int bit = 0; bit < 8; bit++)
                 {
                     if (data[byte] >> bit & 0x01)
@@ -1170,14 +1261,19 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                         char alarmText[80];  // Make sure this is large enough for the largest string it must hold
                         strncpy_P(alarmText, (char *)pgm_read_dword(&(msgTable[byte * 8 + bit])), sizeof(alarmText) - 1);
                         alarmText[sizeof(alarmText) - 1] = 0;
-                        Serial.print("    - ");
+                        Serial.printf_P("%S- ", indentStr);
                         Serial.println(alarmText);
                     } // if
                 } // for
             } // for
 
             uint8_t currentMsg = data[9];
-            Serial.printf_P(PSTR("Message displayed on MFD: \"%S\"\n"), msgTable[currentMsg]);
+
+            // Relying on short-circuit boolean evaluation
+            if (currentMsg <= 0x7F && strlen_P(msgTable[currentMsg]) > 0)
+            {
+                Serial.printf_P(PSTR("Message displayed on MFD: \"%S\"\n"), msgTable[currentMsg]);
+            } // if
         }
         break;
 
@@ -1199,15 +1295,18 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
+            uint16_t engineRpm = (uint16_t)data[0] << 8 | data[1];
+            uint16_t vehicleSpeed = (uint16_t)data[2] << 8 | data[3];
+
             char floatBuf[2][MAX_FLOAT_SIZE];
             Serial.printf_P(
                 PSTR("rpm=%S /min; speed=%S km/h; seq=%lu\n"),
-                data[0] == 0xFF && data[1] == 0xFF ?
+                engineRpm == 0xFFFF ?
                     PSTR("---.-") :
-                    FloatToStr(floatBuf[0], ((uint16_t)data[0] << 8 | data[1]) / 8.0, 1),
-                data[2] == 0xFF && data[3] == 0xFF ?
+                    FloatToStr(floatBuf[0], engineRpm / 8.0, 1),
+                vehicleSpeed == 0xFFFF ?
                     PSTR("---.--") :
-                    FloatToStr(floatBuf[1], ((uint16_t)data[2] << 8 | data[3]) / 100.0, 2),
+                    FloatToStr(floatBuf[1], vehicleSpeed / 100.0, 2),
                 (uint32_t)data[4] << 16 | (uint32_t)data[5] << 8 | data[6]
             );
         }
@@ -1237,7 +1336,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             Serial.printf_P(
                 PSTR(
                     "hazard_lights=%S; door=%S; dashboard_programmed_brightness=%u, esp=%S,\n"
-                    "    fuel_level_filtered=%s litre, fuel_level_raw=%s litre\n"
+                    "    fuel_level_filtered=%S litre, fuel_level_raw=%S litre\n"
                 ),
                 data[0] & 0x02 ? onStr : offStr,
                 data[2] & 0x40 ? PSTR("LOCKED") : PSTR("UNLOCKED"),
@@ -1260,21 +1359,21 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             uint8_t seq = data[0];
             uint8_t infoType = data[1];
 
-            // Head Unit info types
-            enum HeatUnitInfoType_t
+            // Head unit info types
+            enum HeadUnitInfoType_t
             {
                 INFO_TYPE_TUNER = 0xD1,
                 INFO_TYPE_TAPE,
                 INFO_TYPE_PRESET,
                 INFO_TYPE_CDCHANGER = 0xD5, // TODO - Not sure
                 INFO_TYPE_CD,
-            }; // enum HeatUnitInfoType_t
+            }; // enum HeadUnitInfoType_t
 
             switch (infoType)
             {
                 case INFO_TYPE_TUNER:
                 {
-                    // Message when the HeadUnit is in "tuner" (radio) mode
+                    // Message when the head unit is in "tuner" (radio) mode
 
                     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#554_1
 
@@ -1282,6 +1381,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     // 0E554E 80D1019206030F60FFFFA10000000000000000000080 9368
                     // 0E554E 82D1011242040F60FFFFA10000000000000000000082 3680
                     // 0E554E 87D10110CA030F60FFFFA10000000000000000000080 62E6
+
+                    // Note: all packets as received from the following head units:
+                    // - Clarion RM2-00 - PU-1633A(E) - Cassette tape
+                    // - Clarion RD3-01 - PU-2473A(K) - CD player
+                    // Other head units may have different packets.
 
                     // Print only if not duplicate of previous packet
                     static uint8_t packetData[VAN_MAX_DATA_BYTES] = "";  // Previous packet data
@@ -1315,6 +1419,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     uint16_t frequency = (uint16_t)data[5] << 8 | data[4];
 
                     // data[6] - Reception status? Like: receiving station? Stereo? RDS bits like MS, TP, TA, AF?
+                    //
                     // & 0xF0:
                     //   - Usually 0x00 when tuned in to a "normal" station.
                     //   - One or more bits stay '1' when tuned in to a "crappy" or weak station (e.g. pirate).
@@ -1325,10 +1430,6 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     //   - Music/Speech (MS) bit
                     //   - No AF (Alternative Frequencies) available
                     //   - Number (0..15) indicating the quality of the RDS stream
-                    //   & 0x10:
-                    //   & 0x20:
-                    //   & 0x40:
-                    //   & 0x80:
                     //
                     // & 0x0F = signal strength: increases with antenna plugged in and decreases with antenna plugged
                     //          out. Updated when a station is being tuned in to, or when the MAN button is pressed.
@@ -1509,34 +1610,41 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                         return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                     } // if
 
+                    static bool loading = false;
                     bool searching = data[3] & 0x10;
+
+                    // Keep on reporting "loading" until no longer "searching"
+                    if ((data[3] & 0x0F) == 0x01) loading = true;
+                    if (! searching) loading = false;
 
                     char trackTimeStr[7];
                     sprintf_P(trackTimeStr, PSTR("%X:%02X"), data[5], data[6]);
 
                     uint8_t totalTracks = data[8];
-                    bool totalTracksInvalid = totalTracks == 0xFF;
+                    bool totalTracksValid = totalTracks != 0xFF;
                     char totalTracksStr[3];
-                    if (! totalTracksInvalid) sprintf_P(totalTracksStr, PSTR("%X"), totalTracks);
+                    if (totalTracksValid) sprintf_P(totalTracksStr, PSTR("%X"), totalTracks);
 
                     char totalTimeStr[7];
-                    bool totalTimeInvalid = dataLen < 12;
-                    if (! totalTimeInvalid)
+                    bool totalTimeValid = dataLen >= 12;
+                    if (totalTimeValid)
                     {
                         uint8_t totalTimeMin = data[9];
                         uint8_t totalTimeSec = data[10];
-                        totalTimeInvalid = totalTimeMin == 0xFF || totalTimeSec == 0xFF;
-                        if (! totalTimeInvalid) sprintf_P(totalTimeStr, PSTR("%X:%02X"), totalTimeMin, totalTimeSec);
+                        totalTimeValid = totalTimeMin != 0xFF && totalTimeSec != 0xFF;
+                        if (totalTimeValid) sprintf_P(totalTimeStr, PSTR("%X:%02X"), totalTimeMin, totalTimeSec);
                     } // if
 
                     Serial.printf_P(
                         PSTR(
-                            "status=%S; cd_loading_changing_to_cd_source=%S; pause=%S; play=%S; fast_forward=%S; "
+                            "status=%S; loading=%S; eject=%S; pause=%S; play=%S; fast_forward=%S; "
                             "rewind=%S;\n"
                             "    searching=%S; track_time=%S; current_track=%X; total_tracks=%S; total_time=%S, random=%S\n"
                         ),
 
-                        data[3] == 0x11 ? PSTR("LOADING_CD_AND_CHANGING_TO_CD_AUDIO_SOURCE") :
+                        data[3] == 0x00 ? PSTR("EJECT") :
+                        data[3] == 0x10 ? PSTR("ERROR") :  // E.g. disc inserted upside down
+                        data[3] == 0x11 ? PSTR("LOADING") :
                         data[3] == 0x12 ? PSTR("PAUSE-SEARCHING") :
                         data[3] == 0x13 ? PSTR("PLAY-SEARCHING") :
                         data[3] == 0x02 ? PSTR("PAUSE") :
@@ -1545,20 +1653,21 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                         data[3] == 0x05 ? PSTR("REWIND") :
                         ToHexStr(data[3]),
 
-                        (data[3] & 0x0F) == 0x01 ? yesStr : noStr,
+                        loading ? yesStr : noStr,
+                        data[3] == 0x00 ? onStr : offStr,
                         (data[3] & 0x0F) == 0x02 && ! searching ? yesStr : noStr,
                         (data[3] & 0x0F) == 0x03 && ! searching ? yesStr : noStr,
                         (data[3] & 0x0F) == 0x04 ? yesStr : noStr,
                         (data[3] & 0x0F) == 0x05 ? yesStr : noStr,
 
-                        searching ? yesStr : noStr,
+                        (data[3] == 0x12 || data[3] == 0x13) && ! loading ? onStr : offStr,
 
                         searching ? PSTR("--:--") : trackTimeStr,
                         data[7],
-                        totalTracksInvalid ? notApplicable2Str : totalTracksStr,
-                        totalTimeInvalid ? PSTR("--:--") : totalTimeStr,
+                        totalTracksValid ? totalTracksStr : notApplicable2Str,
+                        totalTimeValid ? totalTimeStr : PSTR("--:--"),
 
-                        data[2] & 0x01 ? yesStr : noStr // CD track shuffle: long-press "CD" button
+                        data[2] & 0x01 ? yesStr : noStr  // CD track shuffle: long-press "CD" button
                     );
                 }
                 break;
@@ -1717,14 +1826,16 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // the contact key is removed.
 
             Serial.printf(
-                "MFD_SCREEN_%S\n",
+                "%S\n",
 
                 // hmmm... MFD can also be ON if this is reported; this happens e.g. in the "minimal VAN network" test
                 // setup with only the head unit (radio) and MFD. Maybe this is a status report: the MFD indicates that
                 // it has received packets showing connectivity to e.g. the BSI?
-                data[0] == 0x00 && data[1] == 0xFF ? offStr :
+                mfdStatus == 0x00FF ? PSTR("MFD_SCREEN_OFF") :
 
-                data[0] == 0x20 && data[1] == 0xFF ? onStr :
+                mfdStatus == 0x20FF ? PSTR("MFD_SCREEN_ON") :
+                mfdStatus == 0xA0FF ? PSTR("TRIP_COUTER_1_RESET") :
+                mfdStatus == 0x60FF ? PSTR("TRIP_COUTER_2_RESET") :
                 ToHexStr(mfdStatus)
             );
         }
@@ -1942,10 +2053,15 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             Serial.printf_P(intro);
 
             bool searching = data[2] & 0x10;
+            bool loading = data[2] & 0x08;
+            bool ejecting = data[2] == 0xC1 && data[10] == 0;  // Ejecting cartridge
+
+            uint8_t currentTrack = data[6];
+            uint8_t currentDisc = data[7];
 
             Serial.printf_P(
                 PSTR(
-                    "random=%S; operational=%S; present=%S; searching=%S; loading=%S; state=%S;\n"
+                    "random=%S; operational=%S; present=%S; searching=%S; loading=%S; eject=%S, state=%S;\n"
                     "    pause=%S; play=%S; fast_forward=%S; rewind=%S;\n"
                 ),
 
@@ -1956,36 +2072,44 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
                 data[2] & 0x40 ? yesStr : noStr,  // CD changer device present
                 searching ? yesStr : noStr,
-                data[2] & 0x08 ? yesStr : noStr,  // Loading disc? Not sure
+                loading ? yesStr : noStr,
+                ejecting ? yesStr : noStr,
 
                 // TODO - remove this field?
                 data[2] == 0x40 ? PSTR("POWER_OFF") :  // Not sure
                 data[2] == 0x41 ? PSTR("POWER_ON") : // Not sure
                 data[2] == 0x49 ? PSTR("INITIALIZE") :  // Not sure
+                data[2] == 0x4B ? PSTR("LOADING") :
                 data[2] == 0xC0 ? PSTR("POWER_ON_READY") :  // Not sure
-                data[2] == 0xC1 ? PSTR("PAUSE") :
+                data[2] == 0xC1 ? 
+                    data[10] == 0 ? PSTR("EJECT") :
+                    PSTR("PAUSE") :
                 data[2] == 0xC3 ? PSTR("PLAY") :
                 data[2] == 0xC4 ? PSTR("FAST_FORWARD") :
                 data[2] == 0xC5 ? PSTR("REWIND") :
-                data[2] == 0xD3 ? PSTR("PLAY-SEARCHING") :
+                data[2] == 0xD3 ?
+                    // "PLAY-SEARCHING" (data[2] == 0xD3) with discs found (data[10] > 0) and invalid values for currentDisc/
+                    // currentTrack seems to indicate an error condition, e.g. disc inserted wrong way round.
+                    data[10] >= 0 && currentDisc == 0xFF && currentTrack == 0xFF ? PSTR("ERROR") :
+                    PSTR("PLAY-SEARCHING") :
                 ToHexStr(data[2]),
 
-                (data[2] & 0x07) == 0x01 ? yesStr : noStr,
-                (data[2] & 0x07) == 0x03 && ! searching ? yesStr : noStr,
+                (data[2] & 0x07) == 0x01 && ! ejecting && ! loading ? yesStr : noStr,  // Pause
+                (data[2] & 0x07) == 0x03 && ! searching && ! loading ? yesStr : noStr,  // Play
                 (data[2] & 0x07) == 0x04 ? yesStr : noStr,
                 (data[2] & 0x07) == 0x05 ? yesStr : noStr
             );
 
             uint8_t trackTimeMin = data[4];
             uint8_t trackTimeSec = data[5];
-            bool trackTimeInvalid = trackTimeMin == 0xFF || trackTimeSec == 0xFF;
+            bool trackTimeValid = trackTimeMin != 0xFF && trackTimeSec != 0xFF;
             char trackTimeStr[7];
-            if (! trackTimeInvalid) sprintf_P(trackTimeStr, PSTR("%X:%02X"), trackTimeMin, trackTimeSec);
+            if (trackTimeValid) sprintf_P(trackTimeStr, PSTR("%X:%02X"), trackTimeMin, trackTimeSec);
 
             uint8_t totalTracks = data[8];
-            bool totalTracksInvalid = totalTracks == 0xFF;
+            bool totalTracksValid = totalTracks != 0xFF;
             char totalTracksStr[3];
-            if (! totalTracksInvalid) sprintf_P(totalTracksStr, PSTR("%X"), totalTracks);
+            if (totalTracksValid) sprintf_P(totalTracksStr, PSTR("%X"), totalTracks);
 
             Serial.printf_P(
                 PSTR(
@@ -1995,10 +2119,10 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 data[3] == 0x06 ? PSTR("OUT") :
                 ToHexStr(data[3]),
 
-                trackTimeInvalid ? PSTR("--:--") : trackTimeStr,
-                data[6],
-                totalTracksInvalid ? notApplicable2Str : totalTracksStr,
-                data[7],
+                trackTimeValid ? trackTimeStr : PSTR("--:--"),
+                currentTrack,
+                totalTracksValid ? totalTracksStr : notApplicable2Str,
+                currentDisc,
 
                 data[10] & 0x01 ? PSTR("1") : PSTR(" "),
                 data[10] & 0x02 ? PSTR("2") : PSTR(" "),
@@ -2045,13 +2169,13 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 PSTR("status=%S%S\n"),
 
                 // TODO - check; total guess
-                status == 0x0000 ? PSTR("NOT_OPERATING") :
-                status == 0x0001 ? ToHexStr(status) :  // Seen this but what is it??
+                status == 0x0000 ? emptyStr :
+                status == 0x0001 ? PSTR("DESTINATION_NOT_ON_MAP") :
                 status == 0x0020 ? ToHexStr(status) :  // Seen this but what is it?? Nearly at destination ??
                 status == 0x0080 ? PSTR("READY") :
                 status == 0x0101 ? ToHexStr(status) :  // Seen this but what is it??
                 status == 0x0200 ? PSTR("READING_DISC_1") :
-                status == 0x0220 ? ToHexStr(status) :  // Seen this but what is it??
+                status == 0x0220 ? PSTR("NEARLY_AT_DESTINATION") :  // TODO - guessing
                 status == 0x0300 ? PSTR("IN_GUIDANCE_MODE_1") :
                 status == 0x0301 ? PSTR("IN_GUIDANCE_MODE_2") :
                 status == 0x0320 ? PSTR("STOPPING_GUIDANCE") :
@@ -2063,13 +2187,15 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 status == 0x0800 ? PSTR("END_OF_AUDIO_MESSAGE") :  // Follows 0x0400, 0x0700, 0x0701
                 status == 0x4000 ? PSTR("GUIDANCE_STOPPED") :
                 status == 0x4001 ? ToHexStr(status) :  // Seen this but what is it??
+                status == 0x4080 ? ToHexStr(status) :  // Seen this but what is it??
                 status == 0x4200 ? PSTR("ARRIVED_AT_DESTINATION_2") :
                 status == 0x9000 ? PSTR("READING_DISC_2") :
-                status == 0x9080 ? ToHexStr(status) :  // Seen this but what is it??
-                ToHexStr(data[1], data[2]),
+                status == 0x9080 ? PSTR("START_CALCULATING_ROUTE") : // TODO - guessing
+                status == 0xD001 ? ToHexStr(status) :  // Seen this but what is it??
+                ToHexStr(status),
 
-                data[4] == 0x0B ? PSTR(" reason=0x0B") :  // Seen with status == 0x4001
-                data[4] == 0x0C ? PSTR(" reason=NO_DISC") :
+                data[4] == 0x0B ? PSTR(" reason=0x0B") :  // Seen with status 0x4001 and 0xD001
+                data[4] == 0x0C ? PSTR(" reason=DISC_UNREADABLE") :
                 data[4] == 0x0E ? PSTR(" reason=NO_DISC") :
                 emptyStr
             );
@@ -2122,28 +2248,21 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             Serial.printf_P(intro);
 
-            // Possible meanings of data:
-
+            // Meanings of data:
+            //
             // data[0] & 0x07 - sequence number
             //
-            // data[1] values:
-            // - 0x11: Stopping guidance??
-            // - 0x15: In guidance mode
-            // - 0x20: Idle, not ready??
-            // - 0x21: Idle, ready??
-            // - 0x25: Busy calculating route??
-            // - 0x41: Finished downloading?? Audio volume dialog??
-            // - 0xC1: Finished downloading??
-            // Or bits:
-            // - & 0x01: ??
-            // - & 0x04: ??
-            // - & 0x10: ??
-            // - & 0x20: ??
-            // - & 0x40: ??
-            // - & 0x80: ??
+            // data[1]:
+            // - & 0x0F:
+            //   0x00 = Initializing
+            //   0x01 = Idle
+            //   0x05 = In guidance mode
+            // - & 0x10 - Destination reachable
+            // - & 0x20 - Route computed
+            // - & 0x40 - On map
+            // - & 0x80 - Download finished
             //
             // data[2] values: 0x38, 0x39, 0x3A, 0x3C, 0x78, 0x79, 0x7C
-            // Bits:
             // - & 0x01: GPS fix
             // - & 0x02: GPS signal lost
             // - & 0x04: Scanning for GPS signal (at startup, or when driving under bridge on in tunnel)
@@ -2153,7 +2272,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             //   0x70 = No Disc present
             //
             // data[3] - either 0x00 or 0x02
-            // 
+            //
             // data[4] - always 0x07
             //
             // data[5] - either 0x01 or 0x06
@@ -2166,10 +2285,9 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             //
             // data[11...15] - always 0x00
             //
-            // data[16] - vehicle speed (as measured by GPS?) in km/h. Can be negative (e.g. 0xFC) when reversing.
+            // data[16] - vehicle speed (as measured by GPS) in km/h. Can be negative (e.g. 0xFC) when reversing.
             //
             // data[17] values: 0x00, 0x20, 0x21, 0x22, 0x28, 0x29, 0x2A, 0x2C, 0x2D, 0x30, 0x38, 0xA1
-            // Bits:
             // - & 0x01 - Loading audio fragment
             // - & 0x02 - Audio output
             // - & 0x04 - New guidance instruction??
@@ -2182,40 +2300,25 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             //
             // data[19] - same as data[0]: sequence number
 
-            // uint16_t status = (uint16_t)data[1] << 8 | data[2];
-
-            // char buffer[12];
-            // sprintf_P(buffer, PSTR("0x%04X-0x%02X"), status, data[17]);
-
-            // Serial.printf(
-                // "status=%s",
-                // status == 0x2038 ? "CD_ROM_FOUND" :
-                    // status == 0x203C ? "INITIALIZING" :  // data[17] == 0x28
-                    // status == 0x213C ? "READING_CDROM" :
-                    // status == 0x2139 && data[17] == 0x20 ? "DISC_PRESENT" :
-                    // status == 0x2139 && data[17] == 0x28 ? "DISC_IDENTIFIED" :
-                    // status == 0x2139 && data[17] == 0x29 ? "SHOWING_TERMS_AND_CONDITIONS" : 
-                    // status == 0x2139 && data[17] == 0x2A ? "READ_WELCOME_MESSAGE" : 
-                    // status == 0x2539 ? "CALCULATING_ROUTE" :
-                    // status == 0x1539 ? "GUIDANCE_ACTIVE" :
-                    // status == 0x1139 ? "GUIDANCE_STOPPED" :
-                    // status == 0x2039 ? "POWER_OFF" :
-                    // buffer
-            // );
+            uint8_t satnavStatus2 = data[1] & 0x0F;
 
             Serial.printf_P(PSTR("status=%S"),
 
-                data[1] == 0x11 ? PSTR("STOPPING_GUIDANCE") :
-                data[1] == 0x15 ? PSTR("IN_GUIDANCE_MODE") :
-                data[1] == 0x20 ? PSTR("IDLE_NOT_READY") :
-                data[1] == 0x21 ? PSTR("IDLE_READY") :
-                data[1] == 0x25 ? PSTR("CALCULATING_ROUTE") :
-                data[1] == 0x41 ? PSTR("NOT_ON_MAP") :  // TODO - check if this is correct
-                data[1] == 0xC1 ? PSTR("FINISHED_DOWNLOADING") :
-                ToHexStr(data[1])
+                satnavStatus2 == 0x00 ? PSTR("INITIALIZING") : // TODO - change to "IDLE"
+                satnavStatus2 == 0x01 ? PSTR("IDLE") : // TODO - change to "READY"
+                satnavStatus2 == 0x05 ? PSTR("IN_GUIDANCE_MODE") :
+                ToHexStr(satnavStatus2)
             );
 
-            Serial.printf_P(PSTR(", disc=%S, gps_fix=%S, gps_fix_lost=%S, gps_scanning=%S"),
+            Serial.printf_P(
+                PSTR(
+                    ", destination_reachable=%S, route_computed=%S, on_map=%S, download_finished=%S,\n"
+                    "    disc=%S, gps_fix=%S, gps_fix_lost=%S, gps_scanning=%S"
+                ),
+                data[1] & 0x10 ? yesStr : noStr,
+                data[1] & 0x20 ? noStr : yesStr,
+                data[1] & 0x40 ? noStr : yesStr,
+                data[1] & 0x80 ? yesStr : noStr,
 
                 (data[2] & 0x70) == 0x70 ? PSTR("NONE_PRESENT") :
                 (data[2] & 0x70) == 0x30 ? PSTR("RECOGNIZED") :
@@ -2225,19 +2328,6 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 data[2] & 0x02 ? yesStr : noStr,
                 data[2] & 0x04 ? yesStr : noStr
             );
-
-            if (data[17] != 0x00)
-            {
-                Serial.printf_P(PSTR(", disc_status=%S%S%S%S%S%S%S"),
-                    data[17] & 0x01 ? PSTR("LOADING_AUDIO_FRAGMENT ") : emptyStr,
-                    data[17] & 0x02 ? PSTR("AUDIO_OUTPUT ") : emptyStr,
-                    data[17] & 0x04 ? PSTR("NEW_GUIDANCE_INSTRUCTION ") : emptyStr,
-                    data[17] & 0x08 ? PSTR("READING_DISC ") : emptyStr,
-                    data[17] & 0x10 ? PSTR("CALCULATING_ROUTE ") : emptyStr,
-                    data[17] & 0x20 ? PSTR("DISC_PRESENT ") : emptyStr,
-                    data[17] & 0x80 ? PSTR("REACHED_DESTINATION ") : emptyStr
-                );
-            } // if
 
             // TODO - what is this?
             uint16_t zzz = (uint16_t)data[9] << 8 | data[10];
@@ -2250,6 +2340,19 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
                 data[16] >= 0xE0 ? PSTR(" (reverse)") : emptyStr
             );
+
+            if (data[17] != 0x00)
+            {
+                Serial.printf_P(PSTR(",\n    guidance_status=%S%S%S%S%S%S%S"),
+                    data[17] & 0x01 ? PSTR("LOADING_AUDIO_FRAGMENT ") : emptyStr,
+                    data[17] & 0x02 ? PSTR("AUDIO_OUTPUT ") : emptyStr,
+                    data[17] & 0x04 ? PSTR("NEW_GUIDANCE_INSTRUCTION ") : emptyStr,
+                    data[17] & 0x08 ? PSTR("READING_DISC ") : emptyStr,
+                    data[17] & 0x10 ? PSTR("CALCULATING_ROUTE ") : emptyStr,
+                    data[17] & 0x20 ? PSTR("DISC_PRESENT ") : emptyStr,
+                    data[17] & 0x80 ? PSTR("REACHED_DESTINATION ") : emptyStr
+                );
+            } // if
 
             Serial.println();
         }
@@ -2287,31 +2390,33 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 // TODO - check; total guess
                 Serial.printf_P(
                     PSTR("status=%S\n"),
+
                     status == 0x0000 ? PSTR("CALCULATING_ROUTE") :
                     status == 0x0001 ? PSTR("STOPPING_NAVIGATION") :
-                    status == 0x0C01 ? PSTR("CD_ROM_FOUND") :
-                    status == 0x0C02 ? PSTR("POWERING_OFF") :
-                    status == 0x0140 ? PSTR("GPS_POS_FOUND") :
-                    status == 0x0120 ? PSTR("ACCEPTED_TERMS_AND_CONDITIONS") :
+                    status == 0x0101 ? ToHexStr(status) :
 
                     // This starts when the nag screen is accepted and is seen repeatedly when selecting a destination
                     // and during guidance. It stops after a "STOPPING_NAVIGATION" status message.
                     status == 0x0108 ? PSTR("SATNAV_IN_OPERATION") :
 
+                    status == 0x0110 ? ToHexStr(status) :
+                    status == 0x0120 ? PSTR("ACCEPTED_TERMS_AND_CONDITIONS") :
+                    status == 0x0140 ? PSTR("GPS_POS_FOUND") :
+                    status == 0x0306 ? PSTR("SATNAV_DISC_ID_READ") :
+                    status == 0x0C01 ? PSTR("CD_ROM_FOUND") :
+                    status == 0x0C02 ? PSTR("POWERING_OFF") :
                     ToHexStr(status)
                 );
             }
             else if (dataLen == 3)
             {
-                // Navigation preference
+                // Sat nav guidance preference
+
+                uint8_t preference = data[1];
 
                 Serial.printf_P(
-                    PSTR("satnav_navigation_preference=%S\n"),
-                    data[1] == 0x01 ? PSTR("FASTEST_ROUTE") :
-                    data[1] == 0x04 ? PSTR("SHORTEST_DISTANCE") :
-                    data[1] == 0x12 ? PSTR("AVOID_HIGHWAY") :
-                    data[1] == 0x02 ? PSTR("COMPROMISE_FAST_SHORT") :
-                    ToHexStr(data[1])
+                    PSTR("satnav_guidance_preference=%S\n"),
+                    SatNavGuidancePreferenceStr(preference)
                 );
             }
             else if (dataLen == 17 && data[0] == 0x20)
@@ -2382,10 +2487,12 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             //
             uint16_t currHeading = (uint16_t)data[1] << 8 | data[2];
             uint16_t headingToDestination = (uint16_t)data[3] << 8 | data[4];
-            uint16_t distanceToDestination = (uint16_t)(data[5] & 0x7F) << 8 | data[6];
+            uint16_t roadDistanceToDestination = (uint16_t)(data[5] & 0x7F) << 8 | data[6];
             uint16_t gpsDistanceToDestination = (uint16_t)(data[7] & 0x7F) << 8 | data[8];
             uint16_t distanceToNextTurn = (uint16_t)(data[9] & 0x7F) << 8 | data[10];
             uint16_t headingOnRoundabout = (uint16_t)data[11] << 8 | data[12];
+
+            // TODO - Not sure, just guessing. Could also be number of instructions still to be done.
             uint16_t minutesToTravel = (uint16_t)data[13] << 8 | data[14];
 
             char floatBuf[MAX_FLOAT_SIZE];
@@ -2397,7 +2504,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 ),
                 currHeading,
                 headingToDestination,
-                distanceToDestination,
+                roadDistanceToDestination,
                 data[5] & 0x80 ? PSTR("Km") : PSTR("m") ,
                 gpsDistanceToDestination,
                 data[7] & 0x80 ? PSTR("Km") : PSTR("m") ,
@@ -2746,7 +2853,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // data[0] - Sequence numbers and "end of report" flag
             //  & 0x07 - Global sequence number: increments with every packet
             //  & 0x78 - In-report sequence number: starts from 0 on first packet of new report
-            //  & 0x80 - Marks last packet in report
+            //  & 0x80 - Bit that marks last packet in report
             //
             // data[1]: Code of report; see function SatNavRequestStr(). Only in first packet.
             //
@@ -2756,9 +2863,10 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // - Record: terminated with '\1', containing a set of:
             //   - Strings: terminated with '\0'
             //     - Special characters:
-            //       * 0x81 = '+' in solid circle, means: this destination cannot be selected with the current
-            //         navigation disc. Something from UTF-8? See also U+2A01 (UTF-8 0xe2 0xa8 0x81) at:
-            //         https://www.utf8-chartable.de/unicode-utf8-table.pl?start=10752&number=1024&utf8=0x&htmlent=1
+            //       * 0x80 = '?', means: the entry cannot be selected because the current navigation disc cannot be
+            //         read.
+            //       * 0x81 = '-' in solid circle, means: this destination cannot be selected with the current
+            //         navigation disc.
             //
             // Character set is "Extended ASCII/Windows-1252"; e.g. ë is 0xEB.
             // See also: https://bytetool.web.app/en/ascii/
@@ -2792,7 +2900,6 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             //             match the destination.
             //   For  "private" and "business" address:
             //   [9] Name of entry (e.g. "HOME")
-            //
             //
             // For "place of interest" address (always type "C"):
             // [9] Name of entry (e.g. "CINE SCALA")
@@ -2924,224 +3031,211 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 PSTR("request=%S, param=%S, type=%S, effective_command=%S"),
 
                 SatNavRequestStr(request),
-
                 ToHexStr(param),  // TODO - provide descriptive string
-
-                type == 0 ? PSTR("REQ_LIST_LENGTH") :
-                type == 1 ? PSTR("REQ_LIST") :
-                type == 2 ? PSTR("SELECT") :
-                type == 3 ? PSTR("CITY_CENTER") :  // TODO - not sure
-                ToStr(type),
+                SatNavRequestTypeStr(type),
 
                 // Combinations:
                 //
-                // * request == 0x02 ("ENTER_CITY"), 0x05 ("ENTER_STREET"),
+                // * request == 0x02 (SR_ENTER_CITY),
                 //   param == 0x1D:
-                //   - type = 0 (dataLen = 4): request (remaining) list length
+                //   - type = 0 (SRT_REQ_N_ITEMS) (dataLen = 4): request (remaining) list length
                 //     -- data[3]: (next) character to narrow down selection with. 0x00 if none.
-                //   - type = 1 (dataLen = 9): request list 
+                //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): request list 
                 //     -- data[5] << 8 | data[6]: offset in list (0-based)
                 //     -- data[7] << 8 | data[8]: number of items to retrieve
-                //   - type = 2 (dataLen = 11): select entry
+                //   - type = 2 (SRT_SELECT) (dataLen = 11): select entry
                 //     -- data[5] << 8 | data[6]: selected entry (0-based)
 
-                request == SR_ENTER_CITY && param == 0x1D && type == 0 ? "ENTER_CITY_BY_LETTER" :
-                request == SR_ENTER_CITY && param == 0x1D && type == 1 ? "ENTER_CITY_GET_LIST" :
-                request == SR_ENTER_CITY && param == 0x1D && type == 2 ? "ENTER_CITY_SELECT" :
+                request == SR_ENTER_CITY && param == 0x1D && type == SRT_REQ_N_ITEMS ? "ENTER_CITY_BY_LETTER" :
+                request == SR_ENTER_CITY && param == 0x1D && type == SRT_REQ_ITEMS ? "ENTER_CITY_GET_LIST" :
+                request == SR_ENTER_CITY && param == 0x1D && type == SRT_SELECT ? "ENTER_CITY_SELECT" :
 
-                request == SR_ENTER_STREET && param == 0x1D && type == 0 ? "ENTER_STREET_BY_LETTER" :
-                request == SR_ENTER_STREET && param == 0x1D && type == 1 ? "ENTER_STREET_GET_LIST" :
-                request == SR_ENTER_STREET && param == 0x1D && type == 2 ? "ENTER_STREET_SELECT" :
-
-                // * request == 0x06 ("ENTER_HOUSE_NUMBER"),
+                // * request == 0x05 (SR_ENTER_STREET),
                 //   param == 0x1D:
-                //   - type = 1 (dataLen = 9): request range of house numbers
+                //   - type = 0 (SRT_REQ_N_ITEMS) (dataLen = 4): request (remaining) list length
+                //     -- data[3]: (next) character to narrow down selection with. 0x00 if none.
+                //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): request list 
+                //     -- data[5] << 8 | data[6]: offset in list (0-based)
+                //     -- data[7] << 8 | data[8]: number of items to retrieve
+                //   - type = 2 (SRT_SELECT) (dataLen = 11): select entry
+                //     -- data[5] << 8 | data[6]: selected entry (0-based)
+                //   - type = 3 (SRT_SELECT_CITY_CENTER) (dataLen = 9): select city center
+                //     -- data[5] << 8 | data[6]: offset in list (always 0)
+                //     -- data[7] << 8 | data[8]: number of items to retrieve (always 1)
+
+                request == SR_ENTER_STREET && param == 0x1D && type == SRT_REQ_N_ITEMS ? "ENTER_STREET_BY_LETTER" :
+                request == SR_ENTER_STREET && param == 0x1D && type == SRT_REQ_ITEMS ? "ENTER_STREET_GET_LIST" :
+                request == SR_ENTER_STREET && param == 0x1D && type == SRT_SELECT ? "ENTER_STREET_SELECT" :
+                request == SR_ENTER_STREET && param == 0x1D && type == SRT_SELECT_CITY_CENTER ? PSTR("ENTER_STREET_SELECT_CITY_CENTER") :
+
+                // * request == 0x06 (SR_ENTER_HOUSE_NUMBER),
+                //   param == 0x1D:
+                //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): request range of house numbers
                 //     -- data[7] << 8 | data[8]: always 1
-                //   - type = 2 (dataLen = 11): enter house number
+                //   - type = 2 (SRT_SELECT) (dataLen = 11): enter house number
                 //     -- data[5] << 8 | data[6]: entered house number. 0 if not applicable.
 
-                request == SR_ENTER_HOUSE_NUMBER && param == 0x1D && type == 1 ? "ENTER_HOUSE_NUMBER_GET_RANGE" :
-                request == SR_ENTER_HOUSE_NUMBER && param == 0x1D && type == 2 ? "ENTER_HOUSE_NUMBER_SELECT" :
+                request == SR_ENTER_HOUSE_NUMBER && param == 0x1D && type == SRT_REQ_ITEMS ? "ENTER_HOUSE_NUMBER_GET_RANGE" :
+                request == SR_ENTER_HOUSE_NUMBER && param == 0x1D && type == SRT_SELECT ? "ENTER_HOUSE_NUMBER_SELECT" :
 
-                // * request == 0x08 ("PLACE_OF_INTEREST_CATEGORY"),
+                // * request == 0x08 (SR_SERVICE_LIST),
                 //   param == 0x0D:
-                //   - type = 0 (dataLen = 4): request list length. Satnav will respond with 38 and no
+                //   - type = 0 (SRT_REQ_N_ITEMS) (dataLen = 4): request list length. Satnav will respond with 38 and no
                 //              letters or number to choose from.
-                //   - type = 2 (dataLen = 11): select entry from list
+                //   - type = 2 (SRT_SELECT) (dataLen = 11): select entry from list
                 //     -- data[5] << 8 | data[6]: selected entry (0-based)
 
-                request == SR_PLACE_OF_INTEREST_CATEGORY && param == 0x0D && type == 0 ? "PLACE_OF_INTEREST_CATEGORY_GET_LIST_LENGTH" :
-                request == SR_PLACE_OF_INTEREST_CATEGORY && param == 0x0D && type == 2 ? "PLACE_OF_INTEREST_CATEGORY_SELECT" :
+                request == SR_SERVICE_LIST && param == 0x0D && type == SRT_REQ_N_ITEMS ? "SERVICE_GET_LIST_LENGTH" :
+                request == SR_SERVICE_LIST && param == 0x0D && type == SRT_SELECT ? "SERVICE_SELECT" :
 
-                // * request == 0x08 ("PLACE_OF_INTEREST_CATEGORY"),
+                // * request == 0x08 (SR_SERVICE_LIST),
                 //   param == 0xFF:
-                //   - type = 0 (dataLen = 4): present nag screen. Satnav response is PLACE_OF_INTEREST_CATEGORY_LIST
+                //   - type = 0 (SRT_REQ_N_ITEMS) (dataLen = 4): present nag screen. Satnav response is PLACE_OF_INTEREST_CATEGORY_LIST
                 //              with list_size=38, but the MFD ignores that.
-                //   - type = 1 (dataLen = 9): request list 
+                //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): request list 
                 //     -- data[5] << 8 | data[6]: offset in list (always 0)
                 //     -- data[7] << 8 | data[8]: number of items to retrieve (always 38)
 
-                request == SR_PLACE_OF_INTEREST_CATEGORY && param == 0xFF && type == 0 ? "START_SATNAV_SESSION" :
-                request == SR_PLACE_OF_INTEREST_CATEGORY && param == 0xFF && type == 1 ? "PLACE_OF_INTEREST_CATEGORY_GET_LIST" :
+                request == SR_SERVICE_LIST && param == 0xFF && type == SRT_REQ_N_ITEMS ? "START_SATNAV_SESSION" :
+                request == SR_SERVICE_LIST && param == 0xFF && type == SRT_REQ_ITEMS ? "SERVICE_GET_LIST" :
 
-                // * request == 0x09 ("PLACE_OF_INTEREST"),
+                // * request == 0x09 (SR_SERVICE_ADDRESS),
                 //   param == 0x0D:
-                //   - type = 0 (dataLen = 4): request list length
-                //   - type = 1 (dataLen = 9): request list 
+                //   - type = 0 (SRT_REQ_N_ITEMS) (dataLen = 4): request list length
+                //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): request list 
                 //     -- data[5] << 8 | data[6]: offset in list (always 0)
                 //     -- data[7] << 8 | data[8]: number of items to retrieve (always 1: MFD browses address by address)
 
-                request == SR_PLACE_OF_INTEREST && param == 0x0D && type == 0 ? "PLACE_OF_INTEREST_GET_LIST_LENGTH" :
-                request == SR_PLACE_OF_INTEREST && param == 0x0D && type == 1 ? "PLACE_OF_INTEREST_GET_LIST" :
+                request == SR_SERVICE_ADDRESS && param == 0x0D && type == SRT_REQ_N_ITEMS ? "SERVICE_ADDRESS_GET_LIST_LENGTH" :
+                request == SR_SERVICE_ADDRESS && param == 0x0D && type == SRT_REQ_ITEMS ? "SERVICE_ADDRESS_GET_LIST" :
 
-                // * request == 0x09 ("PLACE_OF_INTEREST"),
+                // * request == 0x09 (SR_SERVICE_ADDRESS),
                 //   param == 0x0E:
-                //   - type = 2 (dataLen = 11): select entry from list
+                //   - type = 2 (SRT_SELECT) (dataLen = 11): select entry from list
                 //     -- data[5] << 8 | data[6]: selected entry (0-based)
 
-                request == SR_PLACE_OF_INTEREST && param == 0x0E && type == 2 ? "SELECT_PLACE_OF_INTEREST_ENTRY" :
+                request == SR_SERVICE_ADDRESS && param == 0x0E && type == SRT_SELECT ? "SELECT_PLACE_OF_INTEREST_ENTRY" :
 
-                // * request == 0x0E ("LAST_DESTINATION"),
+                // * request == 0x0B (SR_ARCHIVE_IN_DIRECTORY),
+                //   param == 0xFF:
+                //   - type = 0 (SRT_REQ_N_ITEMS) (dataLen = 4): request list of available characters
+                //     -- data[3]: character entered by user. 0x00 if none.
+
+                request == SR_ARCHIVE_IN_DIRECTORY && param == 0xFF && type == SRT_REQ_N_ITEMS ? "ARCHIVE_IN_DIRECTORY_LETTERS" :
+
+                // * request == 0x0B (SR_ARCHIVE_IN_DIRECTORY),
                 //   param == 0x0D:
-                //   - type = 2 (dataLen = 11):
+                //   - type = 2 (SRT_SELECT) (dataLen = 11): confirm entered name
                 //     -- no further data
 
-                request == SR_LAST_DESTINATION && param == 0x0D && type == 2 ? "SELECT_LAST_DESTINATION" :
+                request == SR_ARCHIVE_IN_DIRECTORY && param == 0x0D && type == SRT_SELECT ? "ARCHIVE_IN_DIRECTORY_CONFIRM" :
 
-                // * request == 0x0E ("LAST_DESTINATION"),
-                //   param == 0xFF:
-                //   - type = 1 (dataLen = 9):
-                //     -- data[5] << 8 | data[6]: offset in list (always 0)
-                //     -- data[7] << 8 | data[8]: number of items to retrieve (always 1)
-
-                request == SR_LAST_DESTINATION && param == 0xFF && type == 1 ? "GET_LAST_DESTINATION" :
-
-                // * request == 0x0F ("NEXT_STREET"),
-                //   param == 0xFF:
-                //   - type = 1 (dataLen = 9):
-                //     -- data[5] << 8 | data[6]: offset in list (always 0)
-                //     -- data[7] << 8 | data[8]: number of items to retrieve (always 1)
-
-                request == SR_NEXT_STREET && param == 0xFF && type == 1 ? "GET_NEXT_STREET" :
-
-                // * request == 0x10 ("CURRENT_STREET"),
+                // * request == 0x0E (SR_LAST_DESTINATION),
                 //   param == 0x0D:
-                //   - type = 2 (dataLen = 11): select current location for e.g. places of interest
+                //   - type = 2 (SRT_SELECT) (dataLen = 11):
                 //     -- no further data
 
-                request == SR_CURRENT_STREET && param == 0x0D && type == 2 ? "SELECT_CURRENT_STREET" :
+                request == SR_LAST_DESTINATION && param == 0x0D && type == SRT_SELECT ? "SELECT_LAST_DESTINATION" :
 
-                // * request == 0x10 ("CURRENT_STREET"),
+                // * request == 0x0E (SR_LAST_DESTINATION),
                 //   param == 0xFF:
-                //   - type = 1 (dataLen = 9): get current location during sat nav guidance
+                //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9):
                 //     -- data[5] << 8 | data[6]: offset in list (always 0)
                 //     -- data[7] << 8 | data[8]: number of items to retrieve (always 1)
 
-                request == SR_CURRENT_STREET && param == 0xFF && type == 1 ? "GET_CURRENT_STREET" :
+                request == SR_LAST_DESTINATION && param == 0xFF && type == SRT_REQ_ITEMS ? "GET_LAST_DESTINATION" :
 
-                // * request == 0x11 ("PRIVATE_ADDRESS"),
+                // * request == 0x0F (SR_NEXT_STREET),
+                //   param == 0xFF:
+                //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9):
+                //     -- data[5] << 8 | data[6]: offset in list (always 0)
+                //     -- data[7] << 8 | data[8]: number of items to retrieve (always 1)
+
+                request == SR_NEXT_STREET && param == 0xFF && type == SRT_REQ_ITEMS ? "GET_NEXT_STREET" :
+
+                // * request == 0x10 (SR_CURRENT_STREET),
+                //   param == 0x0D:
+                //   - type = 2 (SRT_SELECT) (dataLen = 11): select current location for e.g. places of interest
+                //     -- no further data
+
+                request == SR_CURRENT_STREET && param == 0x0D && type == SRT_SELECT ? "SELECT_CURRENT_STREET" :
+
+                // * request == 0x10 (SR_CURRENT_STREET),
+                //   param == 0xFF:
+                //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): get current location during sat nav guidance
+                //     -- data[5] << 8 | data[6]: offset in list (always 0)
+                //     -- data[7] << 8 | data[8]: number of items to retrieve (always 1)
+
+                request == SR_CURRENT_STREET && param == 0xFF && type == SRT_REQ_ITEMS ? "GET_CURRENT_STREET" :
+
+                // * request == 0x11 (SR_PERSONAL_ADDRESS),
                 //   param == 0x0E:
-                //   - type = 2 (dataLen = 11): select entry from list
+                //   - type = 2 (SRT_SELECT) (dataLen = 11): select entry from list
                 //     -- data[5] << 8 | data[6]: selected entry (0-based)
 
-                request == SR_PRIVATE_ADDRESS && param == 0x0E && type == 2 ? "SELECT_PRIVATE_ADDRESS_ENTRY" :
+                request == SR_PERSONAL_ADDRESS && param == 0x0E && type == SRT_SELECT ? "SELECT_PERSONAL_ADDRESS_ENTRY" :
 
-                // * request == 0x11 ("PRIVATE_ADDRESS"),
+                // * request == 0x11 (SR_PERSONAL_ADDRESS),
                 //   param == 0xFF:
-                //   - type = 1 (dataLen = 9): get entry
+                //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): get entry
                 //     -- data[5] << 8 | data[6]: selected entry (0-based)
 
-                request == SR_PRIVATE_ADDRESS && param == 0xFF && type == 1 ? "RETRIEVE_PRIVATE_ADDRESS" :
+                request == SR_PERSONAL_ADDRESS && param == 0xFF && type == SRT_REQ_ITEMS ? "RETRIEVE_PERSONAL_ADDRESS" :
 
-                // * request == 0x12 ("BUSINESS_ADDRESS"),
+                // * request == 0x12 (SR_PROFESSIONAL_ADDRESS),
                 //   param == 0x0E:
-                //   - type = 2 (dataLen = 11): select entry from list
+                //   - type = 2 (SRT_SELECT) (dataLen = 11): select entry from list
                 //     -- data[5] << 8 | data[6]: selected entry (0-based)
 
-                request == SR_BUSINESS_ADDRESS && param == 0x0E && type == 2 ? "SELECT_BUSINESS_ADDRESS_ENTRY" :
+                request == SR_PROFESSIONAL_ADDRESS && param == 0x0E && type == SRT_SELECT ? "SELECT_PROFESSIONAL_ADDRESS_ENTRY" :
 
-                // * request == 0x12 ("BUSINESS_ADDRESS"),
+                // * request == 0x12 (SR_PROFESSIONAL_ADDRESS),
                 //   param == 0xFF:
-                //   - type = 1 (dataLen = 9): get entry
+                //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): get entry
                 //     -- data[5] << 8 | data[6]: selected entry (0-based)
 
-                request == SR_BUSINESS_ADDRESS && param == 0xFF && type == 1 ? "RETRIEVE_BUSINESS_ADDRESS" :
+                request == SR_PROFESSIONAL_ADDRESS && param == 0xFF && type == SRT_REQ_ITEMS ? "RETRIEVE_PROFESSIONAL_ADDRESS" :
 
-                // * request == 0x1B ("PRIVATE_ADDRESS_LIST"),
+                // * request == 0x1B (SR_PERSONAL_ADDRESS_LIST),
                 //   param == 0xFF:
-                //   - type = 0 (dataLen = 4): request list length
-                //   - type = 1 (dataLen = 9): request list 
+                //   - type = 0 (SRT_REQ_N_ITEMS) (dataLen = 4): request list length
+                //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): request list 
                 //     -- data[5] << 8 | data[6]: offset in list
                 //     -- data[7] << 8 | data[8]: number of items to retrieve
 
-                request == SR_PRIVATE_ADDRESS_LIST && param == 0xFF && type == 0 ? "PRIVATE_ADDRESS_GET_LIST_LENGTH" :
-                request == SR_PRIVATE_ADDRESS_LIST && param == 0xFF && type == 1 ? "PRIVATE_ADDRESS_GET_LIST" :
+                request == SR_PERSONAL_ADDRESS_LIST && param == 0xFF && type == SRT_REQ_N_ITEMS ? "PERSONAL_ADDRESS_GET_LIST_LENGTH" :
+                request == SR_PERSONAL_ADDRESS_LIST && param == 0xFF && type == SRT_REQ_ITEMS ? "PERSONAL_ADDRESS_GET_LIST" :
 
-                // * request == 0x1C ("BUSINESS_ADDRESS_LIST"),
+                // * request == 0x1C (SR_PROFESSIONAL_ADDRESS_LIST),
                 //   param == 0xFF:
-                //   - type = 0 (dataLen = 4): request list length
-                //   - type = 1 (dataLen = 9): request list 
+                //   - type = 0 (SRT_REQ_N_ITEMS) (dataLen = 4): request list length
+                //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): request list 
                 //     -- data[5] << 8 | data[6]: offset in list
                 //     -- data[7] << 8 | data[8]: number of items to retrieve
 
-                request == SR_BUSINESS_ADDRESS_LIST && param == 0xFF && type == 0 ? "BUSINESS_ADDRESS_GET_LIST_LENGTH" :
-                request == SR_BUSINESS_ADDRESS_LIST && param == 0xFF && type == 1 ? "BUSINESS_ADDRESS_GET_LIST" :
+                request == SR_PROFESSIONAL_ADDRESS_LIST && param == 0xFF && type == SRT_REQ_N_ITEMS ? "PROFESSIONAL_ADDRESS_GET_LIST_LENGTH" :
+                request == SR_PROFESSIONAL_ADDRESS_LIST && param == 0xFF && type == SRT_REQ_ITEMS ? "PROFESSIONAL_ADDRESS_GET_LIST" :
 
-                // * request == 0x1D ("DESTINATION"),
+                // * request == 0x1D (SR_DESTINATION),
                 //   param == 0x0E:
-                //   - type = 2 (dataLen = 11): select fastest route
+                //   - type = 2 (SRT_SELECT) (dataLen = 11): select fastest route
                 //     -- no further data
                 //
                 // TODO - run a session in which something else than fastest route is selected
 
-                request == SR_DESTINATION && param == 0x0E && type == 2 ? "SELECT_FASTEST_ROUTE" :
+                request == SR_DESTINATION && param == 0x0E && type == SRT_SELECT ? "SELECT_FASTEST_ROUTE" :
 
-                // * request == 0x1D ("DESTINATION"),
+                // * request == 0x1D (SR_DESTINATION),
                 //   param == 0xFF:
-                //   - type = 1 (dataLen = 9): get current destination. Satnav replies (IDEN 0x6CE) with the last
+                //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): get current destination. Satnav replies (IDEN 0x6CE) with the last
                 //     destination, a city center with GPS coordinate (if no street has been entered yet), or a
                 //     full address
                 //     -- data[5] << 8 | data[6]: offset in list (always 0)
                 //     -- data[7] << 8 | data[8]: number of items to retrieve (always 1)
 
-                request == SR_DESTINATION && param == 0xFF && type == 1 ? "GET_CURRENT_DESTINATION" :
+                request == SR_DESTINATION && param == 0xFF && type == SRT_REQ_ITEMS ? "GET_CURRENT_DESTINATION" :
 
                 ToHexStr(param, type)
-/*
-                Old list
-
-                request == 0x021D ? PSTR("ENTER_CITY") : // 4, 9 or 11 bytes
-                request == 0x051D ? PSTR("ENTER_STREET") : // 4, 9 or 11 bytes
-                request == 0x061D ? PSTR("ENTER_HOUSE_NUMBER") : // 9 or 11 bytes
-                request == 0x080D && dataLen == 4 ? PSTR("REQUEST_LIST_SIZE_OF_CATEGORIES") :
-                request == 0x080D && dataLen == 9 ? PSTR("CHOOSE_CATEGORY") :
-
-                // Strange: when starting a SatNav session, the MFD always starts off by asking the number of
-                // items in the list of categories. It gets the correct answer (38) but just ignores that.
-                // MFD shows the nag screen.
-                request == 0x08FF && dataLen == 4 ? PSTR("START_SATNAV") :
-
-                request == 0x08FF && dataLen == 9 ? PSTR("REQUEST_LIST_OF_CATEGORIES") :
-                request == 0x090D ? PSTR("PLACE_OF_INTEREST_ADDRESS") :
-                request == 0x090E ? PSTR("CHOOSE_PLACE_OF_INTEREST") :
-                request == 0x0E0D ? PSTR("CHOOSE_ADDRESS_FOR_PLACES_OF_INTEREST") :
-                request == 0x0EFF ? PSTR("REQUEST_ADDRESS_FOR_PLACES_OF_INTEREST") :
-                request == 0x0FFF ? PSTR("REQUEST_NEXT_STREET") :
-                request == 0x100D ? PSTR("CHOOSE_CURRENT_ADDRESS") :
-                request == 0x10FF ? PSTR("REQUEST_CURRENT_STREET") :
-                request == 0x110E ? PSTR("CHOOSE_PRIVATE_ADDRESS") :
-                request == 0x11FF ? PSTR("REQUEST_PRIVATE_ADDRESS") :
-                request == 0x120E ? PSTR("CHOOSE_BUSINESS_ADDRESS") :
-                request == 0x12FF ? PSTR("REQUEST_BUSINESS_ADDRESS") :
-                request == 0x13FF ? PSTR("REQUEST_SOFTWARE_MODULE_VERSIONS") :
-                request == 0x1BFF && dataLen == 4 ? PSTR("REQUEST_LIST_SIZE_OF_PRIVATE_ADDRESSES") :
-                request == 0x1BFF && dataLen == 9 ? PSTR("REQUEST_PRIVATE_ADDRESSES") :
-                request == 0x1CFF && dataLen == 4 ? PSTR("REQUEST_LIST_SIZE_OF_BUSINESS_ADDRESSES") :
-                request == 0x1CFF && dataLen == 9 ? PSTR("REQUEST_BUSINESS_ADDRESSES") :
-                request == 0x1D0E ? PSTR("SELECT_FASTEST_ROUTE?") :
-                request == 0x1DFF ? PSTR("CHOOSE_DESTINATION_SHOW_CURRENT_ADDRESS") :
-                ToHexStr(request)
-*/
             );
 
             if (data[3] != 0x00)
@@ -3149,7 +3243,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 char buffer[2];
                 sprintf_P(buffer, PSTR("%c"), data[3]);
                 Serial.printf_P(
-                    PSTR(", letter=%s"),
+                    PSTR(", character=%s"),
                     (data[3] >= 'A' && data[3] <= 'Z') || (data[3] >= '0' && data[3] <= '9') || data[3] == '\'' ? buffer :
                     data[3] == ' ' ? "_" : // Space
                     data[3] == 0x01 ? "Esc" :
@@ -3198,10 +3292,12 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // data[4] << 8 | data[5]: number of items
             // data[17...22]: bits indicating available letters, numbers, single quote (') or space
 
+            sint16_t listSize = (sint16_t)(data[4] << 8 | data[5]);
+
             Serial.printf_P(
-                PSTR("response=%S; list_size=%d, "),
+                PSTR("response=%S, list_size=%d, available_characters="),
                 SatNavRequestStr(data[1]),
-                (sint16_t)(data[4] << 8 | data[5])
+                listSize
             );
 
             // Available letters are bit-coded in bytes 17...20. Print the letter if it is available, print a '.'
@@ -3773,7 +3869,7 @@ void loop()
 
         pkt.CheckCrcAndRepair();
 
-        // Filter on specific IDENs
+        // Filter on specific IDENs?
         uint16_t iden = pkt.Iden();
         if (! isPacketSelected(iden, VAN_PACKETS_ALL_EXCEPT)) continue;
 
