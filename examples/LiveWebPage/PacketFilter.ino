@@ -6,7 +6,8 @@
 // Which type of packets will be selected?
 
 //#define SELECTED_PACKETS VAN_PACKETS_HEAD_UNIT
-#define SELECTED_PACKETS VAN_PACKETS_SAT_NAV
+//#define SELECTED_PACKETS VAN_PACKETS_SAT_NAV
+#define SELECTED_PACKETS VAN_PACKETS_ALL_EXCEPT
 
 // Filter on specific IDENs
 bool isPacketSelected(uint16_t iden, VanPacketFilter_t filter)
