@@ -304,6 +304,9 @@ void ICACHE_RAM_ATTR WaitAckIsr()
     VanBusRx._AdvanceHead();
 } // WaitAckIsr
 
+// TODO - remove
+uint16_t startOfFrameByte = 0x00;
+
 // Pin level change interrupt handler
 void ICACHE_RAM_ATTR RxPinChangeIsr()
 {
@@ -511,12 +514,26 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         if (state == VAN_RX_SEARCHING)
         {
             // First 10 bits must be 00 0011 1101 (0x03D) (SOF, Start Of Frame)
-            // Accept also 00 0001 1101 (0x01D): as with all other interrupts, even the first interrupt (0->1)
-            // might be slightly late.
+            //
+            // Accept also:
+            // - 00 0001 1101 (0x01D) : as with all other interrupts, even the first interrupt (0->1) might be
+            //   slightly late.
+            // - 01 0011 1101 (0x13D) : spurious bit in the '0' series
+            //
             // TODO - test this. Maybe accept also other "slightly-off" patterns?
-            if (currentByte != 0x03D && currentByte != 0x01D)
+            //
+            if (currentByte != 0x03D
+                && currentByte != 0x01D && currentByte != 0x13D
+                && currentByte != 0x185 && currentByte != 0x042 && currentByte != 0x14D
+                && currentByte != 0x1C8 && currentByte != 0x126 && currentByte != 0x04A
+                && currentByte != 0x0CE && currentByte != 0x172 && currentByte != 0x146
+                && currentByte != 0x0AA)
             {
                 rxDesc->state = VAN_RX_VACANT;
+
+                // TODO - remove
+                startOfFrameByte = currentByte;
+
                 //SetTxBitTimer();
 
             #ifdef VAN_RX_ISR_DEBUGGING
@@ -597,6 +614,13 @@ bool TVanPacketRxQueue::Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun)
     if (pin == VAN_NO_PIN_ASSIGNED) return false; // Call Setup first!
 
     if (! Available()) return false;
+
+    // TODO - remove
+    if (startOfFrameByte != 0x00)
+    {
+        Serial.printf("=====> SOF: 0x%02X <=====\n", startOfFrameByte);
+        ISR_SAFE_SET(startOfFrameByte, 0x00);
+    } // if
 
     // Copy the whole packet descriptor out (including the debug info)
     // Note:
