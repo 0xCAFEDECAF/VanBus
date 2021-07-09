@@ -3039,8 +3039,8 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
                 snprintf_P(buf + at, n - at, jsonFormatter,
 
                     report == SR_PERSONAL_ADDRESS ?
-                        PSTR("satnav_private_address_entry") :
-                        PSTR("satnav_business_address_entry"),
+                        PSTR("satnav_personal_address_entry") :
+                        PSTR("satnav_professional_address_entry"),
 
                     // Name of the entry
                     records[0][0] == "C" ? records[0][9].c_str() : records[0][8].c_str(),
@@ -3048,22 +3048,22 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
                     // Address
 
                     report == SR_PERSONAL_ADDRESS ?
-                        PSTR("satnav_private_address_country") :
-                        PSTR("satnav_business_address_country"),
+                        PSTR("satnav_personal_address_country") :
+                        PSTR("satnav_professional_address_country"),
 
                     // Country
                     records[0][1].c_str(),
 
                     report == SR_PERSONAL_ADDRESS ?
-                        PSTR("satnav_private_address_province") :
-                        PSTR("satnav_business_address_province"),
+                        PSTR("satnav_personal_address_province") :
+                        PSTR("satnav_professional_address_province"),
 
                     // Province
                     records[0][2].c_str(),
 
                     report == SR_PERSONAL_ADDRESS ?
-                        PSTR("satnav_private_address_city") :
-                        PSTR("satnav_business_address_city"),
+                        PSTR("satnav_personal_address_city") :
+                        PSTR("satnav_professional_address_city"),
 
                     // City + optional district
                     records[0][3].c_str(),
@@ -3071,8 +3071,8 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
                     records[0][4].c_str(),
 
                     report == SR_PERSONAL_ADDRESS ?
-                        PSTR("satnav_private_address_street") :
-                        PSTR("satnav_business_address_street"),
+                        PSTR("satnav_personal_address_street") :
+                        PSTR("satnav_professional_address_street"),
 
                     // Street
                     // Note: if the street is empty: it means "City center"
@@ -3080,8 +3080,8 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
                     records[0][6].c_str(),
 
                     report == SR_PERSONAL_ADDRESS ?
-                        PSTR("satnav_private_address_house_number") :
-                        PSTR("satnav_business_address_house_number"),
+                        PSTR("satnav_personal_address_house_number") :
+                        PSTR("satnav_professional_address_house_number"),
 
                     // First string is either "C" or "V"; "C" has GPS coordinates in [7] and [8]; "V" has house number
                     // in [7]. If we see "V", show house number
@@ -3437,7 +3437,7 @@ VanPacketParseResult_t ParseMfdToSatNavPkt(const char* idenStr, TVanPacketRxDesc
         //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): get entry
         //     -- data[5] << 8 | data[6]: selected entry (0-based)
 
-        request == SR_PERSONAL_ADDRESS && param == 0xFF && type == SRT_REQ_ITEMS ? PSTR("satnav_show_private_address") :
+        request == SR_PERSONAL_ADDRESS && param == 0xFF && type == SRT_REQ_ITEMS ? PSTR("satnav_show_personal_address") :
 
         // * request == 0x12 (SR_PROFESSIONAL_ADDRESS),
         //   param == 0x0E:

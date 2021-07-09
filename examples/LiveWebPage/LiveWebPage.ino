@@ -98,6 +98,7 @@ char webpage[] PROGMEM = R"=====(
   <head>
     <meta charset='UTF-8' />
     <script>
+
       // Inspired by https://gist.github.com/ismasan/299789
       var FancyWebSocket = function(url)
       {
@@ -110,123 +111,138 @@ char webpage[] PROGMEM = R"=====(
               callbacks[event_name] = callbacks[event_name] || [];
               callbacks[event_name].push(callback);
               return this; // chainable
-          };
+          };  // function
 
           // Dispatch to the right handlers
           conn.onmessage = function(evt)
           {
               var json = JSON.parse(evt.data)
               dispatch(json.event, json.data)
-          };
+          };  // function
 
-          conn.onclose = function(){dispatch('close',null)}
-          conn.onopen = function(){dispatch('open',null)}
+          conn.onclose = function() { dispatch('close', null); }
+          conn.onopen = function() { dispatch('open', null); }
 
           var dispatch = function(event_name, message)
           {
               var chain = callbacks[event_name];
-              if (typeof chain == 'undefined') return; // No callbacks for this event
+              if (chain == undefined) return; // No callbacks for this event
               for (var i = 0; i < chain.length; i++)
               {
                   chain[i](message)
               } // for
           } // function
-      };
+      }; // FancyWebSocket
 
-      var socket = new FancyWebSocket('ws://' + window.location.hostname + ':81/');
+      // WebSocket class instance
+      var socket = new FancyWebSocket("ws://" + window.location.hostname + ":81/");
 
       function writeToDom(jsonObj)
       {
           for (var item in jsonObj)
           {
-              console.log(item, jsonObj[item]);
+              // Select by 'id' attribute (must be unique in the DOM)
+              var selectorById = '#' + item;
 
-              if (Array.isArray(jsonObj[item]))
+              // Select also by custom attribute 'gid' (need not be unique)
+              var selectorByAttr = '[gid="' + item + '"]';
+
+              // jQuery-style loop over merged, unique-element array
+              $.each($.unique($.merge($(selectorByAttr), $(selectorById))), function (index, selector)
               {
-                  // Handling of "text area" DOM objects to show lists
+                  if ($(selector).length <= 0) return; // go to next iteration in .each()
 
-                  var selector = '#' + item;
-                  if($(selector).length > 0)
+                  if (Array.isArray(jsonObj[item]))
                   {
+                      // Handling of multi-line DOM objects to show lists. Example:
+                      //
+                      // {
+                      //   "event": "display",
+                      //   "data": {
+                      //     "alarm_list":
+                      //     [
+                      //       "Tyre pressure low",
+                      //       "Door open",
+                      //       "Water temperature too high",
+                      //       "Oil level too low"
+                      //     ]
+                      //   }
+                      // }
+
                       // Remove current lines
-                      $(selector).val("");
+                      $(selector).empty();
 
                       var len = jsonObj[item].length;
-                      for (var i = 0; i < len; i++)
-                      {
-                          //console.log("appended", jsonObj[item][i]);
-
-                          $(selector).val($(selector).val() + jsonObj[item][i] + "\n");
-                      } // for
-                  } // if
-              }
-              else if (!!jsonObj[item] && typeof(jsonObj[item]) == "object")
-              {
-                  // Handling of "change attribute" events. Examples:
-                  //
-                  // {
-                  //   "event": "display",
-                  //   "data": {
-                  //     "satnav_curr_heading_svg": { "transform": "rotate(247.5)" }
-                  //   }
-                  // }
-                  //
-                  // {
-                  //   "event": "display",
-                  //   "data": {
-                  //     "notification_on_mfd": {
-                  //       "style": { "display": "block" }
-                  //     }
-                  //   }
-                  // }
-
-                  var selector = '#' + item;
-                  if($(selector).length > 0)
+                      for (var i = 0; i < len; i++) $(selector).append(jsonObj[item][i] + (i < len - 1 ? "<br />" : ""));
+                  }
+                  else if (!!jsonObj[item] && typeof(jsonObj[item]) === "object")
                   {
+                      // Handling of "change attribute" events. Examples:
+                      //
+                      // {
+                      //   "event": "display",
+                      //   "data": {
+                      //     "satnav_curr_heading": { "transform": "rotate(247.5)" }
+                      //   }
+                      // }
+                      //
+                      // {
+                      //   "event": "display",
+                      //   "data": {
+                      //     "notification_on_mfd": {
+                      //       "style": { "display": "block" }
+                      //     }
+                      //   }
+                      // }
+
                       var attributeObj = jsonObj[item];
                       for (var attribute in attributeObj)
                       {
-                          var attrValue = attributeObj[attribute];
-
                           // Deeper nesting?
-                          if (typeof(attributeObj) == "object")
+                          if (typeof(attributeObj) === "object")
                           {
                               var propertyObj = attributeObj[attribute];
                               for (var property in propertyObj)
                               {
                                   var value = propertyObj[property];
-                                  document.getElementById(item)[attribute][property] = value;
+                                  $(selector).get(0)[attribute][property] = value;
                               } // for
                           }
                           else
                           {
-                              //document.getElementById(item).setAttribute(attribute, attrValue);
+                              var attrValue = attributeObj[attribute];
                               $(selector).attr(attribute, attrValue);
                           } // if
                       } // for
-                  } // if
-              }
-              else
-              {
-                  // Using jQuery: life's too short for raw DOM scripting
-
-                  var selector = '#' + item;
-                  if($(selector).length > 0)
+                  }
+                  else
                   {
-                      $(selector).text(jsonObj[item]);
+                      if ($(selector).hasClass("led"))
+                      {
+                          // Handle "led" class objects: no text copy, just turn ON or OFF
+                          var on = jsonObj[item].toUpperCase() === "ON" || jsonObj[item].toUpperCase() === "YES";
+
+                          $(selector).toggleClass("ledOn", on);
+                          $(selector).toggleClass("ledOff", ! on);
+                      }
+                      else if ($(selector).hasClass("icon") || $(selector).get(0) instanceof SVGElement)
+                      {
+                          // Handle SVG elements and "icon" class objects: no text copy, just show or hide.
+                          // From https://stackoverflow.com/questions/27950151/hide-show-element-with-a-boolean :
+                          $(selector).toggle(jsonObj[item].toUpperCase() === "ON" || jsonObj[item].toUpperCase() === "YES");
+                      }
+                      else
+                      {
+                          // Handle simple "text" objects
+                          $(selector).html(jsonObj[item]);
+                      } // if
                   } // if
-              } // if
+              }); // each
           } // for
       } // writeToDom
 
-      // Bind to server events
-      socket.bind(
-          'display',
-          function(data)
-          {
-              writeToDom(data);
-          } // function
-      );
+      // Bind to WebSocket to server events
+      socket.bind('display', function(data) { writeToDom(data); });
 
     </script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
@@ -449,7 +465,7 @@ char webpage[] PROGMEM = R"=====(
       <p>Radio</p>
       <p>Band: <b id="tuner_band">---</b></p>
       <p>Memory: <b id="tuner_memory">---</b></p>
-      <p>Frequency: <b id="frequency">---</b><b id="frequency_h">-</b> <b id="frequency_unit"></b></p>
+      <p>Frequency: <b id="frequency">---</b></p>
       <p>Signal strength: <b id="signal_strength">---</b></p>
       <p>Tuner sensitivity: <b id="search_sensitivity">---</b></p>
       <p>Searching: <b id="search_mode">---</b></p>
@@ -717,18 +733,18 @@ char webpage[] PROGMEM = R"=====(
       <p>Last destination - city: <b id="satnav_last_destination_city">---</b></p>
       <p>Last destination - street: <b id="satnav_last_destination_street">---</b></p>
       <p>Last destination - house number: <b id="satnav_last_destination_house_number">---</b></p>
-      <p>Private address - entry: <b id="satnav_private_address_entry">---</b></p>
-      <p>Private address - country: <b id="satnav_private_address_country">---</b></p>
-      <p>Private address - province: <b id="satnav_private_address_province">---</b></p>
-      <p>Private address - city: <b id="satnav_private_address_city">---</b></p>
-      <p>Private address - street: <b id="satnav_private_address_street">---</b></p>
-      <p>Private address - house number: <b id="satnav_private_address_house_number">---</b></p>
-      <p>Business address - entry: <b id="satnav_business_address_entry">---</b></p>
-      <p>Business address - country: <b id="satnav_business_address_country">---</b></p>
-      <p>Business address - province: <b id="satnav_business_address_province">---</b></p>
-      <p>Business address - city: <b id="satnav_business_address_city">---</b></p>
-      <p>Business address - street: <b id="satnav_business_address_street">---</b></p>
-      <p>Business address - house number: <b id="satnav_business_address_house_number">---</b></p>
+      <p>Private address - entry: <b id="satnav_personal_address_entry">---</b></p>
+      <p>Private address - country: <b id="satnav_personal_address_country">---</b></p>
+      <p>Private address - province: <b id="satnav_personal_address_province">---</b></p>
+      <p>Private address - city: <b id="satnav_personal_address_city">---</b></p>
+      <p>Private address - street: <b id="satnav_personal_address_street">---</b></p>
+      <p>Private address - house number: <b id="satnav_personal_address_house_number">---</b></p>
+      <p>Business address - entry: <b id="satnav_professional_address_entry">---</b></p>
+      <p>Business address - country: <b id="satnav_professional_address_country">---</b></p>
+      <p>Business address - province: <b id="satnav_professional_address_province">---</b></p>
+      <p>Business address - city: <b id="satnav_professional_address_city">---</b></p>
+      <p>Business address - street: <b id="satnav_professional_address_street">---</b></p>
+      <p>Business address - house number: <b id="satnav_professional_address_house_number">---</b></p>
       <p>Place of interest address - entry: <b id="satnav_place_of_interest_address_entry">---</b></p>
       <p>Place of interest address - country: <b id="satnav_place_of_interest_address_country">---</b></p>
       <p>Place of interest address - province: <b id="satnav_place_of_interest_address_province">---</b></p>
