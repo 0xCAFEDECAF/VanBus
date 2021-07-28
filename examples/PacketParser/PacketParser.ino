@@ -1300,7 +1300,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             char floatBuf[2][MAX_FLOAT_SIZE];
             Serial.printf_P(
-                PSTR("rpm=%S /min; speed=%S km/h; seq=%lu\n"),
+                PSTR("rpm=%S /min; speed=%S km/h; engine_running_seconds=%lu\n"),
                 engineRpm == 0xFFFF ?
                     PSTR("---.-") :
                     FloatToStr(floatBuf[0], engineRpm / 8.0, 1),
