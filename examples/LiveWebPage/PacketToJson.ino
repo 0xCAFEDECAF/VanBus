@@ -53,7 +53,7 @@ const char PROGMEM notApplicable2Str[] = "--";
 const char PROGMEM notApplicable3Str[] = "---";
 
 // Defined in PacketFilter.ino
-bool isPacketSelected(uint16_t iden, VanPacketFilter_t filter);
+bool IsPacketSelected(uint16_t iden, VanPacketFilter_t filter);
 
 // Uses statically allocated buffer, so don't call twice within the same printf invocation 
 char* ToStr(uint8_t data)
@@ -261,7 +261,7 @@ const char* RadioPiCountry(uint8_t countryCode)
         countryCode == 0x04 ? PSTR("CH") :  // Switzerland
         countryCode == 0x05 ? PSTR("IT") :  // Italy
         countryCode == 0x06 ? PSTR("BEL") :  // Belgium
-        countryCode == 0x07 ? PSTR("LU") :  // Luxemburg
+        countryCode == 0x07 ? PSTR("LUX") :  // Luxemburg
         countryCode == 0x08 ? PSTR("NL") :  // Netherlands
         countryCode == 0x09 ? PSTR("DNK") :  // Denmark
         countryCode == 0x0A ? PSTR("AUT") :  // Austria
@@ -433,9 +433,9 @@ void GuidanceInstructionIconJson(const char* iconName, const uint8_t data[8], ch
             );
     } // for
 
-    // Show the direction to go
+    // Show the direction to go (indicated clock-wise, i.e. 90 degrees is left turn)
 
-    uint16_t direction = data[0] * 225;
+    uint16_t direction = (1800 + data[0] * 225) % 3600;
 
     const static char jsonFormatter[] PROGMEM =
         ",\n"
@@ -2492,7 +2492,7 @@ VanPacketParseResult_t ParseSatNavStatus3Pkt(const char* idenStr, TVanPacketRxDe
             // and during guidance. It stops after a "STOPPING_NAVIGATION" status message.
             status == 0x0108 ? PSTR("SATNAV_IN_OPERATION") :
 
-            status == 0x0110 ? ToHexStr(status) :
+            status == 0x0110 ? PSTR("VOCAL_SYNTHESIS_LEVEL_SETTING") :
             status == 0x0120 ? PSTR("ACCEPTED_TERMS_AND_CONDITIONS") :
             status == 0x0140 ? PSTR("GPS_POS_FOUND") :
             status == 0x0306 ? PSTR("SATNAV_DISC_ID_READ") :
@@ -4084,7 +4084,7 @@ bool IsPacketDataDuplicate(TVanPacketRxDesc& pkt, IdenHandler_t* handler)
     // Relying on short-circuit boolean evaluation
     if (handler->prevData != NULL && memcmp(data, handler->prevData, dataLen) == 0) return true;  // Duplicate packet
 
-    if ((serialDumpFilter == 0 || iden == serialDumpFilter) && isPacketSelected(iden, SELECTED_PACKETS))
+    if ((serialDumpFilter == 0 || iden == serialDumpFilter) && IsPacketSelected(iden, SELECTED_PACKETS))
     {
         Serial.printf_P(PSTR("---> Received: %s packet (0x%03X)\n"), handler->idenStr, iden);
 
@@ -4114,7 +4114,7 @@ bool IsPacketDataDuplicate(TVanPacketRxDesc& pkt, IdenHandler_t* handler)
         memcpy(handler->prevData, data, dataLen);
     } // if
 
-    if ((serialDumpFilter == 0 || iden == serialDumpFilter) && isPacketSelected(iden, SELECTED_PACKETS))
+    if ((serialDumpFilter == 0 || iden == serialDumpFilter) && IsPacketSelected(iden, SELECTED_PACKETS))
     {
         // Now print the new packet's data in full
         Serial.printf_P(PSTR("FULL: 0x%03X (%s) "), iden, handler->idenStr);
@@ -4238,7 +4238,7 @@ const char* ParseVanPacketToJson(TVanPacketRxDesc& pkt)
 
     #ifdef PRINT_JSON_BUFFERS_ON_SERIAL
 
-    if ((serialDumpFilter == 0 || iden == serialDumpFilter) && isPacketSelected(iden, SELECTED_PACKETS))
+    if ((serialDumpFilter == 0 || iden == serialDumpFilter) && IsPacketSelected(iden, SELECTED_PACKETS))
     {
         Serial.print(F("Parsed to JSON object:\n"));
         PrintJsonText(jsonBuffer);

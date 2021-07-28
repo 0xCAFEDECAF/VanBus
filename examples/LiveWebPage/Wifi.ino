@@ -4,12 +4,12 @@
 char* ssid = WIFI_SSID;
 char* password = WIFI_PASSWORD;
 
-const char* getHostname()
+const char* GetHostname()
 {
     return "Car";
-} // getHostname
+} // GetHostname
 
-void setupWifi()
+void SetupWifi()
 {
     Serial.printf_P(PSTR("Connecting to Wi-Fi SSID '%s' "), ssid);
 
@@ -37,7 +37,7 @@ void setupWifi()
     } // while
     Serial.println(F(" OK"));
 
-    WiFi.hostname(getHostname());
+    WiFi.hostname(GetHostname());
 
     Serial.printf_P(PSTR("Wi-Fi signal strength (RSSI): %ld dB\n"), WiFi.RSSI());
 
@@ -46,4 +46,4 @@ void setupWifi()
     wifi_set_sleep_type(NONE_SLEEP_T);
 
     delay(1);
-} // wifiSetup
+} // SetupWifi

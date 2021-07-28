@@ -426,7 +426,7 @@ char webpage[] PROGMEM = R"=====(
     <hr/>
     <div>
       <p>Head Unit</p>
-      <p>Report: <b id="head_unit_report">---</b></p>
+      <p>Last report: <b id="head_unit_report">---</b></p>
       <p>Power: <b id="power">---</b></p>
       <p>Tape present: <b id="tape_present">---</b></p>
       <p>CD present: <b id="cd_present">---</b></p>
@@ -581,11 +581,10 @@ char webpage[] PROGMEM = R"=====(
       <p>On digitized area (on map): <b id="satnav_on_map">---</b></p>
       <p>CD-ROM download finished: <b id="satnav_download_finished">---</b></p>
       <p>System ID</p>
-      <div id="satnav_system_id" style="border:1px solid; width:700px; height:200px; overflow:scroll; overflow-x:hidden; white-space:nowrap;">
-      </div>
+      <div id="satnav_system_id" class="listbox"></div>
       <p>MFD to sat nav: <b id="mfd_to_satnav_instruction">---</b></p>
       <p>GPS fix: <b id="satnav_gps_fix">---</b></p>
-      <p>GPS fix list: <b id="satnav_gps_fix_lost">---</b></p>
+      <p>GPS fix lost: <b id="satnav_gps_fix_lost">---</b></p>
       <p>GPS scanning: <b id="satnav_gps_scanning">---</b></p>
       <p>GPS speed: <b id="satnav_gps_speed">---</b></p>
       <p>ZZZ (?): <b id="satnav_zzz">---</b></p>
@@ -595,22 +594,22 @@ char webpage[] PROGMEM = R"=====(
       <p>SatNav guidance data</p>
 
       <!-- Rotating round an abstract transform-origin like 'center' is better supported for a <div> than an <svg> element -->
-      <div id="satnav_curr_heading_compass_needle" style="width:120px; height:120px; transform:rotate(65deg); transform-origin:center;">
+      <div id="satnav_curr_heading_compass_needle" style="width:120px; height:120px; transform:rotate(0deg); transform-origin:center;">
         <svg>
           <path style="stroke-width:8;" d="M60 15 l30 100 l-60 0 Z"></path>
         </svg>
       </div>
       <p>Current heading: <b id="satnav_curr_heading">---</b></p>
 
-      <div id="satnav_heading_to_dest_pointer" style="width:120px; height:120px; transform:rotate(22.5deg); transform-origin:center;">
+      <div id="satnav_heading_to_dest_pointer" style="width:120px; height:120px; transform:rotate(0deg); transform-origin:center;">
         <svg>
           <path style="stroke-width:8;" d="M60 10 l30 100 l-60 0 Z"></path>
         </svg>
       </div>
       <p>Heading to destination: <b id="satnav_heading_to_dest">---</b></p>
 
-      <p>Road distance to destination: <b id="satnav_distance_to_dest_via_road">---</b> (unit is meters: <b id="satnav_distance_to_dest_via_road_m">---</b>, unit is kilometers: <b id="satnav_distance_to_dest_via_road_km">---</b>)</p>
-      <p>Straight line to destination: <b id="satnav_distance_to_dest_via_straight_line">---</b> (unit is meters: <b id="satnav_distance_to_dest_via_straight_line_m">---</b>, unit is kilometers: <b id="satnav_distance_to_dest_via_straight_line_km">---</b>)</p>
+      <p>Road distance to destination: <b id="satnav_distance_to_dest_via_road">---</b></p>
+      <p>Straight line to destination: <b id="satnav_distance_to_dest_via_straight_line">---</b></p>
       <p>Turn at: <b id="satnav_turn_at">---</b></p>
       <p>Heading on roundabout: <b id="satnav_heading_on_roundabout_as_text">---</b></p>
       <p>Minutes to travel (?): <b id="satnav_minutes_to_travel">---</b></p>
@@ -733,29 +732,27 @@ char webpage[] PROGMEM = R"=====(
       <p>Last destination - city: <b id="satnav_last_destination_city">---</b></p>
       <p>Last destination - street: <b id="satnav_last_destination_street">---</b></p>
       <p>Last destination - house number: <b id="satnav_last_destination_house_number">---</b></p>
-      <p>Private address - entry: <b id="satnav_personal_address_entry">---</b></p>
-      <p>Private address - country: <b id="satnav_personal_address_country">---</b></p>
-      <p>Private address - province: <b id="satnav_personal_address_province">---</b></p>
-      <p>Private address - city: <b id="satnav_personal_address_city">---</b></p>
-      <p>Private address - street: <b id="satnav_personal_address_street">---</b></p>
-      <p>Private address - house number: <b id="satnav_personal_address_house_number">---</b></p>
-      <p>Business address - entry: <b id="satnav_professional_address_entry">---</b></p>
-      <p>Business address - country: <b id="satnav_professional_address_country">---</b></p>
-      <p>Business address - province: <b id="satnav_professional_address_province">---</b></p>
-      <p>Business address - city: <b id="satnav_professional_address_city">---</b></p>
-      <p>Business address - street: <b id="satnav_professional_address_street">---</b></p>
-      <p>Business address - house number: <b id="satnav_professional_address_house_number">---</b></p>
-      <p>Place of interest address - entry: <b id="satnav_place_of_interest_address_entry">---</b></p>
-      <p>Place of interest address - country: <b id="satnav_place_of_interest_address_country">---</b></p>
-      <p>Place of interest address - province: <b id="satnav_place_of_interest_address_province">---</b></p>
-      <p>Place of interest address - city: <b id="satnav_place_of_interest_address_city">---</b></p>
-      <p>Place of interest address - street: <b id="satnav_place_of_interest_address_street">---</b></p>
-      <p>Place of interest address distance: <b id="satnav_place_of_interest_address_distance">---</b></p>
+      <p>Personal address - entry: <b id="satnav_personal_address_entry">---</b></p>
+      <p>Personal address - country: <b id="satnav_personal_address_country">---</b></p>
+      <p>Personal address - province: <b id="satnav_personal_address_province">---</b></p>
+      <p>Personal address - city: <b id="satnav_personal_address_city">---</b></p>
+      <p>Personal address - street: <b id="satnav_personal_address_street">---</b></p>
+      <p>Personal address - house number: <b id="satnav_personal_address_house_number">---</b></p>
+      <p>Professional address - entry: <b id="satnav_professional_address_entry">---</b></p>
+      <p>Professional address - country: <b id="satnav_professional_address_country">---</b></p>
+      <p>Professional address - province: <b id="satnav_professional_address_province">---</b></p>
+      <p>Professional address - city: <b id="satnav_professional_address_city">---</b></p>
+      <p>Professional address - street: <b id="satnav_professional_address_street">---</b></p>
+      <p>Professional address - house number: <b id="satnav_professional_address_house_number">---</b></p>
+      <p>Service address - entry: <b id="satnav_place_of_interest_address_entry">---</b></p>
+      <p>Service address - country: <b id="satnav_place_of_interest_address_country">---</b></p>
+      <p>Service address - province: <b id="satnav_place_of_interest_address_province">---</b></p>
+      <p>Service address - city: <b id="satnav_place_of_interest_address_city">---</b></p>
+      <p>Service address - street: <b id="satnav_place_of_interest_address_street">---</b></p>
+      <p>Service address distance: <b id="satnav_place_of_interest_address_distance">---</b></p>
       <p>Address list</p>
       <div id="satnav_list" class="listbox"></div>
       <p>House number range: <b id="satnav_house_number_range">---</b></p>
-      <p>Places of interest category list</p>
-      <div id="satnav_place_of_interest_category_list" class="listbox"></div>
       <p>Software module list</p>
       <div id="satnav_software_modules_list" class="listbox"></div>
     </div>
@@ -862,6 +859,7 @@ enum VanPacketFilter_t
     VAN_PACKETS_NONE_EXCEPT,
     VAN_PACKETS_HEAD_UNIT,
     VAN_PACKETS_AIRCON,
+    VAN_PACKETS_COM2000_ETC,
     VAN_PACKETS_SAT_NAV
 }; // enum VanPacketFilter_t
 
@@ -872,7 +870,7 @@ uint16_t serialDumpFilter;
 // Set a simple filter on the dumping of packet + JSON data on Serial.
 // Surf to e.g. http://car.lan/dumpOnly?iden=8c4 to have only packets with IDEN 0x8C4 dumped on serial.
 // Surf to http://car.lan/dumpOnly?iden=0 to dump all packets.
-void handleDumpFilter()
+void HandleDumpFilter()
 {
     Serial.print(F("Web server received request from "));
     String ip = webServer.client().remoteIP().toString();
@@ -905,7 +903,7 @@ void handleDumpFilter()
             serialDumpFilter == 0 ?
             F("OK: dumping all JSON data") :
             F("OK: filtering JSON data"));
-} // handleDumpFilter
+} // HandleDumpFilter
 
 // Results returned from the IR decoder
 typedef struct
@@ -917,22 +915,22 @@ typedef struct
 } TIrPacket;
 
 // Defined in Wifi.ino
-void setupWifi();
+void SetupWifi();
 
 // Defined in IRrecv.ino
-void irSetup();
-const char* parseIrPacketToJson(TIrPacket& pkt);
-bool irReceive(TIrPacket& irPacket);
+void IrSetup();
+const char* ParseIrPacketToJson(const TIrPacket& pkt);
+bool IrReceive(TIrPacket& irPacket);
 
 // Defined in Esp.ino
-void printSystemSpecs();
-const char* espDataToJson();
+void PrintSystemSpecs();
+const char* EspDataToJson();
 
 // Defined in PacketToJson.ino
 const char* ParseVanPacketToJson(TVanPacketRxDesc& pkt);
 void PrintJsonText(const char* jsonBuffer);
 
-void broadcastJsonText(const char* json)
+void BroadcastJsonText(const char* json)
 {
     if (strlen(json) > 0)
     {
@@ -956,7 +954,7 @@ void broadcastJsonText(const char* json)
             PrintJsonText(json);
         } // if
     } // if
-} // broadcastJsonText
+} // BroadcastJsonText
 
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length)
 {
@@ -974,7 +972,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
             Serial.printf("Websocket [%u] Connected from %d.%d.%d.%d url: %s\n", num, ip[0], ip[1], ip[2], ip[3], payload);
 
             // Dump some system data
-            broadcastJsonText(espDataToJson());
+            BroadcastJsonText(EspDataToJson());
         }
         break;
     } // switch
@@ -986,16 +984,16 @@ void setup()
     Serial.begin(115200);
     Serial.println(F("Starting VAN bus live web page server"));
 
-    printSystemSpecs();
+    PrintSystemSpecs();
 
-    setupWifi();
+    SetupWifi();
 
     webServer.on("/",[](){
         unsigned long start = millis();
         webServer.send_P(200, "text/html", webpage);  
         Serial.printf_P(PSTR("Sending HTML took: %lu msec\n"), millis() - start);
     });
-    webServer.on("/dumpOnly", handleDumpFilter);
+    webServer.on("/dumpOnly", HandleDumpFilter);
     webServer.begin();
 
     webSocket.begin();
@@ -1011,7 +1009,7 @@ void setup()
     VanBusRx.Setup(RX_PIN, VAN_PACKET_QUEUE_SIZE);
     Serial.printf_P(PSTR("VanBusRx queue of size %d is set up\n"), VanBusRx.QueueSize());
 
-    irSetup();
+    IrSetup();
 } // setup
 
 void loop()
@@ -1021,12 +1019,12 @@ void loop()
 
     // IR receiver
     TIrPacket irPacket;
-    if (irReceive(irPacket)) broadcastJsonText(parseIrPacketToJson(irPacket));
+    if (IrReceive(irPacket)) BroadcastJsonText(ParseIrPacketToJson(irPacket));
 
     // VAN bus receiver
     TVanPacketRxDesc pkt;
     bool isQueueOverrun = false;
-    if (VanBusRx.Receive(pkt, &isQueueOverrun)) broadcastJsonText(ParseVanPacketToJson(pkt));
+    if (VanBusRx.Receive(pkt, &isQueueOverrun)) BroadcastJsonText(ParseVanPacketToJson(pkt));
     if (isQueueOverrun) Serial.print(F("VAN PACKET QUEUE OVERRUN!\n"));
 
     // Print statistics every 5 seconds

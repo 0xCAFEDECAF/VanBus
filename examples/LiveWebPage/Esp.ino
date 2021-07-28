@@ -7,7 +7,7 @@ const char PROGMEM dioStr[] = "DIO";
 const char PROGMEM doutStr[] = "DOUT";
 const char PROGMEM unknownStr[] = "UNKNOWN";
 
-void printSystemSpecs()
+void PrintSystemSpecs()
 {
     Serial.printf_P(PSTR("CPU Speed: %u MHz\n"), system_get_cpu_freq());
     Serial.printf_P(PSTR("SDK: %s\n"), system_get_sdk_version());
@@ -27,9 +27,9 @@ void printSystemSpecs()
         ideMode == FM_DOUT ? doutStr :
         unknownStr);
     Serial.printf_P(PSTR("Flash chip configuration %S\n"), ideSize != realSize ? PSTR("wrong!") : PSTR("ok."));
-} // printSystemSpecs
+} // PrintSystemSpecs
 
-const char* espDataToJson()
+const char* EspDataToJson()
 {
     #define ESP_DATA_JSON_BUFFER_SIZE 1024
     static char jsonBuffer[ESP_DATA_JSON_BUFFER_SIZE];
@@ -100,5 +100,5 @@ const char* espDataToJson()
     #endif // PRINT_JSON_BUFFERS_ON_SERIAL
 
     return jsonBuffer;
-} // espDataToJson
+} // EspDataToJson
 

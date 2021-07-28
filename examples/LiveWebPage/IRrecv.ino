@@ -175,7 +175,7 @@ int IRrecv::compare(unsigned int oldval, unsigned int newval)
   return 1;
 } // IRrecv::compare
 
-const char* parseIrPacketToJson(TIrPacket& pkt)
+const char* ParseIrPacketToJson(const TIrPacket& pkt)
 {
     #define IR_JSON_BUFFER_SIZE 256
     static char jsonBuffer[IR_JSON_BUFFER_SIZE];
@@ -215,11 +215,11 @@ const char* parseIrPacketToJson(TIrPacket& pkt)
     #endif // PRINT_JSON_BUFFERS_ON_SERIAL
 
     return jsonBuffer;
-} // parseIrPacketToJson
+} // ParseIrPacketToJson
 
 IRrecv irrecv(IR_RECV_PIN);
 
-void irSetup()
+void IrSetup()
 {
     Serial.println(F("Setting up IR receiver"));
 
@@ -231,9 +231,9 @@ void irSetup()
     digitalWrite(IR_GND, LOW);
 
     irrecv.enableIRIn(); // Start the receiver
-} // irSetup
+} // IrSetup
 
-bool irReceive(TIrPacket& irPacket)
+bool IrReceive(TIrPacket& irPacket)
 {
     if (! irrecv.decode(&irPacket)) return false;
 
@@ -244,15 +244,15 @@ bool irReceive(TIrPacket& irPacket)
 
     irrecv.resume(); // Receive the next value
 
-    // Ignore same code within 300 ms
+    // Ignore same code within 150 ms
     static unsigned long lastValue = 0;
     static unsigned long lastUpdate = 0;
 
     // Arithmetic has safe roll-over
-    if (irPacket.value == lastValue && millis() - lastUpdate < 300UL) return false;
+    if (irPacket.value == lastValue && millis() - lastUpdate < 150UL) return false;
 
     lastUpdate = millis();
     lastValue = irPacket.value;
 
     return true;
-} // irReceive
+} // IrReceive
