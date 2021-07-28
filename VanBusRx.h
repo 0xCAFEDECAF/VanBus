@@ -237,7 +237,7 @@ class TVanPacketRxQueue
         , nTwoSeparateBitErrors(0)
     { }
 
-    void Setup(uint8_t rxPin, int queueSize = VAN_DEFAULT_RX_QUEUE_SIZE);
+    bool Setup(uint8_t rxPin, int queueSize = VAN_DEFAULT_RX_QUEUE_SIZE);
     bool Available() const { ISR_SAFE_GET(bool, tail->state == VAN_RX_DONE); }
     bool Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun = NULL);
     void Disable();

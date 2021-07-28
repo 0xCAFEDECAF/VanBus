@@ -305,7 +305,7 @@ void ICACHE_RAM_ATTR WaitAckIsr()
 } // WaitAckIsr
 
 // TODO - remove
-uint16_t startOfFrameByte = 0x00;
+volatile uint16_t startOfFrameByte = 0x00;
 
 // Pin level change interrupt handler
 void ICACHE_RAM_ATTR RxPinChangeIsr()
@@ -378,6 +378,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     if (state == VAN_RX_VACANT)
     {
         // Wait until we've seen a series of VAN_LOGICAL_HIGH bits
+        // TODO - wait until we've seen at least IFS bits?
         if (pinLevelChangedTo == VAN_LOGICAL_LOW)
         {
             rxDesc->state = VAN_RX_SEARCHING;
@@ -524,10 +525,11 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             //
             if (currentByte != 0x03D
                 && currentByte != 0x01D && currentByte != 0x13D
-                && currentByte != 0x185 && currentByte != 0x042 && currentByte != 0x14D
-                && currentByte != 0x1C8 && currentByte != 0x126 && currentByte != 0x04A
-                && currentByte != 0x0CE && currentByte != 0x172 && currentByte != 0x146
-                && currentByte != 0x0AA)
+                // && currentByte != 0x185 && currentByte != 0x042 && currentByte != 0x14D
+                // && currentByte != 0x1C8 && currentByte != 0x126 && currentByte != 0x04A
+                // && currentByte != 0x0CE && currentByte != 0x172 && currentByte != 0x146
+                // && currentByte != 0x0AA
+               )
             {
                 rxDesc->state = VAN_RX_VACANT;
 
@@ -543,6 +545,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
                 return;
             } // if
 
+            currentByte = 0x03D;
             rxDesc->state = VAN_RX_LOADING;
         } // if
 
@@ -591,8 +594,10 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 } // RxPinChangeIsr
 
 // Initializes the VAN packet receiver
-void TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
+bool TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
 {
+    if (pin != VAN_NO_PIN_ASSIGNED) return false; // Already setup
+
     pin = rxPin;
     pinMode(rxPin, INPUT_PULLUP);
 
@@ -605,6 +610,8 @@ void TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
     attachInterrupt(digitalPinToInterrupt(rxPin), RxPinChangeIsr, CHANGE);
     timer1_isr_init();
     timer1_disable();
+
+    return true;
 } // TVanPacketRxQueue::Setup
 
 // Copy a VAN packet out of the receive queue, if available. Otherwise, returns false.
@@ -618,7 +625,7 @@ bool TVanPacketRxQueue::Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun)
     // TODO - remove
     if (startOfFrameByte != 0x00)
     {
-        Serial.printf("=====> SOF: 0x%02X <=====\n", startOfFrameByte);
+        //Serial.printf("=====> SOF: 0x%02X <=====\n", startOfFrameByte);
         ISR_SAFE_SET(startOfFrameByte, 0x00);
     } // if
 
