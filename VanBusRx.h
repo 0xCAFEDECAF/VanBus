@@ -240,8 +240,14 @@ class TVanPacketRxQueue
     bool Setup(uint8_t rxPin, int queueSize = VAN_DEFAULT_RX_QUEUE_SIZE);
     bool Available() const { ISR_SAFE_GET(bool, tail->state == VAN_RX_DONE); }
     bool Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun = NULL);
+
+    // Disabling the VAN bus receiver is necessary for timer-intensive tasks, like e.g. operations on the SPI Flash
+    // File System (SPIFFS), which otherwise cause system crash. Unfortunately, after disabling then enabling the
+    // VAN bus receiver like this, the CRC error rate seems to increase...
     void Disable();
     void Enable();
+
+    bool IsSetup() const { return pin != VAN_NO_PIN_ASSIGNED; }
     uint32_t GetCount() const { ISR_SAFE_GET(uint32_t, count); }
     void DumpStats(Stream& s) const;
     int QueueSize() const { return size; }
