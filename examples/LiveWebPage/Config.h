@@ -14,4 +14,12 @@ inline void WifiConfig()
     // WiFi.config(ip, gateway, subnet, dns);
 } // WifiConfig
 
+// Which type of packets will be printed on Serial?
+
+#define SELECTED_PACKETS VAN_PACKETS_ALL
+//#define SELECTED_PACKETS VAN_PACKETS_COM2000_ETC
+//#define SELECTED_PACKETS VAN_PACKETS_HEAD_UNIT
+//#define SELECTED_PACKETS VAN_PACKETS_SAT_NAV
+//#define SELECTED_PACKETS VAN_PACKETS_NONE
+
 #endif // Config_h

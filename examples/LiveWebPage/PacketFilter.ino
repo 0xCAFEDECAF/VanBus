@@ -7,7 +7,7 @@
 // Filter on specific IDENs
 bool IsPacketSelected(uint16_t iden, VanPacketFilter_t filter)
 {
-    if (filter == VAN_PACKETS_ALL_EXCEPT)
+    if (filter == VAN_PACKETS_ALL)
     {
         // Show all packets, but discard the following:
         // (Commented-out IDs will be printed on Serial)
@@ -56,7 +56,7 @@ bool IsPacketSelected(uint16_t iden, VanPacketFilter_t filter)
         return true;
     } // if
 
-    if (filter == VAN_PACKETS_NONE_EXCEPT)
+    if (filter == VAN_PACKETS_NONE)
     {
         // Show no packets, except the following:
         // (Commented-out IDs will NOT be printed on Serial)

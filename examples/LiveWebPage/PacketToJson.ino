@@ -1108,98 +1108,98 @@ VanPacketParseResult_t ParseCarStatus2Pkt(const char* idenStr, TVanPacketRxDesc&
     // All known notifications, as literally retrieved from my vehicle (406 year 2003, DAM number 9586; your vehicle
     // may have other texts). Retrieving was done with VanBus/examples/DisplayNotifications/DisplayNotifications.ino .
 
-    // By convention, the first two bytes are either "! " for warnings or "i " (or just "  ") for information.
+    // By convention, warning notifications end with "!"; information notifications do not.
     // TODO - translate into all languages
 
     // Byte 0, 0x00...0x07
-    static const char msg_0_0[] PROGMEM = "! Tyre pressure too low";
+    static const char msg_0_0[] PROGMEM = "Tyre pressure too low!";
     static const char msg_0_1[] PROGMEM = "";
-    static const char msg_0_2[] PROGMEM = "! Automatic gearbox temperature too high";
-    static const char msg_0_3[] PROGMEM = "! Brake fluid level low"; // and exclamation mark on instrument cluster
-    static const char msg_0_4[] PROGMEM = "! Hydraulic suspension pressure defective";
-    static const char msg_0_5[] PROGMEM = "! Suspension defective";
-    static const char msg_0_6[] PROGMEM = "! Engine oil temperature too high"; // and oil can on instrument cluster
-    static const char msg_0_7[] PROGMEM = "! Engine temperature too high";
+    static const char msg_0_2[] PROGMEM = "Automatic gearbox temperature too high!";
+    static const char msg_0_3[] PROGMEM = "Brake fluid level low!"; // and exclamation mark on instrument cluster
+    static const char msg_0_4[] PROGMEM = "Hydraulic suspension pressure defective!";
+    static const char msg_0_5[] PROGMEM = "Suspension defective!";
+    static const char msg_0_6[] PROGMEM = "Engine oil temperature too high!"; // and oil can on instrument cluster
+    static const char msg_0_7[] PROGMEM = "Engine temperature too high!";
 
     // Byte 1, 0x08...0x0F
-    static const char msg_1_0[] PROGMEM = "  Clear diesel filter (FAP) URGENT"; // and mil icon on instrument cluster
+    static const char msg_1_0[] PROGMEM = "Clear diesel filter (FAP) URGENT"; // and mil icon on instrument cluster
     static const char msg_1_1[] PROGMEM = "";
-    static const char msg_1_2[] PROGMEM = "! Min level additive gasoil";
-    static const char msg_1_3[] PROGMEM = "! Fuel cap open";
-    static const char msg_1_4[] PROGMEM = "! Puncture(s) detected";
-    static const char msg_1_5[] PROGMEM = "! Cooling circuit level too low"; // and icon on instrument cluster
-    static const char msg_1_6[] PROGMEM = "! Oil pressure insufficient";
-    static const char msg_1_7[] PROGMEM = "! Engine oil level too low";
+    static const char msg_1_2[] PROGMEM = "Min level additive gasoil!";
+    static const char msg_1_3[] PROGMEM = "Fuel cap open!";
+    static const char msg_1_4[] PROGMEM = "Puncture(s) detected!";
+    static const char msg_1_5[] PROGMEM = "Cooling circuit level too low!"; // and icon on instrument cluster
+    static const char msg_1_6[] PROGMEM = "Oil pressure insufficient!";
+    static const char msg_1_7[] PROGMEM = "Engine oil level too low!";
 
     // Byte 2, 0x10...0x17
-    static const char msg_2_0[] PROGMEM = "! Engine antipollution system defective";
-    static const char msg_2_1[] PROGMEM = "! Brake pads worn";
-    static const char msg_2_2[] PROGMEM = "  Check Control OK";  // Wow... bad translation
-    static const char msg_2_3[] PROGMEM = "! Automatic gearbox defective";
-    static const char msg_2_4[] PROGMEM = "! ASR / ESP system defective"; // and icon on instrument cluster
-    static const char msg_2_5[] PROGMEM = "! ABS brake system defective";
-    static const char msg_2_6[] PROGMEM = "! Suspension and power steering defective";
-    static const char msg_2_7[] PROGMEM = "! Brake system defective";
+    static const char msg_2_0[] PROGMEM = "Engine antipollution system defective!";
+    static const char msg_2_1[] PROGMEM = "Brake pads worn!";
+    static const char msg_2_2[] PROGMEM = "Check Control OK";  // Wow... bad translation
+    static const char msg_2_3[] PROGMEM = "Automatic gearbox defective!";
+    static const char msg_2_4[] PROGMEM = "ASR / ESP system defective!"; // and icon on instrument cluster
+    static const char msg_2_5[] PROGMEM = "ABS brake system defective!";
+    static const char msg_2_6[] PROGMEM = "Suspension and power steering defective!";
+    static const char msg_2_7[] PROGMEM = "Brake system defective!";
 
     // Byte 3, 0x18...0x1F
-    static const char msg_3_0[] PROGMEM = "! Airbag defective";
-    static const char msg_3_1[] PROGMEM = "! Airbag defective";
+    static const char msg_3_0[] PROGMEM = "Airbag defective!";
+    static const char msg_3_1[] PROGMEM = "Airbag defective!";
     static const char msg_3_2[] PROGMEM = "";
-    static const char msg_3_3[] PROGMEM = "! Engine temperature high";
+    static const char msg_3_3[] PROGMEM = "Engine temperature high!";
     static const char msg_3_4[] PROGMEM = "";
     static const char msg_3_5[] PROGMEM = "";
     static const char msg_3_6[] PROGMEM = "";
-    static const char msg_3_7[] PROGMEM = "  Water in Diesel fuel filter"; // and icon on instrument cluster
+    static const char msg_3_7[] PROGMEM = "Water in Diesel fuel filter"; // and icon on instrument cluster
 
     // Byte 4, 0x20...0x27
     static const char msg_4_0[] PROGMEM = "";
-    static const char msg_4_1[] PROGMEM = "! Automatic beam adjustment defective";
+    static const char msg_4_1[] PROGMEM = "Automatic beam adjustment defective!";
     static const char msg_4_2[] PROGMEM = "";
     static const char msg_4_3[] PROGMEM = "";
-    static const char msg_4_4[] PROGMEM = "! Service battery charge low";
-    static const char msg_4_5[] PROGMEM = "! Battery charge low"; // and battery icon on instrument cluster
-    static const char msg_4_6[] PROGMEM = "! Diesel antipollution system (FAP) defective";
-    static const char msg_4_7[] PROGMEM = "! Engine antipollution system inoperative"; // MIL icon flashing on instrument cluster
+    static const char msg_4_4[] PROGMEM = "Service battery charge low!";
+    static const char msg_4_5[] PROGMEM = "Battery charge low!"; // and battery icon on instrument cluster
+    static const char msg_4_6[] PROGMEM = "Diesel antipollution system (FAP) defective!";
+    static const char msg_4_7[] PROGMEM = "Engine antipollution system inoperative!"; // MIL icon flashing on instrument cluster
 
     // Byte 5, 0x28...0x2F
-    static const char msg_5_0[] PROGMEM = "! Handbrake on";
-    static const char msg_5_1[] PROGMEM = "! Safety belt not fastened";
-    static const char msg_5_2[] PROGMEM = "  Passenger airbag neutralized"; // and icon on instrument cluster
-    static const char msg_5_3[] PROGMEM = "  Windshield liquid level too low";
-    static const char msg_5_4[] PROGMEM = "  Current speed too high";
-    static const char msg_5_5[] PROGMEM = "  Ignition key still inserted";
-    static const char msg_5_6[] PROGMEM = "  Lights not on";
+    static const char msg_5_0[] PROGMEM = "Handbrake on!";
+    static const char msg_5_1[] PROGMEM = "Safety belt not fastened!";
+    static const char msg_5_2[] PROGMEM = "Passenger airbag neutralized"; // and icon on instrument cluster
+    static const char msg_5_3[] PROGMEM = "Windshield liquid level too low";
+    static const char msg_5_4[] PROGMEM = "Current speed too high";
+    static const char msg_5_5[] PROGMEM = "Ignition key still inserted";
+    static const char msg_5_6[] PROGMEM = "Lights not on";
     static const char msg_5_7[] PROGMEM = "";
 
     // Byte 6, 0x30...0x37
-    static const char msg_6_0[] PROGMEM = "  Impact sensor defective";
+    static const char msg_6_0[] PROGMEM = "Impact sensor defective";
     static const char msg_6_1[] PROGMEM = "";
-    static const char msg_6_2[] PROGMEM = "  Tyre pressure sensor battery low";
-    static const char msg_6_3[] PROGMEM = "  Plip remote control battery low";
+    static const char msg_6_2[] PROGMEM = "Tyre pressure sensor battery low";
+    static const char msg_6_3[] PROGMEM = "Plip remote control battery low";
     static const char msg_6_4[] PROGMEM = "";
-    static const char msg_6_5[] PROGMEM = "  Place automatic gearbox in P position";
-    static const char msg_6_6[] PROGMEM = "  Testing stop lamps : brake gently";
-    static const char msg_6_7[] PROGMEM = "! Fuel level low";
+    static const char msg_6_5[] PROGMEM = "Place automatic gearbox in P position";
+    static const char msg_6_6[] PROGMEM = "Testing stop lamps : brake gently";
+    static const char msg_6_7[] PROGMEM = "Fuel level low!";
 
     // Byte 7, 0x38...0x3F
-    static const char msg_7_0[] PROGMEM = "  Automatic headlight activation system disabled";
-    static const char msg_7_1[] PROGMEM = "! Turn-headlight defective";
-    static const char msg_7_2[] PROGMEM = "  Turn-headlight disable";
-    static const char msg_7_3[] PROGMEM = "  Turn-headlight enable";
+    static const char msg_7_0[] PROGMEM = "Automatic headlight activation system disabled";
+    static const char msg_7_1[] PROGMEM = "Turn-headlight defective!";
+    static const char msg_7_2[] PROGMEM = "Turn-headlight disable";
+    static const char msg_7_3[] PROGMEM = "Turn-headlight enable";
     static const char msg_7_4[] PROGMEM = "";
-    static const char msg_7_5[] PROGMEM = "! 7 tyre pressure sensors missing";
-    static const char msg_7_6[] PROGMEM = "! 7 tyre pressure sensors missing";
-    static const char msg_7_7[] PROGMEM = "! 7 tyre pressure sensors missing";
+    static const char msg_7_5[] PROGMEM = "7 tyre pressure sensors missing!";
+    static const char msg_7_6[] PROGMEM = "7 tyre pressure sensors missing!";
+    static const char msg_7_7[] PROGMEM = "7 tyre pressure sensors missing!";
 
     // Byte 8, 0x40...0x47
-    static const char msg_8_0[] PROGMEM = "  Doors locked";
-    static const char msg_8_1[] PROGMEM = "  ASR / ESP system disabled";
-    static const char msg_8_2[] PROGMEM = "  Child safety lock enabled";
-    static const char msg_8_3[] PROGMEM = "  Door self locking system enabled";
-    static const char msg_8_4[] PROGMEM = "  Automatic headlight activation system enabled";
-    static const char msg_8_5[] PROGMEM = "  Automatic wiper system enabled";
-    static const char msg_8_6[] PROGMEM = "  Electronic anti-theft system defective";
-    static const char msg_8_7[] PROGMEM = "  Sport suspension mode enabled";
+    static const char msg_8_0[] PROGMEM = "Doors locked";
+    static const char msg_8_1[] PROGMEM = "ASR / ESP system disabled";
+    static const char msg_8_2[] PROGMEM = "Child safety lock enabled";
+    static const char msg_8_3[] PROGMEM = "Door self locking system enabled";
+    static const char msg_8_4[] PROGMEM = "Automatic headlight activation system enabled";
+    static const char msg_8_5[] PROGMEM = "Automatic wiper system enabled";
+    static const char msg_8_6[] PROGMEM = "Electronic anti-theft system defective";
+    static const char msg_8_7[] PROGMEM = "Sport suspension mode enabled";
 
     // Byte 9 is the index of the current message
 
