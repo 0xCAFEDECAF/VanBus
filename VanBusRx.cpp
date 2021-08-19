@@ -625,7 +625,7 @@ bool TVanPacketRxQueue::Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun)
     // TODO - remove
     if (startOfFrameByte != 0x00)
     {
-        //Serial.printf("=====> SOF: 0x%02X <=====\n", startOfFrameByte);
+        Serial.printf("=====> SOF: 0x%02X <=====\n", startOfFrameByte);
         ISR_SAFE_SET(startOfFrameByte, 0x00);
     } // if
 

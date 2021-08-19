@@ -1,11 +1,27 @@
 0.2.2
-    VanBusRx.cpp: added methods Disable() and Enable(), to be used when other timing-critical / interrupt-driven
-    tasks need to be done, like e.g. writing to SPIFFS (SPI Flash File System).
+    VanBusRx.cpp:
+    * Added methods TVanPacketRxQueue::Disable() and TVanPacketRxQueue::Enable(), to be used when other
+      timing-critical / interrupt-driven tasks need to be done, like e.g. writing to SPIFFS (SPI Flash File System).
+    * Method TVanPacketRxQueue::Setup() returns false if already setup
+    * Experimental: accept a few "slightly-off" SOF bytes (normally always 0x0E)
+
+    VanBusRx.h:
+    * Added method TVanPacketRxQueue::IsSetup(), to check if the Setup() method was called
+
+    DisplayNotifications.ino:
+    * Offer interactivity via menu on Serial
 
     LiveWebPage.ino:
     * Various bugfixes and updates on parsing sat nav data structures
     * Small update in parsing FM tuner data
+    * Updates in parsing and presentation of sat nav status and guidance data
     * "cd_changer_current_disc": set to "---" if no discs present
+    * Show also ESP (hardware/board) data
+    * Added packet category VAN_PACKETS_COM2000_ETC for filtering serial output
+    * Various updates and bugfixes
+
+    PacketParser.ino
+    * Various updates and bugfixes
 
 0.2.1
     VanBusRx.cpp: various changes that seem to decrease the number of packets with CRC errors
