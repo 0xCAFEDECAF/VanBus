@@ -389,7 +389,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             jitter = 0;
 
             // TODO - does this help at all in lowering the number of packets with CRC errors?
-            wifi_fpm_set_sleep_type(LIGHT_SLEEP_T);
+            //wifi_fpm_set_sleep_type(LIGHT_SLEEP_T);
 
             //timer1_disable(); // TODO - necessary?
         } // if
