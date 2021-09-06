@@ -427,7 +427,7 @@ char webpage[] PROGMEM = R"=====(
     <div>
       <p>Head Unit</p>
       <p>Last report: <b id="head_unit_report">---</b></p>
-      <p>Power: <b id="power">---</b></p>
+      <p>Power: <b id="head_unit_power">---</b></p>
       <p>Tape present: <b id="tape_present">---</b></p>
       <p>CD present: <b id="cd_present">---</b></p>
       <p>Source: <b id="audio_source">---</b></p>
@@ -573,7 +573,7 @@ char webpage[] PROGMEM = R"=====(
       <p>Status 1: <b id="satnav_status_1">---</b></p>
       <p>Status 2: <b id="satnav_status_2">---</b></p>
       <p>Status 3: <b id="satnav_status_3">---</b></p>
-      <p>Disc: <b id="satnav_disc_present">---</b></p>
+      <p>Disc: <b id="satnav_disc_recognized">---</b></p>
       <p>Guidance status: <b id="satnav_guidance_status">---</b></p>
       <p>Guidance preference: <b id="satnav_guidance_preference">---</b></p>
       <p>Route computed: <b id="satnav_route_computed">---</b></p>
@@ -744,12 +744,12 @@ char webpage[] PROGMEM = R"=====(
       <p>Professional address - city: <b id="satnav_professional_address_city">---</b></p>
       <p>Professional address - street: <b id="satnav_professional_address_street">---</b></p>
       <p>Professional address - house number: <b id="satnav_professional_address_house_number">---</b></p>
-      <p>Service address - entry: <b id="satnav_place_of_interest_address_entry">---</b></p>
-      <p>Service address - country: <b id="satnav_place_of_interest_address_country">---</b></p>
-      <p>Service address - province: <b id="satnav_place_of_interest_address_province">---</b></p>
-      <p>Service address - city: <b id="satnav_place_of_interest_address_city">---</b></p>
-      <p>Service address - street: <b id="satnav_place_of_interest_address_street">---</b></p>
-      <p>Service address distance: <b id="satnav_place_of_interest_address_distance">---</b></p>
+      <p>Service address - entry: <b id="satnav_service_address_entry">---</b></p>
+      <p>Service address - country: <b id="satnav_service_address_country">---</b></p>
+      <p>Service address - province: <b id="satnav_service_address_province">---</b></p>
+      <p>Service address - city: <b id="satnav_service_address_city">---</b></p>
+      <p>Service address - street: <b id="satnav_service_address_street">---</b></p>
+      <p>Service address distance: <b id="satnav_service_address_distance">---</b></p>
       <p>Address list</p>
       <div id="satnav_list" class="listbox"></div>
       <p>House number range: <b id="satnav_house_number_range">---</b></p>

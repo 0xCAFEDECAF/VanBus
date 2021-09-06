@@ -20,18 +20,20 @@ enum VanPacketParseResult_t
     VAN_PACKET_PARSE_UNRECOGNIZED_IDEN = -3,  // Packet had unrecognized IDEN field
     VAN_PACKET_PARSE_TO_BE_DECODED = -4,  // IDEN recognized but the correct parsing of this packet is not yet known
     VAN_PACKET_PARSE_JSON_TOO_LONG = -5,  // IDEN recognized but the parsing into JSON overflows 'jsonBuffer'
-    VAN_PACKET_PARSE_FRAGMENT_MISSED = -6  // Missed at least on fragment of a multi-fragment message
+    VAN_PACKET_PARSE_FRAGMENT_MISSED = -6  // Missed at least one fragment of a multi-fragment message
 }; // enum VanPacketParseResult_t
 
-typedef VanPacketParseResult_t (*TPacketParser)(const char*, TVanPacketRxDesc&, char*, const int);
+typedef VanPacketParseResult_t (*TPacketParser)(TVanPacketRxDesc&, char*, const int);
 
 struct IdenHandler_t
 {
     uint16_t iden;
     char* idenStr;
     int dataLen;
+    bool ignoreDups;
     TPacketParser parser;
     uint8_t* prevData;
+    int prevDataLen;
 }; // struct IdenHandler_t
 
 // Often used string constants
@@ -49,11 +51,20 @@ const char PROGMEM styleDisplayBlockStr[] = "block";  // To set 'style="display:
 const char PROGMEM styleDisplayNoneStr[] = "none";  // To set 'style="display:none;"' in HTML
 const char PROGMEM noneStr[] = "NONE";
 const char PROGMEM updatedStr[] = "(UPD)";
+const char PROGMEM notApplicable1Str[] = "-";
 const char PROGMEM notApplicable2Str[] = "--";
 const char PROGMEM notApplicable3Str[] = "---";
+PGM_P dashStr = notApplicable1Str;
 
 // Defined in PacketFilter.ino
 bool IsPacketSelected(uint16_t iden, VanPacketFilter_t filter);
+
+// Round downwards (even if negative) to nearest multiple of d. Safe for negative values of n and d, and for
+// values of n around 0.
+sint32_t _floor(sint32_t n, sint32_t d)
+{
+    return (n / d - (((n > 0) ^ (d > 0)) && (n % d))) * d;
+} // _floor
 
 // Uses statically allocated buffer, so don't call twice within the same printf invocation 
 char* ToStr(uint8_t data)
@@ -146,6 +157,28 @@ void AsciiToHtml(String& in)
     } // for
 } // ToHtml
 
+// Pretty-print a JSON formatted string, adding indentation
+void PrintJsonText(const char* jsonBuffer)
+{
+    // Number of spaces to add for each indentation level
+    #define PRETTY_PRINT_JSON_INDENT 2
+
+    size_t j = 0;
+    int indent = 0;
+    while (j < strlen(jsonBuffer))
+    {
+        const char* subString = jsonBuffer + j;
+
+        if (subString[0] == '}' || subString[0] == ']') indent -= PRETTY_PRINT_JSON_INDENT;
+
+        size_t n = strcspn(subString, "\n");
+        if (n != strlen(subString)) Serial.printf("%*s%.*s\n", indent, "", n, subString);
+        j = j + n + 1;
+
+        if (subString[0] == '{' || subString[0] == '[') indent += PRETTY_PRINT_JSON_INDENT;
+    } // while
+} // PrintJsonText
+
 // Tuner band
 enum TunerBand_t
 {
@@ -159,7 +192,7 @@ enum TunerBand_t
 }; // enum TunerBand_t
 
 // Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
-const char* TunerBandStr(uint8_t data)
+PGM_P TunerBandStr(uint8_t data)
 {
     return
         data == TB_NONE ? noneStr :
@@ -194,7 +227,7 @@ enum TunerSearchMode_t
 }; // enum TunerSearchMode_t
 
 // Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
-const char* TunerSearchModeStr(uint8_t data)
+PGM_P TunerSearchModeStr(uint8_t data)
 {
     return
         data == TS_NOT_SEARCHING ? PSTR("NOT_SEARCHING") :
@@ -207,7 +240,7 @@ const char* TunerSearchModeStr(uint8_t data)
 
 // "Full" PTY string
 // Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
-const char* PtyStrFull(uint8_t ptyCode)
+PGM_P PtyStrFull(uint8_t ptyCode)
 {
     // See also:
     // https://www.electronics-notes.com/articles/audio-video/broadcast-audio/rds-radio-data-system-pty-codes.php
@@ -248,7 +281,7 @@ const char* PtyStrFull(uint8_t ptyCode)
 } // PtyStrFull
 
 // Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
-const char* RadioPiCountry(uint8_t countryCode)
+PGM_P RadioPiCountry(uint8_t countryCode)
 {
     // See also:
     // - http://poupa.cz/rds/countrycodes.htm
@@ -273,7 +306,7 @@ const char* RadioPiCountry(uint8_t countryCode)
 } // RadioPiCountry
 
 // Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
-const char* RadioPiAreaCoverage(uint8_t coverageCode)
+PGM_P RadioPiAreaCoverage(uint8_t coverageCode)
 {
     // https://www.pira.cz/rds/show.asp?art=rds_encoder_support
     return
@@ -321,7 +354,7 @@ enum SatNavRequest_t
 }; // enum SatNavRequest_t
 
 // Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
-const char* SatNavRequestStr(uint8_t data)
+PGM_P SatNavRequestStr(uint8_t data)
 {
     return
         data == SR_ENTER_COUNTRY ? PSTR("Enter country") :
@@ -357,7 +390,7 @@ enum SatNavRequestType_t
 }; // enum SatNavRequestType_t
 
 // Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
-const char* SatNavRequestTypeStr(uint8_t data)
+PGM_P SatNavRequestTypeStr(uint8_t data)
 {
     return
         data == SRT_REQ_N_ITEMS ? PSTR("REQ_N_ITEMS") :
@@ -376,7 +409,7 @@ enum SatNavGuidancePreference_t
 }; // enum SatNavGuidancePreference_t
 
 // Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
-const char* SatNavGuidancePreferenceStr(uint8_t data)
+PGM_P SatNavGuidancePreferenceStr(uint8_t data)
 {
     return
         data == SGP_FASTEST_ROUTE ? PSTR("FASTEST_ROUTE") :
@@ -476,7 +509,7 @@ const char* PacketRawToStr(TVanPacketRxDesc& pkt)
 } // PacketRawToStr
 
 // Dump the raw packet data into a JSON object
-VanPacketParseResult_t DefaultPacketParser(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t DefaultPacketParser(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     const static char jsonFormatter[] PROGMEM =
     "{\n"
@@ -497,7 +530,7 @@ VanPacketParseResult_t DefaultPacketParser(const char* idenStr, TVanPacketRxDesc
 
 #endif
 
-VanPacketParseResult_t ParseVinPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseVinPkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#E24
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#E24
@@ -519,7 +552,7 @@ VanPacketParseResult_t ParseVinPkt(const char* idenStr, TVanPacketRxDesc& pkt, c
     return VAN_PACKET_PARSE_OK;
 } // ParseVinPkt
 
-VanPacketParseResult_t ParseEnginePkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseEnginePkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#8A4
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#8A4
@@ -533,6 +566,8 @@ VanPacketParseResult_t ParseEnginePkt(const char* idenStr, TVanPacketRxDesc& pkt
     if (waterTempRaw != 0xFF) lastValidWaterTempRaw = waterTempRaw;  // Copy only if packet value is valid
     bool isWaterTempValid = lastValidWaterTempRaw != 0xFF;
     sint16_t waterTemp = (uint16_t)lastValidWaterTempRaw - 39;
+
+    bool economyMode = data[1] & 0x10;
 
     const static char jsonFormatter[] PROGMEM =
     "{\n"
@@ -572,19 +607,19 @@ VanPacketParseResult_t ParseEnginePkt(const char* idenStr, TVanPacketRxDesc& pkt
         ToHexStr((uint8_t)(data[1] & 0x03)),
 
         data[1] & 0x04 ? yesStr : noStr,
-        data[1] & 0x10 ? onStr : offStr,
+        economyMode ? onStr : offStr,
         data[1] & 0x20 ? yesStr : noStr,
         data[1] & 0x40 ? presentStr : notPresentStr,
         isWaterTempValid ? ToStr(waterTemp) : notApplicable3Str,
 
         // TODO - hard coded value 130 degrees Celsius for 100%
         #define MAX_COOLANT_TEMP (130)
-        ! isWaterTempValid || waterTemp < 0 ? PSTR("0") :
+        ! isWaterTempValid || waterTemp <= 0 ? PSTR("0") :
             waterTemp >= MAX_COOLANT_TEMP ? PSTR("1") :
                 FloatToStr(floatBuf[0], (float)waterTemp / MAX_COOLANT_TEMP, 2),
 
         FloatToStr(floatBuf[1], ((uint32_t)data[3] << 16 | (uint32_t)data[4] << 8 | data[5]) / 10.0, 1),
-        FloatToStr(floatBuf[2], (data[6] - 0x50) / 2.0, 1)
+        FloatToStr(floatBuf[2], (data[6] - 80) / 2.0, 1)
     );
 
     // JSON buffer overflow?
@@ -593,7 +628,7 @@ VanPacketParseResult_t ParseEnginePkt(const char* idenStr, TVanPacketRxDesc& pkt
     return VAN_PACKET_PARSE_OK;
 } // ParseEnginePkt
 
-VanPacketParseResult_t ParseHeadUnitStalkPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseHeadUnitStalkPkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#9C4
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#9C4
@@ -633,7 +668,7 @@ VanPacketParseResult_t ParseHeadUnitStalkPkt(const char* idenStr, TVanPacketRxDe
     return VAN_PACKET_PARSE_OK;
 } // ParseHeadUnitStalkPkt
 
-VanPacketParseResult_t ParseLightsStatusPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseLightsStatusPkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#4FC
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#4FC_1
@@ -644,7 +679,11 @@ VanPacketParseResult_t ParseLightsStatusPkt(const char* idenStr, TVanPacketRxDes
 
     const uint8_t* data = pkt.Data();
 
-    uint16_t remainingKmToService = ((uint16_t)data[2] << 8 | data[3]) * 20;
+    uint16_t remainingKmToService20 = (uint16_t)(data[2] & 0x7F) << 8 | data[3];
+    bool remainingKmToServiceOverdue = data[2] & 0x80;
+
+    sint32_t remainingKmToService = remainingKmToService20 * 20;
+    if (remainingKmToServiceOverdue) remainingKmToService = - remainingKmToService;
 
     const static char jsonFormatter[] PROGMEM =
     "{\n"
@@ -656,8 +695,8 @@ VanPacketParseResult_t ParseLightsStatusPkt(const char* idenStr, TVanPacketRxDes
             "\"warning_led\": \"%S\",\n"
             "\"diesel_glow_plugs\": \"%S\",\n"
             "\"door_open\": \"%S\",\n"
-            "\"remaining_km_to_service\": \"%u\",\n"
-            "\"remaining_km_to_service_dash\": \"%u\",\n"
+            "\"remaining_km_to_service\": \"%ld\",\n"
+            "\"remaining_km_to_service_dash\": \"%ld\",\n"
             "\"remaining_km_to_service_perc\":\n"
             "{\n"
                 "\"style\":\n"
@@ -677,12 +716,13 @@ VanPacketParseResult_t ParseLightsStatusPkt(const char* idenStr, TVanPacketRxDes
         data[1] & 0x01 ? yesStr : noStr,
 
         remainingKmToService,
-        remainingKmToService / 100 * 100,  // Round downwards to nearest multiple of 100 kms
+        _floor(remainingKmToService, 100),  // Round downwards (even if negative) to nearest multiple of 100 kms
 
         // TODO - hard coded value 30,000 kms for 100%
         #define SERVICE_INTERVAL (30000)
-        remainingKmToService >= SERVICE_INTERVAL ? PSTR("1") :
-            FloatToStr(floatBuf, (float)remainingKmToService / SERVICE_INTERVAL, 2),
+        remainingKmToService <= 0 ? PSTR("0") :
+            remainingKmToService >= SERVICE_INTERVAL ? PSTR("1") :
+                FloatToStr(floatBuf, (float)remainingKmToService / SERVICE_INTERVAL, 2),
 
         data[5] & 0x80 ? PSTR("DIPPED_BEAM ") : emptyStr,
         data[5] & 0x40 ? PSTR("HIGH_BEAM ") : emptyStr,
@@ -739,21 +779,19 @@ VanPacketParseResult_t ParseLightsStatusPkt(const char* idenStr, TVanPacketRxDes
                 "}\n"
             "}",
 
-            // 0x55 = 85
-            #define MAX_OIL_LEVEL (0x55)
-            data[8] >= MAX_OIL_LEVEL ?
-                PSTR("1") :
+            #define MAX_OIL_LEVEL (85)
+            data[8] >= MAX_OIL_LEVEL ? PSTR("1") :
                 FloatToStr(floatBuf, (float)data[8] / MAX_OIL_LEVEL, 2)
         );
 
     at += at >= n ? 0 :
         snprintf_P(buf + at, n - at, PSTR(",\n\"oil_level_dash\": \"%S\""),
-            data[8] <= 0x0B ? PSTR("------") :
-            data[8] <= 0x19 ? PSTR("O-----") :
-            data[8] <= 0x27 ? PSTR("OO----") :
-            data[8] <= 0x35 ? PSTR("OOO---") :
-            data[8] <= 0x43 ? PSTR("OOOO--") :
-            data[8] <= 0x51 ? PSTR("OOOOO-") :
+            data[8] <= 11 ? PSTR("------") :
+            data[8] <= 25 ? PSTR("O-----") :
+            data[8] <= 39 ? PSTR("OO----") :
+            data[8] <= 53 ? PSTR("OOO---") :
+            data[8] <= 67 ? PSTR("OOOO--") :
+            data[8] <= 81 ? PSTR("OOOOO-") :
             PSTR("OOOOOO")
         );
 
@@ -762,12 +800,12 @@ VanPacketParseResult_t ParseLightsStatusPkt(const char* idenStr, TVanPacketRxDes
         // Never seen this; I don't have LPG
         at += at >= n ? 0 :
             snprintf_P(buf + at, n - at, PSTR(",\n\"lpg_fuel_level\": \"%S\""),
-                data[10] <= 0x08 ? PSTR("1") :
-                data[10] <= 0x11 ? PSTR("2") :
-                data[10] <= 0x21 ? PSTR("3") :
-                data[10] <= 0x32 ? PSTR("4") :
-                data[10] <= 0x43 ? PSTR("5") :
-                data[10] <= 0x53 ? PSTR("6") :
+                data[10] <= 8 ? PSTR("1") :
+                data[10] <= 17 ? PSTR("2") :
+                data[10] <= 33 ? PSTR("3") :
+                data[10] <= 50 ? PSTR("4") :
+                data[10] <= 67 ? PSTR("5") :
+                data[10] <= 83 ? PSTR("6") :
                 PSTR("7")
             );
     } // if
@@ -800,7 +838,7 @@ VanPacketParseResult_t ParseLightsStatusPkt(const char* idenStr, TVanPacketRxDes
     return VAN_PACKET_PARSE_OK;
 } // ParseLightsStatusPkt
 
-VanPacketParseResult_t ParseDeviceReportPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseDeviceReportPkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#8C4
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#8C4
@@ -831,6 +869,7 @@ VanPacketParseResult_t ParseDeviceReportPkt(const char* idenStr, TVanPacketRxDes
             data[1] == 0x28 ? PSTR("TAPE_PRESENCE_ANNOUNCEMENT") :
             data[1] == 0x30 ? PSTR("CD_PRESENT") :
             data[1] == 0x40 ? PSTR("TUNER_PRESETS_REPLY") :
+            data[1] == 0x42 ? PSTR("TUNER_PRESET_MEMORIZE_BUTTON_PRESS_ANNOUNCE") :
             data[1] == 0x60 ? PSTR("TAPE_INFO_REPLY") :
             data[1] == 0x61 ? PSTR("TAPE_PLAYING_AUDIO_SETTINGS_ANNOUNCE") :
             data[1] == 0x62 ? PSTR("TAPE_PLAYING_BUTTON_PRESS_ANNOUNCE") :
@@ -903,11 +942,12 @@ VanPacketParseResult_t ParseDeviceReportPkt(const char* idenStr, TVanPacketRxDes
         // Found combinations:
         //
         // 07-00-01
-        // 07-00-02 - MFD requests "satnav_status_3" ?
+        // 07-00-02 - MFD requests "satnav_status_3"
         // 07-00-03 - MFD requests "satnav_status_3" and "satnav_status_2" ?
         // 07-01-00 - MFD requests "satnav_status_1" ?
         // 07-01-01 - User selected street from list. MFD requests "satnav_status_1" ?
         // 07-01-03
+        // 07-06-00 - MFD requests "satnav_guidance_data" and "satnav_guidance"
         // 07-10-00 - User pressed "Val" on remote control
         // 07-20-00 - MFD requests next "satnav_report" packet
         // 07-21-00 - MFD requests "satnav_status_1" and next "satnav_report" packet ?
@@ -916,7 +956,7 @@ VanPacketParseResult_t ParseDeviceReportPkt(const char* idenStr, TVanPacketRxDes
         // 07-40-02 - MFD requests "satnav_status_2"
         // 07-41-00 - MFD requests "satnav_status_1" and "satnav_status_2" ?
         // 07-44-00 - MFD requests "satnav_status_2" and "satnav_guidance_data"
-        // 07-47-00 - MFD requests "satnav_status_1", "satnav_status_2", "satnav_guidance_data" and "satnav_guidance" ?
+        // 07-47-00 - MFD requests "satnav_status_1", "satnav_status_2", "satnav_guidance_data" and "satnav_guidance"
         // 07-60-00
         //
         // So it looks like data[1] and data[2] are in fact bitfields:
@@ -938,7 +978,15 @@ VanPacketParseResult_t ParseDeviceReportPkt(const char* idenStr, TVanPacketRxDes
             "\"event\": \"display\",\n"
             "\"data\":\n"
             "{\n"
-                "\"mfd_to_satnav_instruction\": \"%S\"\n"
+                "\"mfd_to_satnav_instruction\": \"%S\",\n"
+                "\"mfd_to_satnav_status_1_request\": \"%S\",\n"
+                "\"mfd_to_satnav_status_2_request\": \"%S\",\n"
+                "\"mfd_to_satnav_status_3_request\": \"%S\",\n"
+                "\"mfd_to_satnav_guidance_request\": \"%S\",\n"
+                "\"mfd_to_satnav_guidance_data_request\": \"%S\",\n"
+                "\"mfd_to_satnav_report_request\": \"%S\",\n"
+                "\"mfd_to_satnav_response_request\": \"%S\",\n"
+                "\"mfd_to_satnav_user_selection\": \"%S\"\n"
             "}\n"
         "}\n";
 
@@ -950,10 +998,10 @@ VanPacketParseResult_t ParseDeviceReportPkt(const char* idenStr, TVanPacketRxDes
             code == 0x0001 ? PSTR("Accept") :
 
             // Always follows 0x1000
-            code == 0x0100 ? PSTR("End-of-button-press") :
+            code == 0x0100 ? PSTR("End_of_button_press") :
 
             // User selects street from list
-            // TODO - also when user selects category from list of services
+            // TODO - also when user selects service from list of services
             code == 0x0101 ? PSTR("Selected_street_from_list") :
 
             // User selects a menu entry or letter? User pressed "Val" (middle button on IR remote control).
@@ -974,7 +1022,16 @@ VanPacketParseResult_t ParseDeviceReportPkt(const char* idenStr, TVanPacketRxDes
             // MFD asks for sat nav guidance data packet (IDEN 0x9CE) and satnav_status_2 (IDEN 0x7CE)
             code == 0x4400 ? PSTR("Request_sat_nav_guidance_data") :
 
-            ToHexStr(code)
+            ToHexStr(code),
+
+            data[1] & 0x01 ? yesStr : noStr,
+            data[1] & 0x40 ? yesStr : noStr,
+            data[2] & 0x02 ? yesStr : noStr,
+            data[1] & 0x02 ? yesStr : noStr,
+            data[1] & 0x04 ? yesStr : noStr,
+            data[1] & 0x20 ? yesStr : noStr,
+            data[1] & 0x10 ? yesStr : noStr,
+            data[2] & 0x01 ? yesStr : noStr
         );
     }
     else if (data[0] == 0x52)
@@ -986,6 +1043,7 @@ VanPacketParseResult_t ParseDeviceReportPkt(const char* idenStr, TVanPacketRxDes
         // Found combinations:
         //
         // 52-08
+        // 52-20
         //
         return VAN_PACKET_PARSE_TO_BE_DECODED;
     }
@@ -1000,7 +1058,7 @@ VanPacketParseResult_t ParseDeviceReportPkt(const char* idenStr, TVanPacketRxDes
     return VAN_PACKET_PARSE_OK;
 } // ParseDeviceReportPkt
 
-VanPacketParseResult_t ParseCarStatus1Pkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseCarStatus1Pkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#564
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#564
@@ -1008,15 +1066,15 @@ VanPacketParseResult_t ParseCarStatus1Pkt(const char* idenStr, TVanPacketRxDesc&
     const uint8_t* data = pkt.Data();
     int dataLen = pkt.DataLen();
 
-    /*
-    // Process only if not duplicate of previous packet; ignore different sequence numbers
+    bool stalkIsPressed = data[10] & 0x01;
 
-    // 2021-02-21 - No, don't skip
-
-    static uint8_t packetData[VAN_MAX_DATA_BYTES] = "";  // Previous packet data
-    if (memcmp(data + 1, packetData, dataLen - 2) == 0) return VAN_PACKET_DUPLICATE;
-    memcpy(packetData, data + 1, dataLen - 2);
-    */
+    uint8_t avgSpeedTrip1 = data[11];
+    uint8_t avgSpeedTrip2 = data[12];
+    uint16_t distanceTrip1 = (uint16_t)data[14] << 8 | data[15];
+    uint16_t avgConsumptionLt100Trip1 = (uint16_t)data[16] << 8 | data[17];
+    uint16_t distanceTrip2 = (uint16_t)data[18] << 8 | data[19];
+    uint16_t avgConsumptionLt100Trip2 = (uint16_t)data[20] << 8 | data[21];
+    uint16_t instConsumptionLt100 = (uint16_t)data[22] << 8 | data[23];
 
     const static char jsonFormatter1[] PROGMEM =
     "{\n"
@@ -1036,14 +1094,6 @@ VanPacketParseResult_t ParseCarStatus1Pkt(const char* idenStr, TVanPacketRxDesc&
             "\"distance_1\": \"%S\",\n"
             "\"avg_consumption_lt_100_1\": \"%S\"";
 
-    uint8_t avgSpeedTrip1 = data[11];
-    uint8_t avgSpeedTrip2 = data[12];
-    uint16_t distanceTrip1 = (uint16_t)data[14] << 8 | data[15];
-    uint16_t avgConsumptionLt100Trip1 = (uint16_t)data[16] << 8 | data[17];
-    uint16_t distanceTrip2 = (uint16_t)data[18] << 8 | data[19];
-    uint16_t avgConsumptionLt100Trip2 = (uint16_t)data[20] << 8 | data[21];
-    uint16_t instConsumptionLt100 = (uint16_t)data[22] << 8 | data[23];
-
     char floatBuf[2][MAX_FLOAT_SIZE];
     int at = snprintf_P(buf, n, jsonFormatter1,
         data[7] & 0x80 ? openStr : closedStr,
@@ -1051,7 +1101,7 @@ VanPacketParseResult_t ParseCarStatus1Pkt(const char* idenStr, TVanPacketRxDesc&
         data[7] & 0x20 ? openStr : closedStr,
         data[7] & 0x10 ? openStr : closedStr,
         data[7] & 0x08 ? openStr : closedStr,
-        data[10] & 0x01 ? PSTR("PRESSED") : PSTR("RELEASED"),
+        stalkIsPressed ? PSTR("PRESSED") : PSTR("RELEASED"),
 
         // When engine running but stopped (actual vehicle speed is 0), this value counts down by 1 every
         // 10 - 20 seconds or so. When driving, this goes up and down slowly toward the current speed.
@@ -1095,7 +1145,7 @@ VanPacketParseResult_t ParseCarStatus1Pkt(const char* idenStr, TVanPacketRxDesc&
     return VAN_PACKET_PARSE_OK;
 } // ParseCarStatus1Pkt
 
-VanPacketParseResult_t ParseCarStatus2Pkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseCarStatus2Pkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#524
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#524
@@ -1106,7 +1156,8 @@ VanPacketParseResult_t ParseCarStatus2Pkt(const char* idenStr, TVanPacketRxDesc&
     if (dataLen != 14 && dataLen != 16) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
     // All known notifications, as literally retrieved from my vehicle (406 year 2003, DAM number 9586; your vehicle
-    // may have other texts). Retrieving was done with VanBus/examples/DisplayNotifications/DisplayNotifications.ino .
+    // may have other notification texts). Retrieving was done with the example sketch:
+    // "VanBus/examples/DisplayNotifications/DisplayNotifications.ino".
 
     // By convention, warning notifications end with "!"; information notifications do not.
     // TODO - translate into all languages
@@ -1302,7 +1353,9 @@ VanPacketParseResult_t ParseCarStatus2Pkt(const char* idenStr, TVanPacketRxDesc&
     bool first = true;
     for (int byte = 0; byte < dataLen; byte++)
     {
+        // Skip byte 9; it is the index of the current message
         if (byte == 9) byte++;
+
         for (int bit = 0; bit < 8; bit++)
         {
             if (data[byte] >> bit & 0x01)
@@ -1326,6 +1379,7 @@ VanPacketParseResult_t ParseCarStatus2Pkt(const char* idenStr, TVanPacketRxDesc&
     // Relying on short-circuit boolean evaluation
     if (currentMsg <= 0x7F && strlen_P(msgTable[currentMsg]) > 0)
     {
+        // The message to be shown in the popup on the MFD
         at += at >= n ? 0 :
             snprintf_P(buf + at, n - at, PSTR(",\n\"notification_message_on_mfd\": \"%S\""), msgTable[currentMsg]);
     } // if
@@ -1338,7 +1392,7 @@ VanPacketParseResult_t ParseCarStatus2Pkt(const char* idenStr, TVanPacketRxDesc&
     return VAN_PACKET_PARSE_OK;
 } // ParseCarStatus2Pkt
 
-VanPacketParseResult_t ParseDashboardPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseDashboardPkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#824
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#824
@@ -1347,18 +1401,21 @@ VanPacketParseResult_t ParseDashboardPkt(const char* idenStr, TVanPacketRxDesc& 
 
     uint16_t engineRpm = (uint16_t)data[0] << 8 | data[1];
     uint16_t vehicleSpeed = (uint16_t)data[2] << 8 | data[3];
-
+    uint32_t sec = (uint32_t)data[4] << 16 | (uint32_t)data[5] << 8 | data[6];
+    static uint32_t prevSec = 0;
     static long savedEngineRpm = 0;
     static long savedVehicleSpeed = 0;
 
     // With engine running, there are about 20 or so of these packets per second. Limit the rate somewhat.
-    // Send only if any of the reported values changes with more than 10 /min (engine_rpm) or 1 km/h (vehicle_speed).
+    // Send only if any of the reported values changes with more than 10 /min (engine_rpm), 1 km/h (vehicle_speed),
+    // or after 1 second.
     long diffEngineRpm = engineRpm - savedEngineRpm;
     long diffVehicleSpeed = vehicleSpeed - savedVehicleSpeed;
-    if (abs(diffEngineRpm) < 10 * 8 && abs(diffVehicleSpeed) < 100 * 1) return VAN_PACKET_NO_CONTENT;
+    if (abs(diffEngineRpm) < 10 * 8 && abs(diffVehicleSpeed) < 100 * 1 && sec == prevSec) return VAN_PACKET_NO_CONTENT;
 
     savedEngineRpm = engineRpm;
     savedVehicleSpeed = vehicleSpeed;
+    prevSec = sec;
 
     const static char jsonFormatter[] PROGMEM =
     "{\n"
@@ -1390,7 +1447,7 @@ VanPacketParseResult_t ParseDashboardPkt(const char* idenStr, TVanPacketRxDesc& 
     return VAN_PACKET_PARSE_OK;
 } // ParseDashboardPkt
 
-VanPacketParseResult_t ParseDashboardButtonsPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseDashboardButtonsPkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#664
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#664
@@ -1432,14 +1489,14 @@ VanPacketParseResult_t ParseDashboardButtonsPkt(const char* idenStr, TVanPacketR
         data[3] & 0x02 ? onStr : offStr,
 
         // Surely fuel level. Test with tank full shows definitely level is in litres.
-        data[4] == 0xFF ? notApplicable3Str : FloatToStr(floatBuf[0], fuelLevelFiltered, 1),
+        data[4] == 0xFF || data[4] == 0x00 ? notApplicable3Str : FloatToStr(floatBuf[0], fuelLevelFiltered, 1),
 
         #define FULL_TANK_LITRES (73.0)
         data[4] == 0xFF ? PSTR("0") :
             fuelLevelFiltered >= FULL_TANK_LITRES ? PSTR("1") :
                 FloatToStr(floatBuf[1], fuelLevelFiltered / FULL_TANK_LITRES, 2),
 
-        data[5] == 0xFF ? notApplicable3Str : FloatToStr(floatBuf[2], data[5] / 2.0, 1)
+        data[5] == 0xFF || data[5] == 0x00 ? notApplicable3Str : FloatToStr(floatBuf[2], data[5] / 2.0, 1)
     );
 
     // JSON buffer overflow?
@@ -1448,21 +1505,21 @@ VanPacketParseResult_t ParseDashboardButtonsPkt(const char* idenStr, TVanPacketR
     return VAN_PACKET_PARSE_OK;
 } // ParseDashboardButtonsPkt
 
-VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseHeadUnitPkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#554
 
     // These packets are sent by the head unit
 
-    // Head Unit info types
-    enum HeatUnitInfoType_t
+    // Head unit info types
+    enum HeadUnitInfoType_t
     {
         INFO_TYPE_TUNER = 0xD1,
         INFO_TYPE_TAPE,
         INFO_TYPE_PRESET,
         INFO_TYPE_CDCHANGER = 0xD5, // TODO - Not sure
         INFO_TYPE_CD,
-    }; // enum HeatUnitInfoType_t
+    }; // enum HeadUnitInfoType_t
 
     const uint8_t* data = pkt.Data();
     uint8_t infoType = data[1];
@@ -1476,6 +1533,11 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
             // Message when the head unit is in "tuner" (radio) mode
 
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#554_1
+
+            // Note: all packets as received from the following head units:
+            // - Clarion RM2-00 - PU-1633A(E) - Cassette tape
+            // - Clarion RD3-01 - PU-2473A(K) - CD player
+            // Other head units may have different packets.
 
             if (dataLen != 22) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
@@ -1498,6 +1560,7 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
             uint16_t frequency = (uint16_t)data[5] << 8 | data[4];
 
             // data[6] - Reception status? Like: receiving station? Stereo? RDS bits like MS, TP, TA, AF?
+            //
             // & 0xF0:
             //   - Usually 0x00 when tuned in to a "normal" station.
             //   - One or more bits stay '1' when tuned in to a "crappy" station (e.g. pirate).
@@ -1508,10 +1571,6 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
             //   - Music/Speech (MS) bit
             //   - No AF (Alternative Frequencies) available
             //   - Number (0..15) indicating the quality of the RDS stream
-            //   & 0x10:
-            //   & 0x20:
-            //   & 0x40:
-            //   & 0x80:
             //
             // & 0x0F = signal strength: increases with antenna plugged in and decreases with antenna plugged
             //          out. Updated when a station is being tuned in to, or when the MAN button is pressed.
@@ -1546,7 +1605,7 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
                 band == TB_FM2 ? onStr : offStr,
                 band == TB_FMAST ? onStr : offStr,
                 band == TB_AM ? onStr : offStr,
-                presetMemory == 0 ? PSTR("-") : presetMemoryBuffer,
+                presetMemory == 0 ? notApplicable1Str : presetMemoryBuffer,
                 frequency == 0x07FF ? notApplicable3Str :
                     band == TB_AM
                         ? FloatToStr(floatBuf, frequency, 0)  // AM and LW bands
@@ -1588,7 +1647,7 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
                 uint16_t piCode = (uint16_t)data[8] << 8 | data[9];
                 uint8_t countryCode = piCode >> 12 & 0x0F;
                 uint8_t coverageCode = piCode >> 8 & 0x0F;
-                char piBuffer[40];
+                char piBuffer[5];
                 sprintf_P(piBuffer, PSTR("%04X"), piCode);
 
                 // data[10]: for PTY-based search mode
@@ -1737,8 +1796,7 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
         {
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#554_6
 
-            // TODO - do we know the fixed numbers? Seems like this can only be 10 or 12.
-            if (dataLen < 10) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
+            if (dataLen != 19) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
 
             char trackTimeStr[7];
             sprintf_P(trackTimeStr, PSTR("%X:%02X"), data[5], data[6]);
@@ -1751,18 +1809,18 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
             if (! searching) loading = false;
 
             uint8_t totalTracks = data[8];
-            bool totalTracksInvalid = totalTracks == 0xFF;
+            bool totalTracksValid = totalTracks != 0xFF;
             char totalTracksStr[3];
-            if (! totalTracksInvalid) sprintf_P(totalTracksStr, PSTR("%X"), totalTracks);
+            if (totalTracksValid) sprintf_P(totalTracksStr, PSTR("%X"), totalTracks);
 
             char totalTimeStr[7];
-            bool totalTimeInvalid = dataLen < 12;
-            if (! totalTimeInvalid)
+            bool totalTimeValid = dataLen >= 12;
+            if (totalTimeValid)
             {
                 uint8_t totalTimeMin = data[9];
                 uint8_t totalTimeSec = data[10];
-                totalTimeInvalid = totalTimeMin == 0xFF || totalTimeSec == 0xFF;
-                if (! totalTimeInvalid) sprintf_P(totalTimeStr, PSTR("%X:%02X"), totalTimeMin, totalTimeSec);
+                totalTimeValid = totalTimeMin != 0xFF && totalTimeSec != 0xFF;
+                if (totalTimeValid) sprintf_P(totalTimeStr, PSTR("%X:%02X"), totalTimeMin, totalTimeSec);
             } // if
 
             const static char jsonFormatter[] PROGMEM =
@@ -1811,10 +1869,10 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
                 searching ? PSTR("--:--") : trackTimeStr,
 
                 data[7],
-                totalTracksInvalid ? notApplicable2Str : totalTracksStr,
-                totalTimeInvalid ? PSTR("--:--") : totalTimeStr,
+                totalTracksValid ? totalTracksStr : notApplicable2Str,
+                totalTimeValid ? totalTimeStr : PSTR("--:--"),
 
-                data[2] & 0x01 ? onStr : offStr
+                data[2] & 0x01 ? onStr : offStr  // CD track shuffle: long-press "CD" button
             );
         }
         break;
@@ -1838,7 +1896,7 @@ VanPacketParseResult_t ParseHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& p
     return VAN_PACKET_PARSE_OK;
 } // ParseHeadUnitPkt
 
-VanPacketParseResult_t ParseTimePkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseTimePkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#984
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#984
@@ -1871,7 +1929,7 @@ VanPacketParseResult_t ParseTimePkt(const char* idenStr, TVanPacketRxDesc& pkt, 
     return VAN_PACKET_PARSE_OK;
 } // ParseTimePkt
 
-VanPacketParseResult_t ParseAudioSettingsPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseAudioSettingsPkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#4D4
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#4D4
@@ -1886,7 +1944,7 @@ VanPacketParseResult_t ParseAudioSettingsPkt(const char* idenStr, TVanPacketRxDe
         "\"event\": \"display\",\n"
         "\"data\":\n"
         "{\n"
-            "\"power\": \"%S\",\n"  // TODO - change to "head_unit_power"
+            "\"head_unit_power\": \"%S\",\n"
             "\"tape_present\": \"%S\",\n"
             "\"cd_present\": \"%S\",\n"
             "\"audio_source\": \"%S\",\n"
@@ -1971,7 +2029,7 @@ VanPacketParseResult_t ParseAudioSettingsPkt(const char* idenStr, TVanPacketRxDe
     return VAN_PACKET_PARSE_OK;
 } // ParseAudioSettingsPkt
 
-VanPacketParseResult_t ParseMfdStatusPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseMfdStatusPkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#5E4
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#5E4
@@ -1979,12 +2037,20 @@ VanPacketParseResult_t ParseMfdStatusPkt(const char* idenStr, TVanPacketRxDesc& 
     const uint8_t* data = pkt.Data();
     uint16_t mfdStatus = (uint16_t)data[0] << 8 | data[1];
 
+    enum MfdStatus_t
+    {
+        MFD_SCREEN_OFF = 0x00FF,
+        MFD_SCREEN_ON = 0x20FF,
+        TRIP_COUTER_1_RESET = 0xA0FF,
+        TRIP_COUTER_2_RESET = 0x60FF
+    }; // enum MfdStatus_t
+
     const static char jsonFormatter[] PROGMEM =
     "{\n"
         "\"event\": \"display\",\n"
         "\"data\":\n"
         "{\n"
-            "\"mfd_status\": \"MFD_SCREEN_%S\"\n"
+            "\"mfd_status\": \"%S\"";
         "}\n"
     "}\n";
 
@@ -1993,9 +2059,11 @@ VanPacketParseResult_t ParseMfdStatusPkt(const char* idenStr, TVanPacketRxDesc& 
         // hmmm... MFD can also be ON if this is reported; this happens e.g. in the "minimal VAN network" test
         // setup with only the head unit (radio) and MFD. Maybe this is a status report: the MFD shows if has
         // received any packets that show connectivity to e.g. the BSI?
-        data[0] == 0x00 && data[1] == 0xFF ? offStr :
+        mfdStatus == MFD_SCREEN_OFF ? PSTR("MFD_SCREEN_OFF") :
 
-        data[0] == 0x20 && data[1] == 0xFF ? onStr :
+        mfdStatus == MFD_SCREEN_ON ? PSTR("MFD_SCREEN_ON") :
+        mfdStatus == TRIP_COUTER_1_RESET ? PSTR("TRIP_COUTER_1_RESET") :
+        mfdStatus == TRIP_COUTER_2_RESET ? PSTR("TRIP_COUTER_2_RESET") :
         ToHexStr(mfdStatus)
     );
 
@@ -2005,7 +2073,7 @@ VanPacketParseResult_t ParseMfdStatusPkt(const char* idenStr, TVanPacketRxDesc& 
     return VAN_PACKET_PARSE_OK;
 } // ParseMfdStatusPkt
 
-VanPacketParseResult_t ParseAirCon1Pkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseAirCon1Pkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#464
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#464
@@ -2122,7 +2190,7 @@ VanPacketParseResult_t ParseAirCon1Pkt(const char* idenStr, TVanPacketRxDesc& pk
     return VAN_PACKET_PARSE_OK;
 } // ParseAirCon1Pkt
 
-VanPacketParseResult_t ParseAirCon2Pkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseAirCon2Pkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#4DC
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#4DC
@@ -2183,7 +2251,7 @@ VanPacketParseResult_t ParseAirCon2Pkt(const char* idenStr, TVanPacketRxDesc& pk
     return VAN_PACKET_PARSE_OK;
 } // ParseAirCon2Pkt
 
-VanPacketParseResult_t ParseCdChangerPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseCdChangerPkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#4EC
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#4EC
@@ -2203,14 +2271,14 @@ VanPacketParseResult_t ParseCdChangerPkt(const char* idenStr, TVanPacketRxDesc& 
 
     uint8_t trackTimeMin = data[4];
     uint8_t trackTimeSec = data[5];
-    bool trackTimeInvalid = trackTimeMin == 0xFF || trackTimeSec == 0xFF;
+    bool trackTimeValid = trackTimeMin != 0xFF && trackTimeSec != 0xFF;
     char trackTimeStr[7];
-    if (! trackTimeInvalid) sprintf_P(trackTimeStr, PSTR("%X:%02X"), trackTimeMin, trackTimeSec);
+    if (trackTimeValid) sprintf_P(trackTimeStr, PSTR("%X:%02X"), trackTimeMin, trackTimeSec);
 
     uint8_t totalTracks = data[8];
-    bool totalTracksInvalid = totalTracks == 0xFF;
+    bool totalTracksValid = totalTracks != 0xFF;
     char totalTracksStr[3];
-    if (! totalTracksInvalid) sprintf_P(totalTracksStr, PSTR("%X"), totalTracks);
+    if (totalTracksValid) sprintf_P(totalTracksStr, PSTR("%X"), totalTracks);
 
     uint8_t currentTrack = data[6];
     uint8_t currentDisc = data[7];
@@ -2281,10 +2349,10 @@ VanPacketParseResult_t ParseCdChangerPkt(const char* idenStr, TVanPacketRxDesc& 
 
         cdChangerCartridgePresent ? yesStr : noStr,
 
-        trackTimeInvalid ? PSTR("--:--") : trackTimeStr,
+        trackTimeValid ? trackTimeStr : PSTR("--:--"),
 
         currentTrack == 0xFF ? notApplicable2Str : ToBcdStr(currentTrack),
-        totalTracksInvalid ? notApplicable2Str : totalTracksStr,
+        totalTracksValid ? totalTracksStr : notApplicable2Str,
 
         data[10] & 0x01 ? yesStr : noStr,
         data[10] & 0x02 ? yesStr : noStr,
@@ -2313,7 +2381,7 @@ VanPacketParseResult_t ParseCdChangerPkt(const char* idenStr, TVanPacketRxDesc& 
     return VAN_PACKET_PARSE_OK;
 } // ParseCdChangerPkt
 
-VanPacketParseResult_t ParseSatNavStatus1Pkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseSatNavStatus1Pkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#54E
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#54E
@@ -2332,8 +2400,7 @@ VanPacketParseResult_t ParseSatNavStatus1Pkt(const char* idenStr, TVanPacketRxDe
 
     int at = snprintf_P(buf, n, jsonFormatter,
 
-        // TODO - check; total guess
-        status == 0x0000 ? emptyStr :
+        status == 0x0000 ? noneStr :
         status == 0x0001 ? PSTR("DESTINATION_NOT_ON_MAP") :
         status == 0x0020 ? ToHexStr(status) :  // Seen this but what is it?? Nearly at destination ??
         status == 0x0080 ? PSTR("READY") :
@@ -2350,12 +2417,12 @@ VanPacketParseResult_t ParseSatNavStatus1Pkt(const char* idenStr, TVanPacketRxDe
         status == 0x0701 ? PSTR("INSTRUCTION_AUDIO_MESSAGE_START_2") :
         status == 0x0800 ? PSTR("END_OF_AUDIO_MESSAGE") :  // Follows 0x0400, 0x0700, 0x0701
         status == 0x4000 ? PSTR("GUIDANCE_STOPPED") :
-        status == 0x4001 ? ToHexStr(status) :  // Seen this but what is it??
+        status == 0x4001 ? PSTR("DESTINATION_NOT_ON_MAP") :  // TODO - guessing
         status == 0x4080 ? ToHexStr(status) :  // Seen this but what is it??
         status == 0x4200 ? PSTR("ARRIVED_AT_DESTINATION_2") :
         status == 0x9000 ? PSTR("READING_DISC_2") :
         status == 0x9080 ? PSTR("START_CALCULATING_ROUTE") : // TODO - guessing
-        status == 0xD001 ? ToHexStr(status) :  // Seen this but what is it??
+        status == 0xD001 ? PSTR("DESTINATION_NOT_ON_MAP") :  // TODO - guessing
         ToHexStr(status),
 
         data[4] == 0x0B ? PSTR(" 0x0B") :  // Seen with status 0x4001 and 0xD001
@@ -2370,23 +2437,91 @@ VanPacketParseResult_t ParseSatNavStatus1Pkt(const char* idenStr, TVanPacketRxDe
     return VAN_PACKET_PARSE_OK;
 } // ParseSatNavStatus1Pkt
 
-VanPacketParseResult_t ParseSatNavStatus2Pkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+// Sat nav equipment detection
+bool satnavEquipmentDetected = true;
+
+VanPacketParseResult_t ParseSatNavStatus2Pkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#7CE
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#7CE
 
+    int dataLen = pkt.DataLen();
+    if (dataLen != 0 && dataLen != 20) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
+
+    // Count number of times a a "read" frame did not get an in-frame response
+    static int nSatNavNotSeen = 0;
+
+    if (dataLen == 0)
+    {
+        // This is a "read" packet that did not get an in-frame response. If the sat nav unit is not there, this
+        // packet is sent by the MFD over and over again.
+
+        static unsigned long lastPacketReceived = 0;
+        unsigned long now = millis();
+        unsigned long packetInterval = now - lastPacketReceived;  // Arithmetic has safe roll-over
+        lastPacketReceived = now;
+
+        if (packetInterval < 500)
+        {
+            // As long as the MFD assumes the sat nav equipment is present (e.g. at boot time), it sends 5 bursts
+            // of each 3 packets. Ater that it sends one packet per second.
+            nSatNavNotSeen = 0;
+
+            // Already reported "equipment present"?
+            if (satnavEquipmentDetected) return VAN_PACKET_NO_CONTENT;
+
+            satnavEquipmentDetected = true;
+        }
+        else
+        {
+            // Already reported "no equipment present"?
+            if (! satnavEquipmentDetected) return VAN_PACKET_NO_CONTENT;
+
+            // After the last burst, count 2 non-bursts
+            nSatNavNotSeen++;
+
+            #define SATNAV_NO_ANSWER (2)
+            if (nSatNavNotSeen < SATNAV_NO_ANSWER) return VAN_PACKET_NO_CONTENT;
+
+            satnavEquipmentDetected = false;
+        } // if
+
+        const static char jsonFormatter[] PROGMEM =
+        "{\n"
+            "\"event\": \"display\",\n"
+            "\"data\":\n"
+            "{\n"
+                "\"satnav_equipment_present\": \"%S\"\n"
+            "}\n"
+        "}\n";
+
+        int at = snprintf_P(buf, n, jsonFormatter, satnavEquipmentDetected ? yesStr : noStr);
+
+        // JSON buffer overflow?
+        if (at >= n) return VAN_PACKET_PARSE_JSON_TOO_LONG;
+
+        return VAN_PACKET_PARSE_OK;
+    } // if
+
+    nSatNavNotSeen = 0;
+
     const uint8_t* data = pkt.Data();
+
+    // Ignore duplicates of the "long" (20 byte) packets
+    static uint8_t packetData[VAN_MAX_DATA_BYTES];  // Previous packet data
+    if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
+    memcpy(packetData, data, dataLen);
 
     uint8_t satnavStatus2 = data[1] & 0x0F;
 
-    const char* satnavStatus2Str =
-        satnavStatus2 == 0x00 ? PSTR("INITIALIZING") : // TODO - change to "IDLE"
-        satnavStatus2 == 0x01 ? PSTR("IDLE") : // TODO - change to "READY"
+    PGM_P satnavStatus2Str =
+        satnavStatus2 == 0x00 ? PSTR("INITIALIZING") :
+        satnavStatus2 == 0x01 ? PSTR("IDLE") :
         satnavStatus2 == 0x05 ? PSTR("IN_GUIDANCE_MODE") :
         ToHexStr(satnavStatus2);
 
     bool satnavGuidanceActive = satnavStatus2 == 0x05;
-    bool satnavDiscPresent = (data[2] & 0x70) == 0x30;
+    bool satnavDiscRecognized = (data[2] & 0x70) == 0x30;
 
     const static char jsonFormatter[] PROGMEM =
     "{\n"
@@ -2398,7 +2533,7 @@ VanPacketParseResult_t ParseSatNavStatus2Pkt(const char* idenStr, TVanPacketRxDe
             "\"satnav_destination_reachable\": \"%S\",\n"
             "\"satnav_on_map\": \"%S\",\n"
             "\"satnav_download_finished\": \"%S\",\n"
-            "\"satnav_disc_present\": \"%S\",\n"
+            "\"satnav_disc_recognized\": \"%S\",\n"
             "\"satnav_gps_fix\": \"%S\",\n"
             "\"satnav_gps_fix_lost\": \"%S\",\n"
             "\"satnav_gps_scanning\": \"%S\",\n"
@@ -2414,8 +2549,8 @@ VanPacketParseResult_t ParseSatNavStatus2Pkt(const char* idenStr, TVanPacketRxDe
         data[1] & 0x40 ? noStr : yesStr,
         data[1] & 0x80 ? yesStr : noStr,
 
+        satnavDiscRecognized ? yesStr :
         (data[2] & 0x70) == 0x70 ? noStr :
-        (data[2] & 0x70) == 0x30 ? yesStr :
         ToHexStr((uint8_t)(data[2] & 0x70)),
 
         data[2] & 0x01 ? yesStr : noStr,
@@ -2423,7 +2558,7 @@ VanPacketParseResult_t ParseSatNavStatus2Pkt(const char* idenStr, TVanPacketRxDe
         data[2] & 0x04 ? yesStr : noStr,
 
         // 0xE0 as boundary for "reverse": just guessing. Do we ever drive faster than 224 km/h?
-        data[16] >= 0xE0 ? PSTR("-") : emptyStr,
+        data[16] >= 0xE0 ? dashStr : emptyStr,
         data[16] < 0xE0 ? data[16] : 0xFF - data[16] + 1
     );
 
@@ -2449,15 +2584,23 @@ VanPacketParseResult_t ParseSatNavStatus2Pkt(const char* idenStr, TVanPacketRxDe
             );
     } // if
 
+    if (! satnavEquipmentDetected)
+    {
+        at += at >= n ? 0 :
+            snprintf_P(buf + at, n - at, PSTR(",\n\"satnav_equipment_present\": \"YES\""));
+    } // if
+
     at += at >= n ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}\n"));
 
     // JSON buffer overflow?
     if (at >= n) return VAN_PACKET_PARSE_JSON_TOO_LONG;
 
+    satnavEquipmentDetected = true;
+
     return VAN_PACKET_PARSE_OK;
 } // ParseSatNavStatus2Pkt
 
-VanPacketParseResult_t ParseSatNavStatus3Pkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseSatNavStatus3Pkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#8CE
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#8CE
@@ -2483,7 +2626,6 @@ VanPacketParseResult_t ParseSatNavStatus3Pkt(const char* idenStr, TVanPacketRxDe
 
         at = snprintf_P(buf, n, jsonFormatter,
 
-            // TODO - check; total guess
             status == 0x0000 ? PSTR("CALCULATING_ROUTE") :
             status == 0x0001 ? PSTR("STOPPING_NAVIGATION") :
             status == 0x0101 ? ToHexStr(status) :
@@ -2505,7 +2647,7 @@ VanPacketParseResult_t ParseSatNavStatus3Pkt(const char* idenStr, TVanPacketRxDe
     {
         // Sat nav guidance preference
 
-        uint8_t preference = data[1];
+        uint8_t satnavGuidancePreference = data[1];
 
         const static char jsonFormatter[] PROGMEM =
         "{\n"
@@ -2516,7 +2658,7 @@ VanPacketParseResult_t ParseSatNavStatus3Pkt(const char* idenStr, TVanPacketRxDe
             "}\n"
         "}\n";
 
-        at = snprintf_P(buf, n, jsonFormatter, SatNavGuidancePreferenceStr(preference));
+        at = snprintf_P(buf, n, jsonFormatter, SatNavGuidancePreferenceStr(satnavGuidancePreference));
     }
     else if (dataLen == 17 && data[0] == 0x20)
     {
@@ -2555,7 +2697,7 @@ VanPacketParseResult_t ParseSatNavStatus3Pkt(const char* idenStr, TVanPacketRxDe
     return VAN_PACKET_PARSE_OK;
 } // ParseSatNavStatus3Pkt
 
-VanPacketParseResult_t ParseSatNavGuidanceDataPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseSatNavGuidanceDataPkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#9CE
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#9CE
@@ -2631,7 +2773,7 @@ VanPacketParseResult_t ParseSatNavGuidanceDataPkt(const char* idenStr, TVanPacke
     return VAN_PACKET_PARSE_OK;
 } // ParseSatNavGuidanceDataPkt
 
-VanPacketParseResult_t ParseSatNavGuidancePkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseSatNavGuidancePkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#64E
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#64E
@@ -2763,7 +2905,7 @@ VanPacketParseResult_t ParseSatNavGuidancePkt(const char* idenStr, TVanPacketRxD
     return VAN_PACKET_PARSE_OK;
 } // ParseSatNavGuidancePkt
 
-VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseSatNavReportPkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#6CE
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#6CE
@@ -2873,11 +3015,11 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
                 records[currentRecord][currentString] = buffer;
 
                 // The last character can be:
-                // - 0x80: indicates that the entry cannot be selected because the current disk cannot be read.
-                //   This is shown as a "?".
-                // - 0x81: indicates that the entry cannot be selected because the current disk is for a different
-                //   country/region.
-                //   This is shown on the MFD as an circle with a bar "(-)"; here we use a circle with a cross "(X)".
+                // - 0x80: indicates that the entry cannot be selected because the current navigation disc cannot be
+                //   read. This is shown as a "?".
+                // - 0x81: indicates that the entry cannot be selected because the current navigation disc is for a
+                //   different country/region. This is shown on the MFD as an circle with a bar "(-)"; here we use a
+                //   circle with a cross "(X)".
                 records[currentRecord][currentString].replace("\x80", "?");
                 records[currentRecord][currentString].replace("\x81", "&#x24E7;");
 
@@ -2925,13 +3067,20 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
         {
             if (records[0][6].length() == 0)
             {
+                // In this case, the original MFD says: "Street not listed"
+
                 const static char jsonFormatter[] PROGMEM =
                     ",\n"
-                    "\"%S\": \"\"";
+                    "\"%S\": \"%s%S%s\"";
 
                 at += at >= n ? 0 :
                     snprintf_P(buf + at, n - at, jsonFormatter,
-                        report == SR_CURRENT_STREET ? PSTR("satnav_curr_street") : PSTR("satnav_next_street")
+                        report == SR_CURRENT_STREET ? PSTR("satnav_curr_street") : PSTR("satnav_next_street"),
+
+                        // City (if any) + optional district
+                        records[0][3].c_str(),
+                        records[0][4].length() == 0 ? emptyStr : PSTR(" - "),
+                        records[0][4].c_str()
                     );
 
                 break;
@@ -3096,22 +3245,22 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
         {
             const static char jsonFormatter[] PROGMEM =
                 ",\n"
-                "\"satnav_place_of_interest_address_entry\": \"%s\",\n"
-                "\"satnav_place_of_interest_address_country\": \"%s\",\n"
-                "\"satnav_place_of_interest_address_province\": \"%s\",\n"
-                "\"satnav_place_of_interest_address_city\": \"%s%S%s\",\n"
-                "\"satnav_place_of_interest_address_street\": \"%s%s\",\n"
-                "\"satnav_place_of_interest_address_distance\": \"%s m\"";
+                "\"satnav_service_address_entry\": \"%s\",\n"
+                "\"satnav_service_address_country\": \"%s\",\n"
+                "\"satnav_service_address_province\": \"%s\",\n"
+                "\"satnav_service_address_city\": \"%s%S%s\",\n"
+                "\"satnav_service_address_street\": \"%s%s\",\n"
+                "\"satnav_service_address_distance\": \"%s m\"";
 
-            // Chosen place of interest address is in first (and only) record. Copy at least city [3], district [4]
+            // Chosen service address is in first (and only) record. Copy at least city [3], district [4]
             // (if any), street [5, 6], entry name [9] and distance [11]; skip the other strings.
             at += at >= n ? 0 :
                 snprintf_P(buf + at, n - at, jsonFormatter,
 
-                    // Name of the place of interest
+                    // Name of the service address
                     records[0][9].c_str(),
 
-                    // Address of the place of interest
+                    // Service address
 
                     // Country
                     records[0][1].c_str(),
@@ -3128,7 +3277,7 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
                     records[0][5].c_str() + 1,  // Skip the fixed first letter ('G' or 'I')
                     records[0][6].c_str(),
 
-                    // Distance (in metres) to the place of interest
+                    // Distance (in metres) to the service address
                     records[0][11].c_str()
                 );
         }
@@ -3156,7 +3305,17 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
                         i == 0 ? emptyStr : commaStr,
                         records[i][0].c_str()
                     );
+
+                if (report == SR_PERSONAL_ADDRESS_LIST || report == SR_PROFESSIONAL_ADDRESS_LIST)
+                {
+                    // Remove possibly trailing special characters and spaces.
+                    // The special characters that can occur are listed in the above 'while' loop (around line 2985).
+                    records[i][0].replace("?", "");
+                    records[i][0].replace("&#x24E7;", "");
+                    records[i][0].trim();
+                } // if
             } // for
+
             at += at >= n ? 0 :
                 snprintf_P(buf + at, n - at, PSTR("\n]"));
         }
@@ -3191,7 +3350,7 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
             at += at >= n ? 0 :
                 snprintf_P(buf + at, n - at, jsonFormatter);
 
-            // Each "category" in the list is a single string in a separate record
+            // Each "service" in the list is a single string in a separate record
             for (int i = 0; i < currentRecord; i++)
             {
                 at += at >= n ? 0 :
@@ -3259,7 +3418,7 @@ VanPacketParseResult_t ParseSatNavReportPkt(const char* idenStr, TVanPacketRxDes
     return VAN_PACKET_PARSE_OK;
 } // ParseSatNavReportPkt
 
-VanPacketParseResult_t ParseMfdToSatNavPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseMfdToSatNavPkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#94E
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#94E
@@ -3291,7 +3450,7 @@ VanPacketParseResult_t ParseMfdToSatNavPkt(const char* idenStr, TVanPacketRxDesc
         // Combinations:
 
         // * request == 0x02 (SR_ENTER_CITY),
-        //   param == 0x1D:
+        //   param == 0x1D || param == 0x0D:
         //   - type = 0 (SRT_REQ_N_ITEMS) (dataLen = 4): request (remaining) list length
         //     -- data[3]: (next) character to narrow down selection with. 0x00 if none.
         //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): request list 
@@ -3300,12 +3459,12 @@ VanPacketParseResult_t ParseMfdToSatNavPkt(const char* idenStr, TVanPacketRxDesc
         //   - type = 2 (SRT_SELECT) (dataLen = 11): select entry
         //     -- data[5] << 8 | data[6]: selected entry (0-based)
 
-        request == SR_ENTER_CITY && param == 0x1D && type == SRT_REQ_N_ITEMS ? PSTR("satnav_enter_city_characters") :
-        request == SR_ENTER_CITY && param == 0x1D && type == SRT_REQ_ITEMS ? PSTR("satnav_choose_from_list") :
-        request == SR_ENTER_CITY && param == 0x1D && type == SRT_SELECT ? emptyStr :
+        request == SR_ENTER_CITY && (param == 0x1D || param == 0x0D) && type == SRT_REQ_N_ITEMS ? PSTR("satnav_enter_city_characters") :
+        request == SR_ENTER_CITY && (param == 0x1D || param == 0x0D) && type == SRT_REQ_ITEMS ? PSTR("satnav_choose_from_list") :
+        request == SR_ENTER_CITY && (param == 0x1D || param == 0x0D) && type == SRT_SELECT ? emptyStr :
 
         // * request == 0x05 (SR_ENTER_STREET),
-        //   param == 0x1D:
+        //   param == 0x1D || param == 0x0D:
         //   - type = 0 (SRT_REQ_N_ITEMS) (dataLen = 4): request (remaining) list length
         //     -- data[3]: (next) character to narrow down selection with. 0x00 if none.
         //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): request list 
@@ -3313,13 +3472,14 @@ VanPacketParseResult_t ParseMfdToSatNavPkt(const char* idenStr, TVanPacketRxDesc
         //     -- data[7] << 8 | data[8]: number of items to retrieve
         //   - type = 2 (SRT_SELECT) (dataLen = 11): select entry
         //     -- data[5] << 8 | data[6]: selected entry (0-based)
+        //   param == 0x1D: (TODO also || param == 0x0D ?)
         //   - type = 3 (SRT_SELECT_CITY_CENTER) (dataLen = 9): select city center
         //     -- data[5] << 8 | data[6]: offset in list (always 0)
         //     -- data[7] << 8 | data[8]: number of items to retrieve (always 1)
 
-        request == SR_ENTER_STREET && param == 0x1D && type == SRT_REQ_N_ITEMS ? PSTR("satnav_enter_street_characters") :
-        request == SR_ENTER_STREET && param == 0x1D && type == SRT_REQ_ITEMS ? PSTR("satnav_choose_from_list") :
-        request == SR_ENTER_STREET && param == 0x1D && type == SRT_SELECT ? emptyStr :
+        request == SR_ENTER_STREET && (param == 0x1D || param == 0x0D) && type == SRT_REQ_N_ITEMS ? PSTR("satnav_enter_street_characters") :
+        request == SR_ENTER_STREET && (param == 0x1D || param == 0x0D) && type == SRT_REQ_ITEMS ? PSTR("satnav_choose_from_list") :
+        request == SR_ENTER_STREET && (param == 0x1D || param == 0x0D) && type == SRT_SELECT ? emptyStr :
         request == SR_ENTER_STREET && param == 0x1D && type == SRT_SELECT_CITY_CENTER ? PSTR("satnav_show_current_destination") :
 
         // * request == 0x06 (SR_ENTER_HOUSE_NUMBER),
@@ -3344,7 +3504,7 @@ VanPacketParseResult_t ParseMfdToSatNavPkt(const char* idenStr, TVanPacketRxDesc
 
         // * request == 0x08 (SR_SERVICE_LIST),
         //   param == 0xFF:
-        //   - type = 0 (SRT_REQ_N_ITEMS) (dataLen = 4): present nag screen. Satnav response is PLACE_OF_INTEREST_CATEGORY_LIST
+        //   - type = 0 (SRT_REQ_N_ITEMS) (dataLen = 4): present nag screen. Satnav response is SR_SERVICE_LIST
         //              with list_size=38, but the MFD ignores that.
         //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): request list 
         //     -- data[5] << 8 | data[6]: offset in list (always 0)
@@ -3361,7 +3521,7 @@ VanPacketParseResult_t ParseMfdToSatNavPkt(const char* idenStr, TVanPacketRxDesc
         //     -- data[7] << 8 | data[8]: number of items to retrieve (always 1: MFD browses address by address)
 
         request == SR_SERVICE_ADDRESS && param == 0x0D && type == SRT_REQ_N_ITEMS ? PSTR("satnav_choose_from_list") :
-        request == SR_SERVICE_ADDRESS && param == 0x0D && type == SRT_REQ_ITEMS ? PSTR("satnav_show_place_of_interest_address") :
+        request == SR_SERVICE_ADDRESS && param == 0x0D && type == SRT_REQ_ITEMS ? PSTR("satnav_show_service_address") :
 
         // * request == 0x09 (SR_SERVICE_ADDRESS),
         //   param == 0x0E:
@@ -3409,7 +3569,7 @@ VanPacketParseResult_t ParseMfdToSatNavPkt(const char* idenStr, TVanPacketRxDesc
 
         // * request == 0x10 (SR_CURRENT_STREET),
         //   param == 0x0D:
-        //   - type = 2 (SRT_SELECT) (dataLen = 11): select current location for e.g. places of interest
+        //   - type = 2 (SRT_SELECT) (dataLen = 11): select current location for e.g. service addresses
         //     -- no further data
 
         request == SR_CURRENT_STREET && param == 0x0D && type == SRT_SELECT ? emptyStr :
@@ -3451,7 +3611,7 @@ VanPacketParseResult_t ParseMfdToSatNavPkt(const char* idenStr, TVanPacketRxDesc
         //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): get entry
         //     -- data[5] << 8 | data[6]: selected entry (0-based)
 
-        request == SR_PROFESSIONAL_ADDRESS && param == 0xFF && type == SRT_REQ_ITEMS ? PSTR("satnav_show_business_address") :
+        request == SR_PROFESSIONAL_ADDRESS && param == 0xFF && type == SRT_REQ_ITEMS ? PSTR("satnav_show_professional_address") :
 
         // * request == 0x1B (SR_PERSONAL_ADDRESS_LIST),
         //   param == 0xFF:
@@ -3566,7 +3726,7 @@ VanPacketParseResult_t ParseMfdToSatNavPkt(const char* idenStr, TVanPacketRxDesc
     return VAN_PACKET_PARSE_OK;
 } // ParseMfdToSatNavPkt
 
-VanPacketParseResult_t ParseSatNavToMfdPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseSatNavToMfdPkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#74E
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#74E
@@ -3636,7 +3796,7 @@ VanPacketParseResult_t ParseSatNavToMfdPkt(const char* idenStr, TVanPacketRxDesc
     return VAN_PACKET_PARSE_OK;
 } // ParseSatNavToMfdPkt
 
-VanPacketParseResult_t ParseWheelSpeedPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseWheelSpeedPkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#744
 
@@ -3669,7 +3829,7 @@ VanPacketParseResult_t ParseWheelSpeedPkt(const char* idenStr, TVanPacketRxDesc&
     return VAN_PACKET_PARSE_OK;
 } // ParseWheelSpeedPkt
 
-VanPacketParseResult_t ParseOdometerPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseOdometerPkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#8FC
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#8FC
@@ -3697,7 +3857,7 @@ VanPacketParseResult_t ParseOdometerPkt(const char* idenStr, TVanPacketRxDesc& p
     return VAN_PACKET_PARSE_OK;
 } // ParseOdometerPkt
 
-VanPacketParseResult_t ParseCom2000Pkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseCom2000Pkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#450
 
@@ -3775,7 +3935,7 @@ VanPacketParseResult_t ParseCom2000Pkt(const char* idenStr, TVanPacketRxDesc& pk
     return VAN_PACKET_PARSE_OK;
 } // ParseCom2000Pkt
 
-VanPacketParseResult_t ParseCdChangerCmdPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseCdChangerCmdPkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#8EC
 
@@ -3816,7 +3976,7 @@ VanPacketParseResult_t ParseCdChangerCmdPkt(const char* idenStr, TVanPacketRxDes
     return VAN_PACKET_PARSE_OK;
 } // ParseCdChangerCmdPkt
 
-VanPacketParseResult_t ParseMfdToHeadUnitPkt(const char* idenStr, TVanPacketRxDesc& pkt, char* buf, const int n)
+VanPacketParseResult_t ParseMfdToHeadUnitPkt(TVanPacketRxDesc& pkt, char* buf, const int n)
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#8D4
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#8D4
@@ -4082,8 +4242,17 @@ bool IsPacketDataDuplicate(TVanPacketRxDesc& pkt, IdenHandler_t* handler)
     const uint8_t* data = pkt.Data();
 
     // Relying on short-circuit boolean evaluation
-    if (handler->prevData != NULL && memcmp(data, handler->prevData, dataLen) == 0) return true;  // Duplicate packet
+    bool isDuplicate =
+        handler->prevDataLen - 1 == dataLen  // handler->prevDataLen is initialized to 0; use 1 for 0-byte packets
+        && handler->prevData != NULL
+        && memcmp(data, handler->prevData, dataLen) == 0;
 
+    if (handler->ignoreDups && isDuplicate) return true;  // Duplicate packet, to be ignored
+
+    // Don't repeatedly print the same packet
+    if (isDuplicate) return false;  // Duplicate packet, not to be ignored, but don't print
+
+    // Not a duplicate packet: print the diff, and save the packet to compare with the next
     if ((serialDumpFilter == 0 || iden == serialDumpFilter) && IsPacketSelected(iden, SELECTED_PACKETS))
     {
         Serial.printf_P(PSTR("---> Received: %s packet (0x%03X)\n"), handler->idenStr, iden);
@@ -4093,15 +4262,23 @@ bool IsPacketDataDuplicate(TVanPacketRxDesc& pkt, IdenHandler_t* handler)
         {
             // First line: print the new packet's data where it differs from the previous packet
             Serial.printf_P(PSTR("DIFF: 0x%03X (%s) "), iden, handler->idenStr);
-            for (int i = 0; i < dataLen; i++)
+            if (dataLen > 0)
             {
-                char diffByte[3] = "  ";
-                if (data[i] != handler->prevData[i])
+                for (int i = 0; i < dataLen; i++)
                 {
-                    snprintf_P(diffByte, sizeof(diffByte), PSTR("%02X"), handler->prevData[i]);
-                } // if
-                Serial.printf_P(PSTR("%s%c"), diffByte, i < dataLen - 1 ? '-' : '\n');
-            } // for
+                    char diffByte[3] = "  ";
+                    if (data[i] != handler->prevData[i])
+                    {
+                        snprintf_P(diffByte, sizeof(diffByte), PSTR("%02X"), handler->prevData[i]);
+                    } // if
+                    Serial.printf_P(PSTR("%s%S"), diffByte, i < dataLen - 1 ? dashStr : emptyStr);
+                } // for
+                Serial.println();
+            }
+            else
+            {
+                Serial.println("<no_data>");
+            } // if
         } // if
     } // if
 
@@ -4112,77 +4289,70 @@ bool IsPacketDataDuplicate(TVanPacketRxDesc& pkt, IdenHandler_t* handler)
         // Save packet data to compare against at next packet reception
         memset(handler->prevData, 0, VAN_MAX_DATA_BYTES);
         memcpy(handler->prevData, data, dataLen);
+        handler->prevDataLen = dataLen + 1;
     } // if
 
     if ((serialDumpFilter == 0 || iden == serialDumpFilter) && IsPacketSelected(iden, SELECTED_PACKETS))
     {
         // Now print the new packet's data in full
         Serial.printf_P(PSTR("FULL: 0x%03X (%s) "), iden, handler->idenStr);
-        for (int i = 0; i < dataLen; i++) Serial.printf_P(PSTR("%02X%c"), data[i], i < dataLen - 1 ? '-' : ' ');
-        Serial.println();
+        if (dataLen > 0)
+        {
+            for (int i = 0; i < dataLen; i++)
+            {
+                Serial.printf_P(PSTR("%02X%S"), data[i], i < dataLen - 1 ? dashStr : emptyStr);
+            } // for
+            Serial.println();
+        }
+        else
+        {
+            Serial.println("<no_data>");
+        } // if
     } // if
 
     return false;
 } // IsPacketDataDuplicate
 
-// Pretty-print a JSON formatted string, adding indentation
-void PrintJsonText(const char* jsonBuffer)
-{
-    // Number of spaces to add for each indentation level
-    #define PRETTY_PRINT_JSON_INDENT 2
-
-    size_t j = 0;
-    int indent = 0;
-    while (j < strlen(jsonBuffer))
-    {
-        const char* subString = jsonBuffer + j;
-
-        if (subString[0] == '}' || subString[0] == ']') indent -= PRETTY_PRINT_JSON_INDENT;
-
-        size_t n = strcspn(subString, "\n");
-        if (n != strlen(subString)) Serial.printf("%*s%.*s\n", indent, "", n, subString);
-        j = j + n + 1;
-
-        if (subString[0] == '{' || subString[0] == '[') indent += PRETTY_PRINT_JSON_INDENT;
-    } // while
-} // PrintJsonText
-
 static IdenHandler_t handlers[] =
 {
     // Columns:
-    // IDEN value, IDEN string, number of expected bytes (or -1 if varying/unknown), handler function
-    { VIN_IDEN, "vin", 17, &ParseVinPkt },
-    { ENGINE_IDEN, "engine", 7, &ParseEnginePkt },
-    { HEAD_UNIT_STALK_IDEN, "head_unit_stalk", 2, &ParseHeadUnitStalkPkt },
-    { LIGHTS_STATUS_IDEN, "lights_status", -1, &ParseLightsStatusPkt },
-    { DEVICE_REPORT, "device_report", -1, &ParseDeviceReportPkt },
-    { CAR_STATUS1_IDEN, "car_status_1", 27, &ParseCarStatus1Pkt },
-    { CAR_STATUS2_IDEN, "car_status_2", -1, &ParseCarStatus2Pkt },
-    { DASHBOARD_IDEN, "dashboard", 7, &ParseDashboardPkt },
-    { DASHBOARD_BUTTONS_IDEN, "dashboard_buttons", -1, &ParseDashboardButtonsPkt },
-    { HEAD_UNIT_IDEN, "head_unit", -1, &ParseHeadUnitPkt },
-    { TIME_IDEN, "time", 5, &ParseTimePkt },
-    { AUDIO_SETTINGS_IDEN, "audio_settings", 11, &ParseAudioSettingsPkt },
-    { MFD_STATUS_IDEN, "mfd_status", 2, &ParseMfdStatusPkt },
-    { AIRCON1_IDEN, "aircon_1", 5, &ParseAirCon1Pkt },
-    { AIRCON2_IDEN, "aircon_2", 7, &ParseAirCon2Pkt },
-    { CDCHANGER_IDEN, "cd_changer", -1, &ParseCdChangerPkt },
-    { SATNAV_STATUS_1_IDEN, "satnav_status_1", 6, &ParseSatNavStatus1Pkt },
-    { SATNAV_STATUS_2_IDEN, "satnav_status_2", 20, &ParseSatNavStatus2Pkt },
-    { SATNAV_STATUS_3_IDEN, "satnav_status_3", -1, &ParseSatNavStatus3Pkt },
-    { SATNAV_GUIDANCE_DATA_IDEN, "satnav_guidance_data", 16, &ParseSatNavGuidanceDataPkt },
-    { SATNAV_GUIDANCE_IDEN, "satnav_guidance", -1, &ParseSatNavGuidancePkt },
-    { SATNAV_REPORT_IDEN, "satnav_report", -1, &ParseSatNavReportPkt },
-    { MFD_TO_SATNAV_IDEN, "mfd_to_satnav", -1, &ParseMfdToSatNavPkt },
-    { SATNAV_TO_MFD_IDEN, "satnav_to_mfd", 27, &ParseSatNavToMfdPkt },
-    { WHEEL_SPEED_IDEN, "wheel_speed", 5, &ParseWheelSpeedPkt },
-    { ODOMETER_IDEN, "odometer", 5, &ParseOdometerPkt },
-    { COM2000_IDEN, "com2000", 10, &ParseCom2000Pkt },
-    { CDCHANGER_COMMAND_IDEN, "cd_changer_command", 2, &ParseCdChangerCmdPkt },
-    { MFD_TO_HEAD_UNIT_IDEN, "display_to_head_unit", -1, &ParseMfdToHeadUnitPkt },
+    // 1. IDEN value,
+    // 2. IDEN string,
+    // 3. Number of expected bytes (or -1 if varying/unknown),
+    // 4. Ignore duplicates (boolean)
+    // 5. handler function
+    { VIN_IDEN, "vin", 17, true, &ParseVinPkt },
+    { ENGINE_IDEN, "engine", 7, true, &ParseEnginePkt },
+    { HEAD_UNIT_STALK_IDEN, "head_unit_stalk", 2, true, &ParseHeadUnitStalkPkt },
+    { LIGHTS_STATUS_IDEN, "lights_status", -1, true, &ParseLightsStatusPkt },
+    { DEVICE_REPORT, "device_report", -1, true, &ParseDeviceReportPkt },
+    { CAR_STATUS1_IDEN, "car_status_1", 27, true, &ParseCarStatus1Pkt },
+    { CAR_STATUS2_IDEN, "car_status_2", -1, true, &ParseCarStatus2Pkt },
+    { DASHBOARD_IDEN, "dashboard", 7, true, &ParseDashboardPkt },
+    { DASHBOARD_BUTTONS_IDEN, "dashboard_buttons", -1, true, &ParseDashboardButtonsPkt },
+    { HEAD_UNIT_IDEN, "head_unit", -1, true, &ParseHeadUnitPkt },
+    { TIME_IDEN, "time", 5, true, &ParseTimePkt },
+    { AUDIO_SETTINGS_IDEN, "audio_settings", 11, true, &ParseAudioSettingsPkt },
+    { MFD_STATUS_IDEN, "mfd_status", 2, true, &ParseMfdStatusPkt },
+    { AIRCON1_IDEN, "aircon_1", 5, true, &ParseAirCon1Pkt },
+    { AIRCON2_IDEN, "aircon_2", 7, true, &ParseAirCon2Pkt },
+    { CDCHANGER_IDEN, "cd_changer", -1, true, &ParseCdChangerPkt },
+    { SATNAV_STATUS_1_IDEN, "satnav_status_1", 6, true, &ParseSatNavStatus1Pkt },
+    { SATNAV_STATUS_2_IDEN, "satnav_status_2", -1, false, &ParseSatNavStatus2Pkt },
+    { SATNAV_STATUS_3_IDEN, "satnav_status_3", -1, true, &ParseSatNavStatus3Pkt },
+    { SATNAV_GUIDANCE_DATA_IDEN, "satnav_guidance_data", 16, true, &ParseSatNavGuidanceDataPkt },
+    { SATNAV_GUIDANCE_IDEN, "satnav_guidance", -1, true, &ParseSatNavGuidancePkt },
+    { SATNAV_REPORT_IDEN, "satnav_report", -1, true, &ParseSatNavReportPkt },
+    { MFD_TO_SATNAV_IDEN, "mfd_to_satnav", -1, true, &ParseMfdToSatNavPkt },
+    { SATNAV_TO_MFD_IDEN, "satnav_to_mfd", 27, true, &ParseSatNavToMfdPkt },
+    { WHEEL_SPEED_IDEN, "wheel_speed", 5, true, &ParseWheelSpeedPkt },
+    { ODOMETER_IDEN, "odometer", 5, true, &ParseOdometerPkt },
+    { COM2000_IDEN, "com2000", 10, true, &ParseCom2000Pkt },
+    { CDCHANGER_COMMAND_IDEN, "cd_changer_command", 2, true, &ParseCdChangerCmdPkt },
+    { MFD_TO_HEAD_UNIT_IDEN, "display_to_head_unit", -1, true, &ParseMfdToHeadUnitPkt },
 #if 0
-    { AIR_CONDITIONER_DIAG_IDEN, "aircon_diag", -1, &DefaultPacketParser },
-    { AIR_CONDITIONER_DIAG_COMMAND_IDEN, "aircon_diag_command", -1, &DefaultPacketParser },
+    { AIR_CONDITIONER_DIAG_IDEN, "aircon_diag", -1, true, &DefaultPacketParser },
+    { AIR_CONDITIONER_DIAG_COMMAND_IDEN, "aircon_diag_command", -1, true, &DefaultPacketParser },
 #endif
 }; // handlers
 
@@ -4219,12 +4389,10 @@ const char* ParseVanPacketToJson(TVanPacketRxDesc& pkt)
 
     if (handler->dataLen >= 0 && dataLen != handler->dataLen) return ""; // Unexpected packet length
 
-    // Only process if packet content differs from previous packet
-    // TODO - specify handling modes for duplicate packets in handlers table: not all duplicate packets should
-    //   be ignored.
+    // Check if packet content is the same as in previous packet and must therefore be ignored
     if (IsPacketDataDuplicate(pkt, handler)) return "";
 
-    int result = handler->parser(handler->idenStr, pkt, jsonBuffer, JSON_BUFFER_SIZE);
+    int result = handler->parser(pkt, jsonBuffer, JSON_BUFFER_SIZE);
 
     if (result == VAN_PACKET_PARSE_JSON_TOO_LONG)
     {
@@ -4236,15 +4404,13 @@ const char* ParseVanPacketToJson(TVanPacketRxDesc& pkt)
 
     if (result != VAN_PACKET_PARSE_OK) return ""; // Parsing result not OK
 
-    #ifdef PRINT_JSON_BUFFERS_ON_SERIAL
-
+#ifdef PRINT_JSON_BUFFERS_ON_SERIAL
     if ((serialDumpFilter == 0 || iden == serialDumpFilter) && IsPacketSelected(iden, SELECTED_PACKETS))
     {
         Serial.print(F("Parsed to JSON object:\n"));
         PrintJsonText(jsonBuffer);
     } // if
-
-    #endif // PRINT_JSON_BUFFERS_ON_SERIAL
+#endif // PRINT_JSON_BUFFERS_ON_SERIAL
 
     return jsonBuffer;
 } // ParseVanPacketToJson
