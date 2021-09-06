@@ -2211,8 +2211,10 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             // Examples:
 
-            // 0E7CEF2114
-
+            // No sat nav equipment present:
+            // Raw: #0109 ( 5/15)  0( 5) 0E 7CE RA1 21-14 NO_ACK OK 2114 CRC_OK
+            //
+            // Sat nav equipment present:
             // Raw: #0517 ( 7/15) 25 0E 7CE RA0 80-20-38-00-07-06-01-00-00-00-00-00-00-00-00-00-00-00-00-80-C4-18 ACK OK C418 CRC_OK
             // Raw: #0973 (13/15) 25 0E 7CE RA0 81-20-38-00-07-06-01-00-00-00-00-00-00-00-00-00-00-20-00-81-3D-68 ACK OK 3D68 CRC_OK
             // Raw: #1057 ( 7/15) 25 0E 7CE RA0 82-20-3C-00-07-06-01-00-00-00-00-00-00-00-00-00-00-28-00-82-1E-A0 ACK OK 1EA0 CRC_OK
