@@ -6,7 +6,7 @@ char* password = WIFI_PASSWORD;
 
 const char* GetHostname()
 {
-    return "Car";
+    return HOST_NAME;
 } // GetHostname
 
 void SetupWifi()
