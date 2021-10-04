@@ -130,7 +130,7 @@ class TVanPacketRxDesc
     int DataLen() const;
     uint16_t Crc() const;
     bool CheckCrc() const;
-    bool CheckCrcAndRepair();  // Yes, we can sometimes repair a corrupt packet by flipping a single bit
+    bool CheckCrcAndRepair();  // Yes, we can sometimes repair a corrupt packet by flipping one or two bits
     void DumpRaw(Stream& s, char last = '\n') const;
 
     // Example of the longest string that can be dumped (not realistic):
@@ -197,23 +197,44 @@ class TVanPacketRxDesc
     friend class TVanPacketRxQueue;
 }; // class TVanPacketRxDesc
 
+#ifdef ARDUINO_ARCH_ESP32
+extern hw_timer_t * timer;
+extern portMUX_TYPE mux;
+#endif // ARDUINO_ARCH_ESP32
+
+#ifdef ARDUINO_ARCH_ESP32
+
+    #define NO_INTERRUPTS portENTER_CRITICAL(&mux)
+    #define INTERRUPTS portEXIT_CRITICAL(&mux)
+
+#else // ! ARDUINO_ARCH_ESP32
+
+    #define NO_INTERRUPTS noInterrupts()
+    #define INTERRUPTS interrupts()
+
+#endif // ARDUINO_ARCH_ESP32
+
 #define ISR_SAFE_GET(TYPE, CODE) \
 { \
-    noInterrupts(); \
+    NO_INTERRUPTS; \
     TYPE result = (CODE); \
-    interrupts(); \
+    INTERRUPTS; \
     return result; \
 }
 
 #define ISR_SAFE_SET(VAR, CODE) \
 { \
-    noInterrupts(); \
+    NO_INTERRUPTS; \
     (VAR) = (CODE); \
-    interrupts(); \
+    INTERRUPTS; \
 }
 
 // Forward declaration
 class TVanPacketTxDesc;
+
+#ifdef ARDUINO_ARCH_ESP32
+typedef void(*timercallback)(void);
+#endif // ARDUINO_ARCH_ESP32
 
 //  Circular buffer of VAN packet Rx descriptors
 class TVanPacketRxQueue

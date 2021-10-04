@@ -31,7 +31,13 @@ void ICACHE_RAM_ATTR FinishPacketTransmission(TVanPacketTxDesc* txDesc)
     if (VanBusTx._tail->state == VAN_TX_DONE)
     {
         VanBusRx.RegisterTxIsr(NULL);
+
+    #ifdef ARDUINO_ARCH_ESP32
+        timerEnd(timer);
+    #else // ! ARDUINO_ARCH_ESP32
         timer1_disable();
+    #endif // ARDUINO_ARCH_ESP32
+
     } // if 
 
     VanBusRx.SetLastMediaAccessAt(ESP.getCycleCount()); // It was me! :-)
@@ -80,7 +86,12 @@ void ICACHE_RAM_ATTR SendBitIsr()
     if (p_stuffedByte < txDesc->p_eod)
     {
         // Check if previously transmitted bit has been copied by reading RX pin
+
+    #ifdef ARDUINO_ARCH_ESP32
+        int pinLevel = digitalRead(VanBusRx.pin);
+    #else // ! ARDUINO_ARCH_ESP32
         int pinLevel = GPIP(VanBusRx.pin);
+    #endif // ARDUINO_ARCH_ESP32
 
         if (pinLevel == VAN_BIT_DOMINANT && lastSetLevel == VAN_BIT_RECESSIVE)
         {
@@ -103,12 +114,20 @@ void ICACHE_RAM_ATTR SendBitIsr()
     // Write to GPIO pin
     if (bit != 0)
     {
+    #ifdef ARDUINO_ARCH_ESP32
+        REG_WRITE(GPIO_OUT_W1TS_REG, 1 << VanBusTx.txPin);
+    #else // ! ARDUINO_ARCH_ESP32
         GPOS = (1 << VanBusTx.txPin);
+    #endif // ARDUINO_ARCH_ESP32
         lastSetLevel = VAN_BIT_RECESSIVE;
     }
     else
     {
+    #ifdef ARDUINO_ARCH_ESP32
+        REG_WRITE(GPIO_OUT_W1TC_REG, 1 << VanBusTx.txPin);
+    #else // ! ARDUINO_ARCH_ESP32
         GPOC = (1 << VanBusTx.txPin);
+    #endif // ARDUINO_ARCH_ESP32
         lastSetLevel = VAN_BIT_DOMINANT;
     } // if
 
@@ -206,11 +225,25 @@ void TVanPacketTxQueue::StartBitSendTimer()
     uint32_t nCycles = curr - VanBusRx.GetLastMediaAccessAt();  // Arithmetic has safe roll-over
     //if (nCycles < (8 /* EOF */ + 5 /* IFS */) * (VAN_BIT_TIMER_TICKS * 16) * CPU_F_FACTOR) return;
 
-    noInterrupts();
+    NO_INTERRUPTS;
+
+    // Transmitting a packet is done completely by interrupt-servicing
+
+#ifdef ARDUINO_ARCH_ESP32
+
+    if (timerAlarmEnabled(timer))
+    {
+        // Set a repetitive timer
+        timerEnd(timer);
+        timerAttachInterrupt(timer, SendBitIsr, true);
+        timerAlarmWrite(timer, VAN_BIT_TIMER_TICKS, true);
+        timerAlarmEnable(timer);
+    } // if
+
+#else // ! ARDUINO_ARCH_ESP32
+
     if (! timer1_enabled())
     {
-        // Transmitting a packet is done completely by interrupt-servicing
-
         // Set a repetitive timer
         timer1_disable();
         timer1_attachInterrupt(SendBitIsr);
@@ -220,7 +253,10 @@ void TVanPacketTxQueue::StartBitSendTimer()
 
         timer1_write(VAN_BIT_TIMER_TICKS);
     } // if
-    interrupts();
+
+#endif // ARDUINO_ARCH_ESP32
+
+    INTERRUPTS;
 } // void TVanPacketTxQueue::StartBitSendTimer
 
 // Wait until the head of the queue is available. When 'timeOutMs' is set to 0, will wait forever.

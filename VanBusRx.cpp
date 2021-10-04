@@ -8,8 +8,6 @@
  * MIT license, all text above must be included in any redistribution.
  */
 
-#include <ESP8266WiFi.h>  // wifi_fpm_set_sleep_type
-
 #include "VanBusRx.h"
 
 static const uint16_t VAN_CRC_POLYNOM = 0x0F9D;
@@ -281,17 +279,33 @@ inline unsigned int ICACHE_RAM_ATTR nBitsFromCycles(uint32_t nCycles, uint32_t& 
 
 void ICACHE_RAM_ATTR SetTxBitTimer()
 {
+#ifdef ARDUINO_ARCH_ESP32
+    timerEnd(timer);
+#else // ! ARDUINO_ARCH_ESP32
     timer1_disable(); 
+#endif // ARDUINO_ARCH_ESP32
 
     if (VanBusRx.txTimerIsr)
     {
         // Turn on the Tx bit timer
+
+    #ifdef ARDUINO_ARCH_ESP32
+
+        timerAttachInterrupt(timer, VanBusRx.txTimerIsr, true);
+        timerAlarmWrite(timer, VanBusRx.txTimerTicks, true);
+        timerAlarmEnable(timer);
+
+    #else // ! ARDUINO_ARCH_ESP32
+
         timer1_attachInterrupt(VanBusRx.txTimerIsr);
 
         // Clock to timer (prescaler) is always 80MHz, even F_CPU is 160 MHz
         timer1_enable(TIM_DIV16, TIM_EDGE, TIM_LOOP);
 
         timer1_write(VanBusRx.txTimerTicks);
+
+    #endif // ARDUINO_ARCH_ESP32
+
     } // if
 } // SetTxBitTimer
 
@@ -307,13 +321,24 @@ void ICACHE_RAM_ATTR WaitAckIsr()
 // TODO - remove
 volatile uint16_t startOfFrameByte = 0x00;
 
+#ifdef ARDUINO_ARCH_ESP32
+hw_timer_t * timer = NULL;
+portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
+#endif // ARDUINO_ARCH_ESP32
+
 // Pin level change interrupt handler
 void ICACHE_RAM_ATTR RxPinChangeIsr()
 {
     // The logic is:
     // - if pinLevelChangedTo == VAN_LOGICAL_HIGH, we've just had a series of VAN_LOGICAL_LOW bits.
     // - if pinLevelChangedTo == VAN_LOGICAL_LOW, we've just had a series of VAN_LOGICAL_HIGH bits.
+
+#ifdef ARDUINO_ARCH_ESP32
+    int pinLevelChangedTo = digitalRead(VanBusRx.pin);
+#else // ! ARDUINO_ARCH_ESP32
     int pinLevelChangedTo = GPIP(VanBusRx.pin);  // GPIP() is faster than digitalRead()?
+#endif // ARDUINO_ARCH_ESP32
+
     static int prevPinLevelChangedTo = VAN_BIT_RECESSIVE;
 
     static uint32_t prev = 0;
@@ -328,6 +353,10 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     // Return quickly when it is a spurious interrupt (pin level not changed).
     if (pinLevelChangedTo == prevPinLevelChangedTo) return;
     prevPinLevelChangedTo = pinLevelChangedTo;
+
+#ifdef ARDUINO_ARCH_ESP32
+    portENTER_CRITICAL_ISR(&mux);
+#endif // ARDUINO_ARCH_ESP32
 
     // Media access detection for packet transmission
     if (pinLevelChangedTo == VAN_BIT_RECESSIVE)
@@ -388,11 +417,12 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             rxDesc->size = 0;
             jitter = 0;
 
-            // TODO - does this help at all in lowering the number of packets with CRC errors?
-            //wifi_fpm_set_sleep_type(LIGHT_SLEEP_T);
-
             //timer1_disable(); // TODO - necessary?
         } // if
+
+    #ifdef ARDUINO_ARCH_ESP32
+        portEXIT_CRITICAL_ISR(&mux);
+    #endif // ARDUINO_ARCH_ESP32
 
         return;
     } // if
@@ -405,13 +435,24 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             atBit = 0;
             readBits = 0;
             rxDesc->state = VAN_RX_LOADING;
+
+        #ifdef ARDUINO_ARCH_ESP32
+            portEXIT_CRITICAL_ISR(&mux);
+            timerEnd(timer);
+        #else // ! ARDUINO_ARCH_ESP32
             timer1_disable();
+        #endif // ARDUINO_ARCH_ESP32
+
             return;
         } // if
 
         rxDesc->ack = VAN_ACK;
 
         // The timer ISR 'WaitAckIsr' will call 'VanBusRx._AdvanceHead()'
+
+    #ifdef ARDUINO_ARCH_ESP32
+        portEXIT_CRITICAL_ISR(&mux);
+    #endif // ARDUINO_ARCH_ESP32
 
         return;
     } // if
@@ -421,6 +462,11 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     {
         VanBusRx._overrun = true;
         //SetTxBitTimer();
+
+    #ifdef ARDUINO_ARCH_ESP32
+        portEXIT_CRITICAL_ISR(&mux);
+    #endif // ARDUINO_ARCH_ESP32
+
         return;
     } // if
 
@@ -444,12 +490,21 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             readBits = 0;
             rxDesc->size = 0;
             jitter = 0;
+
+        #ifdef ARDUINO_ARCH_ESP32
+            portEXIT_CRITICAL_ISR(&mux);
+        #endif // ARDUINO_ARCH_ESP32
+
             return;
         } // if
 
         rxDesc->result = VAN_RX_ERROR_NBITS;
         VanBusRx._AdvanceHead();
         //WaitAckIsr();
+
+    #ifdef ARDUINO_ARCH_ESP32
+        portEXIT_CRITICAL_ISR(&mux);
+    #endif // ARDUINO_ARCH_ESP32
 
         return;
     } // if
@@ -542,6 +597,10 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
                 isrDebugPacket->Init();
             #endif // VAN_RX_ISR_DEBUGGING
 
+            #ifdef ARDUINO_ARCH_ESP32
+                portEXIT_CRITICAL_ISR(&mux);
+            #endif // ARDUINO_ARCH_ESP32
+
                 return;
             } // if
 
@@ -565,6 +624,19 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             rxDesc->state = VAN_RX_WAITING_ACK;
 
             // Set a timeout for the ACK bit
+
+        #ifdef ARDUINO_ARCH_ESP32
+
+            portEXIT_CRITICAL_ISR(&mux);
+
+            timerEnd(timer);
+            timerAttachInterrupt(timer, WaitAckIsr, true);
+            //timer1_write(12 * 5); // 1.5 time slots = 1.5 * 8 us = 12 us
+            timerAlarmWrite(timer, 16 * 5, false); // 2 time slots = 2 * 8 us = 16 us
+            timerAlarmEnable(timer);
+
+        #else // ! ARDUINO_ARCH_ESP32
+
             timer1_disable();
             timer1_attachInterrupt(WaitAckIsr);
 
@@ -573,6 +645,8 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
             //timer1_write(12 * 5); // 1.5 time slots = 1.5 * 8 us = 12 us
             timer1_write(16 * 5); // 2 time slots = 2 * 8 us = 16 us
+
+        #endif // ARDUINO_ARCH_ESP32
 
             return;
         } // if
@@ -583,9 +657,17 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             VanBusRx._AdvanceHead();
             //WaitAckIsr();
 
+        #ifdef ARDUINO_ARCH_ESP32
+            portEXIT_CRITICAL_ISR(&mux);
+        #endif // ARDUINO_ARCH_ESP32
+
             return;
         } // if
     } // if
+
+#ifdef ARDUINO_ARCH_ESP32
+    portEXIT_CRITICAL_ISR(&mux);
+#endif // ARDUINO_ARCH_ESP32
 
     return;
 
@@ -608,8 +690,14 @@ bool TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
     end = pool + queueSize;
 
     attachInterrupt(digitalPinToInterrupt(rxPin), RxPinChangeIsr, CHANGE);
+
+#ifdef ARDUINO_ARCH_ESP32
+    // Clock to timer (prescaler) is always 80MHz, even F_CPU is 160 MHz. We want 0.2 microsecond resolution.
+    timer = timerBegin(0, 80 / 5, true);
+#else // ! ARDUINO_ARCH_ESP32
     timer1_isr_init();
     timer1_disable();
+#endif // ARDUINO_ARCH_ESP32
 
     return true;
 } // TVanPacketRxQueue::Setup
