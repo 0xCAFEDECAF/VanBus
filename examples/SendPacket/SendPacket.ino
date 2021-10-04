@@ -17,10 +17,8 @@
  *
  * 1. Use a MCP2551 transceiver, connected with its CANH and CANL pins to the vehicle's VAN bus.
  *    As the MCP2551 has 5V logic, a 5V <-> 3.3V level converter is needed to. For this example, connect:
- *    - the CRX / RXD / R pin of the transceiver, via the level converter, to GPIO pin 2 (RX_PIN) of your ESP8266
- *      board, and
- *    - the CTX / TXD / D pin of the transceiver, via the level converter, to GPIO pin 3 (TX_PIN) of your ESP8266
- *      board.
+ *    - the CRX / RXD / R pin of the transceiver, via the level converter, to GPIO pin 2 (RX_PIN) of your ESP8266, and
+ *    - the CTX / TXD / D pin of the transceiver, via the level converter, to GPIO pin 3 (TX_PIN) of your ESP8266.
  *
  * 2. Use a SN65HVD230 transceiver, connected with its CANH and CANL pins to the vehicle's VAN bus.
  *    The SN65HVD230 transceiver already has 3.3V logic, so it is possible to directly connect the CRX / RXD / R
@@ -32,11 +30,19 @@
  *   sense media access from other devices on the bus, so that bus arbitration can be performed.
  */
 
+#ifdef  ARDUINO_ARCH_ESP8266 
 #include <ESP8266WiFi.h>
+#endif // ARDUINO_ARCH_ESP8266
+
 #include <VanBus.h>
 
+#ifdef ARDUINO_ARCH_ESP32
+const int TX_PIN = GPIO_NUM_23; // Set to GPIO pin connected to VAN bus transceiver input
+const int RX_PIN = GPIO_NUM_22; // Set to GPIO pin connected to VAN bus transceiver output
+#else // ! ARDUINO_ARCH_ESP32
 const int TX_PIN = D3; // Set to GPIO pin connected to VAN bus transceiver input
 const int RX_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
+#endif // ARDUINO_ARCH_ESP32
 
 void setup()
 {
@@ -44,6 +50,7 @@ void setup()
     Serial.begin(115200);
     Serial.println("Starting VAN bus transmitter");
 
+#ifdef  ARDUINO_ARCH_ESP8266 
     // Disable WIFI altogether to get rid of long and variable interrupt latency, causing packet CRC errors
     // From: https://esp8266hints.wordpress.com/2017/06/29/save-power-by-reliably-switching-the-esp-wifi-on-and-off/
     WiFi.disconnect(true);
@@ -52,6 +59,7 @@ void setup()
     delay(1);
     WiFi.forceSleepBegin();
     delay(1);
+#endif // ARDUINO_ARCH_ESP8266
 
     VanBus.Setup(RX_PIN, TX_PIN);
 } // setup
