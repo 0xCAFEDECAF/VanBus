@@ -21,7 +21,7 @@
  *
  * 2. Use a SN65HVD230 transceiver, connected with its CANH and CANL pins to the vehicle's VAN bus.
  *    The SN65HVD230 transceiver already has 3.3V logic, so it is possible to directly connect the CRX / RXD / R pin of
- *    the transceiver to a GPIO pin of your ESP8266 board.
+ *    the transceiver to (in this example) GPIO pin 2 (RX_PIN) of your ESP8266 board.
  *
  * 3. The simplest schematic is not to use a transceiver at all, but connect the VAN DATA line to GrouND using
  *    two 4.7 kOhm resistors. Connect the GPIO pin of your ESP8266 board to the 1:2 voltage divider that is thus
@@ -60,14 +60,24 @@
  *         +--- Packet sequence number (modulo 10000)
  */
 
+#ifdef  ARDUINO_ARCH_ESP8266 
 #include <ESP8266WiFi.h>
+#endif // ARDUINO_ARCH_ESP8266
+
 #include <VanBusRx.h>
 
+#ifdef ARDUINO_ARCH_ESP32
+const int RX_PIN = GPIO_NUM_22; // Set to GPIO pin connected to VAN bus transceiver output
+
+#else // ! ARDUINO_ARCH_ESP32
 #if defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
 // For ESP-01 board we use GPIO 2 (internal pull-up, keep disconnected or high at boot time)
 #define D2 (2)
-#endif
+#endif // defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
+
 const int RX_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
+
+#endif // ARDUINO_ARCH_ESP32
 
 void setup()
 {
@@ -75,6 +85,7 @@ void setup()
     Serial.begin(115200);
     Serial.println("Starting VAN bus receiver");
 
+#ifdef  ARDUINO_ARCH_ESP8266 
     // Disable Wi-Fi altogether to get rid of long and variable interrupt latency, causing packet CRC errors
     // From: https://esp8266hints.wordpress.com/2017/06/29/save-power-by-reliably-switching-the-esp-wifi-on-and-off/
     WiFi.disconnect(true);
@@ -83,6 +94,7 @@ void setup()
     delay(1);
     WiFi.forceSleepBegin();
     delay(1);
+#endif // ARDUINO_ARCH_ESP8266
 
     VanBusRx.Setup(RX_PIN);
     Serial.printf_P(PSTR("VanBusRx queue of size %d is set up\n"), VanBusRx.QueueSize());
