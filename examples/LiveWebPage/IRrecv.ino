@@ -188,7 +188,7 @@ const char* ParseIrPacketToJson(const TIrPacket& pkt)
         pkt.value == 0x77678D53 ? PSTR("LEFT_BUTTON") :
         pkt.value == 0xF79A2397 ? PSTR("RIGHT_BUTTON") :
         pkt.value == 0xF59A2071 ? PSTR("UP_BUTTON") :
-        pkt.value == 0xF98D3EE1 ? PSTR("ENTER_BUTTON") :
+        pkt.value == 0xF98D3EE1 ? PSTR("VAL_BUTTON") :  // "Enter" button
         PSTR("");
 
     if (strlen_P(buttonStr) == 0) return "";

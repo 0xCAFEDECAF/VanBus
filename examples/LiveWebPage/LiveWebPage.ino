@@ -3,7 +3,7 @@
  *
  * Written by Erik Tromp
  *
- * Version 0.2.2 - August, 2021
+ * Version 0.2.3 - October, 2021
  *
  * MIT license, all text above must be included in any redistribution.
  *
@@ -63,10 +63,6 @@
  *   to have hiccups in the TCP traffic, ultimately causing the VAN Rx bus to overrun.
  */
 
-// Uncomment to see JSON buffers printed on the Serial port.
-// Note: printing the JSON buffers takes pretty long, so it leads to more Rx queue overruns.
-#define PRINT_JSON_BUFFERS_ON_SERIAL
-
 #include <ESP8266WiFi.h>
 
 // Either this for "WebSockets" (https://github.com/Links2004/arduinoWebSockets):
@@ -88,6 +84,10 @@ int RX_PIN = D2;  // GPIO4 - often used as SDA (I2C)
 //int RX_PIN = D3;  // GPIO0 - pulled up - Boot fails
 //int RX_PIN = D4;  // GPIO2 - pulled up
 //int RX_PIN = D8;  // GPIO15 - pulled to GND - Boot fails
+
+// TODO - reduce size of large JSON packets like the ones containing guidance instruction icons
+#define JSON_BUFFER_SIZE 4096
+char jsonBuffer[JSON_BUFFER_SIZE];
 
 ESP8266WebServer webServer;
 WebSocketsServer webSocket = WebSocketsServer(81);
@@ -924,9 +924,10 @@ bool IrReceive(TIrPacket& irPacket);
 
 // Defined in Esp.ino
 void PrintSystemSpecs();
-const char* EspDataToJson();
+const char* EspSystemDataToJson(char* buf, const int n);
 
 // Defined in PacketToJson.ino
+extern char jsonBuffer[];
 const char* ParseVanPacketToJson(TVanPacketRxDesc& pkt);
 void PrintJsonText(const char* jsonBuffer);
 
@@ -971,8 +972,8 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
             IPAddress ip = webSocket.remoteIP(num);
             Serial.printf("Websocket [%u] Connected from %d.%d.%d.%d url: %s\n", num, ip[0], ip[1], ip[2], ip[3], payload);
 
-            // Dump some system data
-            BroadcastJsonText(EspDataToJson());
+            // Send ESP system data to client
+            BroadcastJsonText(EspSystemDataToJson(jsonBuffer, JSON_BUFFER_SIZE));
         }
         break;
     } // switch

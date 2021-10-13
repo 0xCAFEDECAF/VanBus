@@ -3,16 +3,20 @@
 
 #include <ESP8266WiFi.h>
 
+// -----
+// Wi-Fi and IP configuration
+
 #define HOST_NAME "MyCarLive"
 
 #define WIFI_SSID "MyCar"  // Choose yours
 #define WIFI_PASSWORD "WiFiPass"  // Fill in yours
 
-// Define when using DHCP; comment out when using a fixed IP address.
+// Define when using DHCP; comment out when using a static (fixed) IP address.
+// Note: only applicable in Wi-Fi station (client) mode.
 #define USE_DHCP
 
 // Define when using a Windows Internet Connection Sharing (ICS) Wi-Fi. Comment out when using Android Wi-Fi hotspot.
-// Note: only applicable when using a fixed IP address, not when using DHCP.
+// Note: only applicable when using a static (fixed) IP address, not when using DHCP.
 //#define WINDOWS_ICS
 
 #ifdef USE_DHCP
@@ -51,12 +55,20 @@ inline void WifiConfig()
 #endif // ifndef USE_DHCP
 } // WifiConfig
 
-// Which type of packets will be printed on Serial?
+// -----
+// Debugging
+
+// Define to see JSON buffers printed on the serial port
+#define PRINT_JSON_BUFFERS_ON_SERIAL
+
+// Which type of packets will be printed on the serial port?
 
 #define SELECTED_PACKETS VAN_PACKETS_ALL
 //#define SELECTED_PACKETS VAN_PACKETS_COM2000_ETC
 //#define SELECTED_PACKETS VAN_PACKETS_HEAD_UNIT
 //#define SELECTED_PACKETS VAN_PACKETS_SAT_NAV
 //#define SELECTED_PACKETS VAN_PACKETS_NONE
+
+#define SHOW_VAN_CRC_ERROR_PACKETS
 
 #endif // Config_h
