@@ -56,7 +56,45 @@ inline void WifiConfig()
 } // WifiConfig
 
 // -----
+// Infrared receiver
+
+// Choose one of these #defines below (or define your own IR_RECV_PIN, IR_VCC and IR_GND)
+//#define IR_TSOP48XX
+#define IR_TSOP312XX
+
+// TSOP48XX
+#ifdef IR_TSOP48XX
+
+  // IR receiver data pin
+  #define IR_RECV_PIN D5
+
+  // Using D7 as VCC and D6 as ground pin for the IR receiver. Should be possible with e.g. the
+  // TSOP4838 IR receiver as it typically uses only 0.7 mA (maximum GPIO current is 12 mA;
+  // see https://tttapa.github.io/ESP8266/Chap04%20-%20Microcontroller.html for ESP8266 and
+  // https://esp32.com/viewtopic.php?f=2&t=2027 for ESP32).
+  #define IR_VCC D7
+  #define IR_GND D6
+
+#endif // IR_TSOP48XX
+
+// TSOP312XX
+#ifdef IR_TSOP312XX
+
+  // IR receiver data pin
+  #define IR_RECV_PIN D7
+
+  // Using D7 as VCC and D6 as ground pin for the IR receiver. Should be possible with e.g. the
+  // TSOP31238 IR receiver as it typically uses only 0.35 mA.
+  #define IR_VCC D5
+  #define IR_GND D0
+
+#endif // IR_TSOP312XX
+
+// -----
 // Debugging
+
+// Define to see infrared key hash values and timing on the serial port
+#define DEBUG_IR_RECV
 
 // Define to see JSON buffers printed on the serial port
 #define PRINT_JSON_BUFFERS_ON_SERIAL

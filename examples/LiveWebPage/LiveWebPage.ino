@@ -909,9 +909,11 @@ void HandleDumpFilter()
 typedef struct
 {
     unsigned long value;  // Decoded value
+    PGM_P buttonStr;
     int bits;  // Number of bits in decoded value
-    volatile unsigned int *rawbuf;  // Raw intervals in 50 usec ticks
+    volatile unsigned int* rawbuf;  // Raw intervals in 50 usec ticks
     int rawlen;  // Number of records in rawbuf
+    bool held;
 } TIrPacket;
 
 // Defined in Wifi.ino

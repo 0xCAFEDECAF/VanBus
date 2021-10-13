@@ -11,12 +11,7 @@
 // - Removed all decoding stuff except decoding as hash
 //
 
-#define IR_RECV_PIN D5  // IR receiver data pin is connected to pin D5
-
-// Using D7 as VCC and D6 as ground pin for the IR receiver. Should be possible with e.g. the
-// TSOP4838 IR receiver as it typically uses only 0.7 mA.
-#define IR_VCC D7
-#define IR_GND D6
+#include "Config.h"
 
 // Receiver states
 #define STATE_IDLE 2
@@ -28,7 +23,7 @@
 
 // Some useful constants
 #define USECPERTICK 50  // microseconds per clock interrupt tick
-#define RAWBUF 100 // Length of raw duration buffer 
+#define RAWBUF 100 // Length of raw duration buffer
 
 // Information for the interrupt handler
 typedef struct
@@ -38,6 +33,11 @@ typedef struct
     unsigned int rawbuf[RAWBUF];  // raw data
     uint8_t rawlen;  // counter of entries in rawbuf
 } TIrParams;
+
+// Defined in PacketToJson.ino
+extern const char emptyStr[];
+extern const char yesStr[];
+extern const char noStr[];
 
 // Main class for receiving IR
 class IRrecv
@@ -113,6 +113,34 @@ void IRrecv::resume()
     interrupts();
 } // IRrecv::resume
 
+// IR controller button codes
+enum IrButton_t
+{
+    IB_MENU = 0x01A0DA1B,
+    IB_MODE = 0x8E8C855C,
+    IB_ESC = 0x816E43D7,
+    IB_DOWN = 0x02B619B3,
+    IB_LEFT = 0x77678D53,
+    IB_RIGHT = 0xF79A2397,
+    IB_UP = 0xF59A2071,
+    IB_ENTER = 0xF98D3EE1
+}; // enum TunerBand_t
+
+// Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
+PGM_P IrButtonStr(unsigned long data)
+{
+    return
+        data == IB_MENU ? PSTR("MENU_BUTTON") :
+        data == IB_MODE ? PSTR("MODE_BUTTON") :
+        data == IB_ESC ? PSTR("ESC_BUTTON") :
+        data == IB_DOWN ? PSTR("DOWN_BUTTON") :
+        data == IB_LEFT ? PSTR("LEFT_BUTTON") :
+        data == IB_RIGHT ? PSTR("RIGHT_BUTTON") :
+        data == IB_UP ? PSTR("UP_BUTTON") :
+        data == IB_ENTER ? PSTR("VAL_BUTTON") :  // "Enter" button
+        emptyStr;
+} // IrButtonStr
+
 // Decodes the received IR message.
 // Returns 0 if no data ready, 1 if data ready.
 // Results of decoding are stored in results.
@@ -132,7 +160,11 @@ int IRrecv::decode(TIrPacket* results)
 
     if (irparams.rcvstate != STATE_STOP) return IR_ERR;
 
-    if (decodeHash(results)) return IR_DECODED;
+    if (decodeHash(results))
+    {
+        results->buttonStr = IrButtonStr(results->value);
+        if (strlen_P(results->buttonStr) > 0) return IR_DECODED;
+    } // if
 
     // Throw away and start over
     resume();
@@ -141,12 +173,12 @@ int IRrecv::decode(TIrPacket* results)
 
 // Use FNV hash algorithm: http://isthe.com/chongo/tech/comp/fnv/#FNV-param
 #define FNV_PRIME_32 16777619
-#define FNV_BASIS_32 2166136261 
+#define FNV_BASIS_32 2166136261
 
 // Converts the raw code values into a 32-bit hash code.
 // Hopefully this code is unique for each button.
 // This isn't a "real" decoding, just an arbitrary value.
-long IRrecv::decodeHash(TIrPacket *results)
+long IRrecv::decodeHash(TIrPacket* results)
 {
     // Require at least 6 samples to prevent triggering on noise
     if (results->rawlen < 6) return IR_ERR;
@@ -170,9 +202,9 @@ long IRrecv::decodeHash(TIrPacket *results)
 // Use a tolerance of 20%
 int IRrecv::compare(unsigned int oldval, unsigned int newval)
 {
-  if (newval < oldval * .8) return 0;
-  else if (oldval < newval * .8) return 2;
-  return 1;
+    if (newval < oldval * .8) return 0;
+    else if (oldval < newval * .8) return 2;
+    return 1;
 } // IRrecv::compare
 
 const char* ParseIrPacketToJson(const TIrPacket& pkt)
@@ -180,29 +212,20 @@ const char* ParseIrPacketToJson(const TIrPacket& pkt)
     #define IR_JSON_BUFFER_SIZE 256
     static char jsonBuffer[IR_JSON_BUFFER_SIZE];
 
-    const char* buttonStr =
-        pkt.value == 0x01A0DA1B ? PSTR("MENU_BUTTON") :
-        pkt.value == 0x8E8C855C ? PSTR("MODE_BUTTON") :
-        pkt.value == 0x816E43D7 ? PSTR("ESC_BUTTON") :
-        pkt.value == 0x02B619B3 ? PSTR("DOWN_BUTTON") :
-        pkt.value == 0x77678D53 ? PSTR("LEFT_BUTTON") :
-        pkt.value == 0xF79A2397 ? PSTR("RIGHT_BUTTON") :
-        pkt.value == 0xF59A2071 ? PSTR("UP_BUTTON") :
-        pkt.value == 0xF98D3EE1 ? PSTR("VAL_BUTTON") :  // "Enter" button
-        PSTR("");
+    if (strlen_P(pkt.buttonStr) == 0) return "";
 
-    if (strlen_P(buttonStr) == 0) return "";
+    PGM_P heldStr = pkt.held ? PSTR(" (held)") : emptyStr;
 
     const static char jsonFormatter[] PROGMEM =
     "{\n"
         "\"event\": \"display\",\n"
         "\"data\":\n"
         "{\n"
-            "\"mfd_remote_control\": \"%S\"\n"
+            "\"mfd_remote_control\": \"%S%S\"\n"
         "}\n"
     "}\n";
 
-    int at = snprintf_P(jsonBuffer, IR_JSON_BUFFER_SIZE, jsonFormatter, buttonStr);
+    int at = snprintf_P(jsonBuffer, IR_JSON_BUFFER_SIZE, jsonFormatter, pkt.buttonStr, heldStr);
 
     // JSON buffer overflow?
     if (at >= IR_JSON_BUFFER_SIZE) return "";
@@ -225,9 +248,9 @@ void IrSetup()
 
     // Using GPIO pins to feed the IR receiver. Should be possible with e.g. the TSOP4838 IR receiver as
     // it typically uses only 0.7 mA.
-    pinMode(IR_VCC, OUTPUT); 
+    pinMode(IR_VCC, OUTPUT);
     digitalWrite(IR_VCC, HIGH);
-    pinMode(IR_GND, OUTPUT); 
+    pinMode(IR_GND, OUTPUT);
     digitalWrite(IR_GND, LOW);
 
     irrecv.enableIRIn(); // Start the receiver
@@ -237,22 +260,104 @@ bool IrReceive(TIrPacket& irPacket)
 {
     if (! irrecv.decode(&irPacket)) return false;
 
-#if 0
-    Serial.print(F("IR receiver: "));
-    Serial.println(irPacket.value, HEX);
-#endif
-
     irrecv.resume(); // Receive the next value
 
-    // Ignore same code within 150 ms
+    // Code that detects "button held" condition
+    //
+    // The IR controller normally fires ~ 20 times per second (measured 16 firings in 805 milliseconds,
+    // i.e. 805 / 16 = 50.3 milliseconds). (BTW: I'm not sure if this is the rate of the controller itself, or
+    // of the used IR receiver software library. Anyway, it doesn't matter, 20 times per second is enough to
+    // implement a correct handling.)
+    //
+    // Handling procedure:
+    //
+    // - If the same button is seen within 2 * 50 + 25 milliseconds, set the "held" bit, otherwise clear.
+    //
+    // - Return an "IR packet" when first seen ("held" bit clear); as long as "held" bit is set, count down
+    //   initially 14, then 4 packet intervals before returning the next "IR packet". This achieves an initial delay
+    //   or ~ 0.7 seconds followed by a firing rate of ~ 5 times per second.
+    //
+    // Note: the original MFD has a pretty buggy IR receiver (or its handling). When using the IR in a 50 Hz lighted
+    // environment, it misses many (or even all) IR packets.
+
     static unsigned long lastValue = 0;
     static unsigned long lastUpdate = 0;
 
     // Arithmetic has safe roll-over
-    if (irPacket.value == lastValue && millis() - lastUpdate < 150UL) return false;
+    unsigned long lastInterval = millis() - lastUpdate;
 
-    lastUpdate = millis();
+    // Firing interval or IR unit (milliseconds)
+    #define IR_BUTTON_HELD_INTV_MS (50UL)
+
+    // Same IR decoded value seen within this time (milliseconds) is seen as "held" button. Sometimes an IR packet
+    // is missed, so we use 2 firing intervals (2 * 50) plus a margin of 25.
+    #define IR_BUTTON_HELD_2_MS (125UL)
+
+    irPacket.held = irPacket.value == lastValue && lastInterval < IR_BUTTON_HELD_2_MS;
+
     lastValue = irPacket.value;
+    lastUpdate = millis();
+
+#ifdef DEBUG_IR_RECV
+    Serial.printf_P(PSTR("[irRecv] irPacket.value = 0x%lX (%S), lastValue = 0x%lX, lastInterval = %lu, held = %S\n"),
+        irPacket.value, irPacket.buttonStr, lastValue, lastInterval, irPacket.held ? yesStr : noStr);
+#endif // DEBUG_IR_RECV
+
+    // "MENU_BUTTON", "MODE_BUTTON" and "VAL_BUTTON" are never "held". They fire only once.
+    if (irPacket.held
+        && (
+            irPacket.value == IB_MENU
+            || irPacket.value == IB_MODE
+            || irPacket.value == IB_ENTER
+           )
+       )
+    {
+        return false;
+    } // if
+
+    // IR controller button codes
+    enum IrButtonHeldState_t
+    {
+        IBHS_DELAYING,
+        IBHS_REPEATING
+    };
+
+    static IrButtonHeldState_t irButtonRepeatState = IBHS_DELAYING;
+
+    // Wait for 14 packet intervals (14 * 50 = 700 milliseconds) as long as "held" bit is set, achieving a delay
+    // of ~ 0.70 seconds
+    #define IR_DELAY_N_INTERVALS (14)
+    static unsigned long countDownDelay = IR_DELAY_N_INTERVALS;
+
+    // Wait for 4 packet intervals (4 * 50 = 200 milliseconds) as long as "held" bit is set, achieving a firing
+    // rate of ~ 5 times per second
+    #define IR_REPEAT_N_INTERVALS (4)
+    static unsigned long countDownRepeat = IR_REPEAT_N_INTERVALS;
+
+    if (! irPacket.held)
+    {
+        irButtonRepeatState = IBHS_DELAYING;
+        countDownDelay = IR_DELAY_N_INTERVALS;
+        return true;
+    } // if
+
+    if (irButtonRepeatState == IBHS_DELAYING)
+    {
+        // 50 = -1; 74 = -1; 75 = -2; 100 = -2; 124 = -2; 125 = -3; 150 = -3; 175 = -4; 200 = -4; ...
+        countDownDelay -= (lastInterval + IR_BUTTON_HELD_INTV_MS / 2) / IR_BUTTON_HELD_INTV_MS;
+        if (countDownDelay > 0) return false;
+
+        countDownRepeat = IR_REPEAT_N_INTERVALS;
+        irButtonRepeatState = IBHS_REPEATING;
+    }
+    else if (irButtonRepeatState == IBHS_REPEATING)
+    {
+        // 50 = -1; 74 = -1; 75 = -2; 100 = -2; 124 = -2; 125 = -3; 150 = -3; 175 = -4; 200 = -4
+        countDownRepeat -= (lastInterval + IR_BUTTON_HELD_INTV_MS / 2) / IR_BUTTON_HELD_INTV_MS;
+        if (countDownRepeat > 0) return false;
+
+        countDownRepeat = IR_REPEAT_N_INTERVALS;
+    } // if
 
     return true;
 } // IrReceive
