@@ -949,6 +949,7 @@ VanPacketParseResult_t ParseDeviceReportPkt(TVanPacketRxDesc& pkt, char* buf, co
         // 07-01-03
         // 07-06-00 - MFD requests "satnav_guidance_data" and "satnav_guidance"
         // 07-10-00 - User pressed "Val" on remote control
+        // 07-11-00 - User pressed "Val" on remote control
         // 07-20-00 - MFD requests next "satnav_report" packet
         // 07-21-00 - MFD requests "satnav_status_1" and next "satnav_report" packet ?
         // 07-21-01 - User selected city from list. MFD requests "satnav_status_1" and next "satnav_report" packet ?
@@ -965,7 +966,7 @@ VanPacketParseResult_t ParseDeviceReportPkt(TVanPacketRxDesc& pkt, char* buf, co
         // & 0x01: Requesting "satnav_status_1" (IDEN 0x54E)
         // & 0x02: Requesting "satnav_guidance" (IDEN 0x64E)
         // & 0x04: Requesting "satnav_guidance_data" (IDEN 0x9CE)
-        // & 0x10: User pressing "Val" on remote control, requesting "satnav_to_mfd_response" (IDEN 0x74E)
+        // & 0x10: Requesting "satnav_to_mfd_response" (IDEN 0x74E) (happens when user presses "Val" on remote control)
         // & 0x20: Requesting next "satnav_report" (IDEN 0x6CE) in sequence
         // & 0x40: Requesting "satnav_status_2" (IDEN 0x7CE)
         //
@@ -1006,7 +1007,7 @@ VanPacketParseResult_t ParseDeviceReportPkt(TVanPacketRxDesc& pkt, char* buf, co
 
             // User selects a menu entry or letter? User pressed "Val" (middle button on IR remote control).
             // Always followed by 0x0100.
-            code == 0x1000 ? PSTR("Val") :
+            code == 0x1000 || code == 0x1100 ? PSTR("Val") :
 
             // MFD requests sat nav for next report packet (IDEN 0x6CE) in sequence
             // (Or: select from list using "Val"?)
@@ -1115,7 +1116,7 @@ VanPacketParseResult_t ParseCarStatus1Pkt(TVanPacketRxDesc& pkt, char* buf, cons
         // about 12% per minute. If the actual vehicle speed is sampled every second, then, in the
         // following formula, K would be around 12% / 60 = 0.2% = 0.002 :
         //
-        //   exp_moving_avg_speed := exp_moving_avg_speed * (1 - K) + actual_vehicle_speed * K
+        //   exp_moving_avg_speed := exp_moving_avg_speed * (1 − K) + actual_vehicle_speed * K
         //
         // Often used in EMA is the constant N, where K = 2 / (N + 1). That means N would be around 1000 (given
         // a sampling time of 1 second).
@@ -1444,14 +1445,10 @@ VanPacketParseResult_t ParseDashboardPkt(TVanPacketRxDesc& pkt, char* buf, const
     char floatBuf[2][MAX_FLOAT_SIZE];
     int at = snprintf_P(buf, n, jsonFormatter,
         engineRpm_x8 != 0xFFFF ?
-            //FloatToStr(floatBuf[0], engineRpm_x8 / 8.0, 1) :
             FloatToStr(floatBuf[0], engineRpm_x8 / 8.0, 0) :
-            //PSTR("---.-"),
             notApplicable3Str,
         vehicleSpeed_x100 != 0xFFFF ?
-            //FloatToStr(floatBuf[1], vehicleSpeed_x100 / 100.0, 2) :
             FloatToStr(floatBuf[1], vehicleSpeed_x100 / 100.0, 0) :
-            //PSTR("---.--")
             notApplicable2Str
     );
 
@@ -2432,7 +2429,7 @@ VanPacketParseResult_t ParseSatNavStatus1Pkt(TVanPacketRxDesc& pkt, char* buf, c
         status == 0x4080 ? ToHexStr(status) :  // Seen this but what is it??
         status == 0x4200 ? PSTR("ARRIVED_AT_DESTINATION_POPUP") :
         status == 0x9000 ? PSTR("READING_DISC_2") :
-        status == 0x9080 ? PSTR("START_CALCULATING_ROUTE") : // TODO - guessing
+        status == 0x9080 ? PSTR("START_COMPUTING_ROUTE") : // TODO - guessing
         status == 0xD001 ? PSTR("DESTINATION_NOT_ON_MAP") :  // TODO - guessing
         ToHexStr(status),
 
@@ -2589,7 +2586,7 @@ VanPacketParseResult_t ParseSatNavStatus2Pkt(TVanPacketRxDesc& pkt, char* buf, c
                 data[17] & 0x02 ? PSTR("AUDIO_OUTPUT ") : emptyStr,
                 data[17] & 0x04 ? PSTR("NEW_GUIDANCE_INSTRUCTION ") : emptyStr,
                 data[17] & 0x08 ? PSTR("READING_DISC ") : emptyStr,
-                data[17] & 0x10 ? PSTR("CALCULATING_ROUTE ") : emptyStr,
+                data[17] & 0x10 ? PSTR("COMPUTING_ROUTE ") : emptyStr,
                 data[17] & 0x20 ? PSTR("DISC_PRESENT ") : emptyStr,
                 data[17] & 0x80 ? PSTR("REACHED_DESTINATION ") : emptyStr
             );
@@ -2639,7 +2636,7 @@ VanPacketParseResult_t ParseSatNavStatus3Pkt(TVanPacketRxDesc& pkt, char* buf, c
 
         at = snprintf_P(buf, n, jsonFormatter,
 
-            status == 0x0000 ? PSTR("CALCULATING_ROUTE") :
+            status == 0x0000 ? PSTR("COMPUTING_ROUTE") :
             status == 0x0001 ? PSTR("STOPPING_NAVIGATION") :
             status == 0x0101 ? ToHexStr(status) :
 
@@ -3730,8 +3727,7 @@ VanPacketParseResult_t ParseMfdToSatNavPkt(TVanPacketRxDesc& pkt, char* buf, con
         } // if
     } // if
 
-    at += at >= n ? 0 :
-        snprintf_P(buf + at, n - at, PSTR("\n}\n}\n"));
+    at += at >= n ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}\n"));
 
     // JSON buffer overflow?
     if (at >= n) return VAN_PACKET_PARSE_JSON_TOO_LONG;
@@ -3748,16 +3744,29 @@ VanPacketParseResult_t ParseSatNavToMfdPkt(TVanPacketRxDesc& pkt, char* buf, con
     uint8_t request = data[1];
     sint16_t listSize = (sint16_t)(data[4] << 8 | data[5]);
 
+    // Sometimes there is a second list size. The first list size (bytes 4 and 5) is the number of items *containing*
+    // the selected characters, the second list size (bytes 11 and 12) is the number of items *starting* with the
+    // selected characters.
+    sint16_t list2Size = (sint16_t)(data[11] << 8 | data[12]);
+
     const static char jsonFormatter[] PROGMEM =
     "{\n"
         "\"event\": \"display\",\n"
         "\"data\":\n"
         "{\n"
             "\"satnav_to_mfd_response\": \"%S\",\n"
-            "\"satnav_to_mfd_list_size\": \"%d\",\n"
-            "\"satnav_to_mfd_show_characters\": \"";  // TODO - rename to "satnav_to_mfd_available_characters"
+            "\"satnav_to_mfd_list_size\": \"%d\"";
 
     int at = snprintf_P(buf, n, jsonFormatter, SatNavRequestStr(request), listSize);
+
+    // data[10] is some "flags" byte. Values seen:
+    // - 0x41 : Second list
+    // - 0x48 : No second list
+    // - 0xF1 : Second list with same length as first list
+
+    at += at >= n ? 0 : snprintf_P(buf + at, n - at, PSTR(",\n\"satnav_to_mfd_list_2_size\": \"%d\""), list2Size);
+
+    at += at >= n ? 0 : snprintf_P(buf + at, n - at, PSTR(",\n\"satnav_to_mfd_show_characters\": \""));
 
     // TODO - handle SR_ARCHIVE_IN_DIRECTORY
 
@@ -4383,17 +4392,17 @@ const char* ParseVanPacketToJson(TVanPacketRxDesc& pkt)
     if (! pkt.CheckCrcAndRepair())
     {
 
-#ifdef SHOW_VAN_CRC_ERROR_PACKETS
+#ifdef PRINT_VAN_CRC_ERROR_PACKETS_ON_SERIAL
         Serial.print(F("VAN PACKET CRC ERROR!\n"));
 
         // Show byte content of packet
         pkt.DumpRaw(Serial);
 
-        #ifdef VAN_RX_ISR_DEBUGGING
+    #ifdef VAN_RX_ISR_DEBUGGING
         // Fully dump bit timings for packets that have CRC ERROR, for further analysis
         pkt.getIsrDebugPacket().Dump(Serial);
-        #endif // VAN_RX_ISR_DEBUGGING
-#endif // SHOW_VAN_CRC_ERROR_PACKETS
+    #endif // VAN_RX_ISR_DEBUGGING
+#endif // PRINT_VAN_CRC_ERROR_PACKETS_ON_SERIAL
 
         return ""; // CRC error
     } // if

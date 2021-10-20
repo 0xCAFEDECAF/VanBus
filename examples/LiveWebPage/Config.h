@@ -97,16 +97,17 @@ inline void WifiConfig()
 #define DEBUG_IR_RECV
 
 // Define to see JSON buffers printed on the serial port
+// Note: for some reason, having JSON buffers printed on the serial port reduces the number of CRC errors in the
+// VAN bus packets
 #define PRINT_JSON_BUFFERS_ON_SERIAL
 
-// Which type of packets will be printed on the serial port?
-
+// If PRINT_JSON_BUFFERS_ON_SERIAL is defined, which type of packets will be printed on the serial port?
 #define SELECTED_PACKETS VAN_PACKETS_ALL
 //#define SELECTED_PACKETS VAN_PACKETS_COM2000_ETC
 //#define SELECTED_PACKETS VAN_PACKETS_HEAD_UNIT
 //#define SELECTED_PACKETS VAN_PACKETS_SAT_NAV
 //#define SELECTED_PACKETS VAN_PACKETS_NONE
 
-#define SHOW_VAN_CRC_ERROR_PACKETS
+#define PRINT_VAN_CRC_ERROR_PACKETS_ON_SERIAL
 
 #endif // Config_h

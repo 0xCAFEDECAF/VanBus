@@ -772,6 +772,7 @@ char webpage[] PROGMEM = R"=====(
       <p>SatNav to multi-function display</p>
       <p>Response: <b id="satnav_to_mfd_response">---</b></p>
       <p>List size: <b id="satnav_to_mfd_list_size">---</b></p>
+      <p>List 2 size: <b id="satnav_to_mfd_list_2_size">---</b></p>
       <p>Characters: <b id="satnav_to_mfd_show_characters">---</b></p>
     </div>
     <hr/>
