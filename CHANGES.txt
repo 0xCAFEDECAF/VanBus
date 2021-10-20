@@ -1,3 +1,11 @@
+0.2.3
+    General:
+    * Compiles also for ESP32 architecture (but not tested!)
+    LiveWebPage.ino:
+    * Improved compile-time options in Config.h
+    * Detecting and handling of button delay and repeat when held-down on IR remote control
+    * Various optimizations and improvements in packet parsing and handling (PacketToJson.ino)
+
 0.2.2
     VanBusRx.cpp:
     * Added methods TVanPacketRxQueue::Disable() and TVanPacketRxQueue::Enable(), to be used when other

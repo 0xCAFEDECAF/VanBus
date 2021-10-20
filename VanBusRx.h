@@ -186,8 +186,8 @@ class TVanPacketRxDesc
     {
         size = 0;
         state = VAN_RX_VACANT;
-        result = VAN_RX_PACKET_OK; // TODO - not necessary
-        ack = VAN_NO_ACK; // TODO - not necessary
+        result = VAN_RX_PACKET_OK;
+        ack = VAN_NO_ACK;
 #ifdef VAN_RX_ISR_DEBUGGING
         isrDebugPacket.Init();
 #endif // VAN_RX_ISR_DEBUGGING
