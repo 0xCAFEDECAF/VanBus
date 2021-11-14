@@ -128,36 +128,36 @@ Interfaces for transmitting packets:
 
 ---
 
-### 1. ```void Setup(uint8_t rxPin, uint8_t txPin)``` <a name = "Setup"></a>
+#### 1. ```void Setup(uint8_t rxPin, uint8_t txPin)``` <a name = "Setup"></a>
 
 Start the receiver listening on GPIO pin ```rxPin```. The transmitter will transmit on GPIO pin ```txPin```.
 
-### 2. ```void DumpStats(Stream& s)``` <a name = "DumpStats"></a>
+#### 2. ```void DumpStats(Stream& s)``` <a name = "DumpStats"></a>
 
 Dumps a few packet statistics on the passed stream.
 
-### 3. ```bool Available()``` <a name = "Available"></a>
+#### 3. ```bool Available()``` <a name = "Available"></a>
 
 Returns ```true``` if a VAN packet is available in the receive queue.
 
-### 4. ```bool Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun = NULL)``` <a name = "Receive"></a>
+#### 4. ```bool Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun = NULL)``` <a name = "Receive"></a>
 
 Copy a VAN packet out of the receive queue, if available. Otherwise, returns ```false```.
 If a valid pointer is passed to 'isQueueOverrun', will report then clear any queue overrun condition.
 
-### 5. ```uint32_t GetRxCount()``` <a name = "GetRxCount"></a>
+#### 5. ```uint32_t GetRxCount()``` <a name = "GetRxCount"></a>
 
 Returns the number of received VAN packets since power-on. Counter may roll over.
 
-### 6. ```bool SyncSendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)``` <a name = "SyncSendPacket"></a>
+#### 6. ```bool SyncSendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)``` <a name = "SyncSendPacket"></a>
 
 Sends a packet for transmission. Returns ```true``` if the packet was successfully transmitted.
 
-### 7. ```bool SendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)``` <a name = "SendPacket"></a>
+#### 7. ```bool SendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)``` <a name = "SendPacket"></a>
 
 Queues a packet for transmission. Returns ```true``` if the packet was successfully queued.
 
-### 8. ```uint32_t GetTxCount()``` <a name = "GetTxCount"></a>
+#### 8. ```uint32_t GetTxCount()``` <a name = "GetTxCount"></a>
 
 Returns the number of VAN packets, offered for transmitting, since power-on. Counter may roll over.
 
@@ -199,7 +199,7 @@ The following methods are available for ```TVanPacketRxDesc``` packet objects as
 
 ---
 
-### 1. ```uint16_t Iden()``` <a name = "Iden"></a>
+#### 1. ```uint16_t Iden()``` <a name = "Iden"></a>
 
 Returns the IDEN field of the VAN packet.
 
@@ -208,7 +208,7 @@ An overview of known IDEN values can be found e.g. at:
 - http://pinterpeti.hu/psavanbus/PSA-VAN.html
 - http://graham.auld.me.uk/projects/vanbus/protocol.html
 
-### 2. ```uint16_t CommandFlags()``` <a name = "CommandFlags"></a>
+#### 2. ```uint16_t CommandFlags()``` <a name = "CommandFlags"></a>
 
 Returns the "command" FLAGS field of the VAN packet. Each VAN packet has 4 "command" flags:
 - EXT : always 1
@@ -219,28 +219,32 @@ Returns the "command" FLAGS field of the VAN packet. Each VAN packet has 4 "comm
 A thorough explanation is found (in French) on page 6 and 7 of
 http://www.educauto.org/files/file_fields/2013/11/18/mux3.pdf#page=6 .
 
-### 3. ```const uint8_t* Data()``` <a name = "Data"></a>
+#### 3. ```const uint8_t* Data()``` <a name = "Data"></a>
 
 Returns the data field (bytes) of the VAN packet.
 
-### 4. ```int DataLen()``` <a name = "DataLen"></a>
+#### 4. ```int DataLen()``` <a name = "DataLen"></a>
 
 Returns the number of data bytes in the VAN packet. There can be at most 28 data bytes in a VAN packet.
 
-### 5. ```uint16_t Crc()``` <a name = "Crc"></a>
+#### 5. ```unsigned long Millis()``` <a name = "Millis"></a>
+
+Packet time stamp in milliseconds.
+
+#### 6. ```uint16_t Crc()``` <a name = "Crc"></a>
 
 Returns the 15-bit CRC value of the VAN packet.
 
-### 6. ```bool CheckCrc()``` <a name = "CheckCrc"></a>
+#### 7. ```bool CheckCrc()``` <a name = "CheckCrc"></a>
 
 Checks the CRC value of the VAN packet.
 
-### 7. ```bool CheckCrcAndRepair()``` <a name = "CheckCrcAndRepair"></a>
+#### 8. ```bool CheckCrcAndRepair()``` <a name = "CheckCrcAndRepair"></a>
 
 Checks the CRC value of the VAN packet. If not, tries to repair it by flipping each bit. Returns ```true``` if the
 packet is OK (either before or after the repair).
 
-### 8. ```void DumpRaw(Stream& s, char last = '\n')``` <a name = "DumpRaw"></a>
+#### 9. ```void DumpRaw(Stream& s, char last = '\n')``` <a name = "DumpRaw"></a>
 
 Dumps the raw packet bytes to a stream. Optionally specify the last character; default is '\n' (newline).
 
@@ -268,21 +272,21 @@ Example of dumping into a char array:
 Note: for this, you will need to install the [PrintEx](https://github.com/Chris--A/PrintEx) library. I tested with
 version 1.2.0 .
 
-### 9. ```const TIsrDebugPacket& getIsrDebugPacket()``` <a name = "getIsrDebugPacket"></a>
+#### 10. ```const TIsrDebugPacket& getIsrDebugPacket()``` <a name = "getIsrDebugPacket"></a>
 
 Retrieves a debug structure that can be used to analyse (observed) bit timings.
 
-### 10. ```const char* CommandFlagsStr()``` <a name = "CommandFlagsStr"></a>
+#### 11. ```const char* CommandFlagsStr()``` <a name = "CommandFlagsStr"></a>
 
 Returns the "command" FLAGS field of the VAN packet as a string
 
 Note: uses a statically allocated buffer, so don't call this method twice within the same printf invocation.
 
-### 11. ```const char* AckStr()``` <a name = "AckStr"></a>
+#### 12. ```const char* AckStr()``` <a name = "AckStr"></a>
 
 Returns the ACK field of the VAN packet as a string, either "ACK" or "NO_ACK".
 
-### 12. ```const char* ResultStr()``` <a name = "ResultStr"></a>
+#### 13. ```const char* ResultStr()``` <a name = "ResultStr"></a>
 
 Returns the RESULT field of the VAN packet as a string, either "OK" or a string starting with "ERROR_".
 
@@ -309,13 +313,6 @@ investigating how to improve on this.
 Currently the library supports only 125 kbit/s VAN bus. Need to add support for different rate, like 62.5 kbit/s,
 which can be passed as an optional parameter to ```VanBusRx.Setup(...)```.
 
-### Looking forward
-
-Currently I am writing a VAN packet parser that will be able to send WebSocket messages to a browser, for real-time
-updates on a "virtual dashboard" web page that is served by the ESP8266 based board. I am looking for volunteers who
-can draw a nice skin for this "virtual dashboard" 😁. Inspiration? Have a look e.g. at
-https://realdash.net/gallery.php.
-
 ## 📖 License<a name = "license"></a>
 
 This library is open-source and licensed under the [MIT license](http://opensource.org/licenses/MIT).
@@ -327,3 +324,8 @@ Do whatever you like with it, but contributions are appreciated!
 [SN65HVD230]: https://www.ti.com/lit/ds/symlink/sn65hvd230.pdf?ts=1592992149874
 [voltage divider]: https://www.quora.com/How-many-pins-on-Arduino-Uno-give-a3-3v-pin-output
 [ESP32 RMT peripheral Vehicle Area Network (VAN bus) reader]: https://github.com/morcibacsi/esp32_rmt_van_rx
+
+## See also
+
+- [VAN Live Connect](https://github.com/0xCAFEDECAF/VanLiveConnect) - Live data from your PSA vehicle (Peugeot,
+  Citroën) on your smartphone or tablet, directly from the VAN bus.

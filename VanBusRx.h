@@ -3,7 +3,7 @@
  *
  * Written by Erik Tromp
  *
- * Version 0.2.3 - October, 2021
+ * Version 0.2.4 - November, 2021
  *
  * MIT license, all text above must be included in any redistribution.
  */
@@ -27,6 +27,8 @@
 #define VanBusRx_h
 
 #include <Arduino.h>
+
+#define VAN_BUX_RX_VERSION 000002004
 
 //#define VAN_RX_ISR_DEBUGGING
 
@@ -128,6 +130,7 @@ class TVanPacketRxDesc
     uint8_t CommandFlags() const;  // See page 17 of http://ww1.microchip.com/downloads/en/DeviceDoc/doc4205.pdf
     const uint8_t* Data() const;
     int DataLen() const;
+    unsigned long Millis() { return millis_; }  // Packet time stamp in milliseconds
     uint16_t Crc() const;
     bool CheckCrc() const;
     bool CheckCrcAndRepair();  // Yes, we can sometimes repair a corrupt packet by flipping one or two bits
@@ -174,6 +177,7 @@ class TVanPacketRxDesc
     PacketReadState_t state;
     PacketReadResult_t result;
     PacketAck_t ack;
+    unsigned long millis_;  // Packet time stamp in milliseconds
 
 #ifdef VAN_RX_ISR_DEBUGGING
     TIsrDebugPacket isrDebugPacket;  // For debugging of packet reception inside ISR
@@ -270,7 +274,7 @@ class TVanPacketRxQueue
 
     bool IsSetup() const { return pin != VAN_NO_PIN_ASSIGNED; }
     uint32_t GetCount() const { ISR_SAFE_GET(uint32_t, count); }
-    void DumpStats(Stream& s) const;
+    void DumpStats(Stream& s, bool longForm = true) const;
     int QueueSize() const { return size; }
 
   private:
@@ -308,6 +312,7 @@ class TVanPacketRxQueue
     {
         _head->state = VAN_RX_DONE;
         _head->seqNo = count++;
+        _head->millis_ = millis();
         if (++_head == end) _head = pool;  // roll over if needed
     } // _AdvanceHead
 

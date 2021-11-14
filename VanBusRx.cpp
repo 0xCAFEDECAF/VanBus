@@ -3,7 +3,7 @@
  *
  * Written by Erik Tromp
  *
- * Version 0.2.3 - October, 2021
+ * Version 0.2.4 - November, 2021
  *
  * MIT license, all text above must be included in any redistribution.
  */
@@ -768,39 +768,58 @@ char* FloatToStr(char* buffer, float f, int prec)
 } // FloatToStr
 
 // Dumps packet statistics
-void TVanPacketRxQueue::DumpStats(Stream& s) const
+void TVanPacketRxQueue::DumpStats(Stream& s, bool longForm) const
 {
     uint32_t pktCount = GetCount();
-
-   char floatBuf[MAX_FLOAT_SIZE];
-
-    // Using shared buffer floatBuf, so only one invocation per printf
-    s.printf_P(
-        PSTR("received pkts: %lu, corrupt: %lu (%s%%)"),
-        pktCount,
-        nCorrupt,
-        pktCount == 0
-            ? "-.---"
-            : FloatToStr(floatBuf, 100.0 * nCorrupt / pktCount, 3));
-
-    s.printf_P(
-        PSTR(", repaired: %lu (%s%%)"),
-        nRepaired,
-        nCorrupt == 0
-            ? "---" 
-            : FloatToStr(floatBuf, 100.0 * nRepaired / nCorrupt, 0));
-
-    s.printf_P(PSTR(" [SB_err: %lu, DCB_err: %lu"), nOneBitError, nTwoConsecutiveBitErrors);
-    if (nTwoSeparateBitErrors > 0) s.printf_P(PSTR(", DSB_err: %lu"), nTwoSeparateBitErrors);
-    s.print(F("]"));
+    static const char PROGMEM formatter[] = "received pkts: %lu, corrupt: %lu (%s%%)";
+    char floatBuf[MAX_FLOAT_SIZE];
 
     uint32_t overallCorrupt = nCorrupt - nRepaired;
-    s.printf_P(
-        PSTR(", overall: %lu (%s%%)\n"),
-        overallCorrupt,
-        pktCount == 0
-            ? "-.---" 
-            : FloatToStr(floatBuf, 100.0 * overallCorrupt / pktCount, 3));
+
+    if (longForm)
+    {
+        // Long output format
+
+        // Using shared buffer floatBuf, so only one invocation per printf
+        s.printf_P(
+            formatter,
+            pktCount,
+            nCorrupt,
+            pktCount == 0
+                ? "-.---"
+                : FloatToStr(floatBuf, 100.0 * nCorrupt / pktCount, 3));
+
+        s.printf_P(
+            PSTR(", repaired: %lu (%s%%)"),
+            nRepaired,
+            nCorrupt == 0
+                ? "---" 
+                : FloatToStr(floatBuf, 100.0 * nRepaired / nCorrupt, 0));
+
+        s.printf_P(PSTR(" [SB_err: %lu, DCB_err: %lu"), nOneBitError, nTwoConsecutiveBitErrors);
+        if (nTwoSeparateBitErrors > 0) s.printf_P(PSTR(", DSB_err: %lu"), nTwoSeparateBitErrors);
+        s.print(F("]"));
+
+        s.printf_P(
+            PSTR(", overall: %lu (%s%%)\n"),
+            overallCorrupt,
+            pktCount == 0
+                ? "-.---" 
+                : FloatToStr(floatBuf, 100.0 * overallCorrupt / pktCount, 3));
+    }
+    else
+    {
+        // Short output format
+
+        s.printf_P(
+            formatter,
+            pktCount,
+            overallCorrupt,
+            pktCount == 0
+                ? "-.---"
+                : FloatToStr(floatBuf, 100.0 * overallCorrupt / pktCount, 3));
+        s.print(F("\n"));
+    } // if
 } // TVanPacketRxQueue::DumpStats
 
 #ifdef VAN_RX_ISR_DEBUGGING
