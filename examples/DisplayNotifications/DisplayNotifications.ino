@@ -1,5 +1,5 @@
 /*
- * VanBus: DisplayNotifications - send all MFD notifications (information, warning), one by one
+ * VanBus: DisplayNotifications - send all multifunction display (MFD) notifications (information, warning), one by one
  *
  * Written by Erik Tromp
  *
@@ -55,6 +55,7 @@ void SendMfdNotificationMessage(uint8_t msgIdx)
 
 #define MSG_ID_START (0x00)
 #define MSG_ID_END (0x7F)
+#define MSG_ID_INVALID (0x80)
 
 // Return the next notification message ID
 uint8_t NextMfdNotificationMessageIndex(uint8_t msgIdx)
@@ -94,6 +95,21 @@ void CycleMessage(bool restart = false)
         msgIdx = NextMfdNotificationMessageIndex(msgIdx);
     } // if
 } // CycleMessage
+
+void RepeatMessage(uint8_t msgIdx)
+{
+    static unsigned long lastSentAt = -7000;
+
+    // To display the notification permanently, it must be re-triggered every 7 seconds
+    if (millis() - lastSentAt >= 7000UL)  // Arithmetic has safe roll-over
+    {
+        lastSentAt = millis();
+
+        // Re-trigger the display of the current notification message
+        SendMfdNotificationMessage(MSG_ID_INVALID);
+        SendMfdNotificationMessage(msgIdx);
+    } // if
+} // if
 
 char RecvOneChar()
 {
@@ -179,21 +195,20 @@ void loop()
         break;
     } // switch
 
-    if (cycling) CycleMessage();
+    if (cycling) CycleMessage(); else RepeatMessage(msgIdx);
 
     // Write exterior temperature packet every second (causes the MFD to light its backlight)
     static unsigned long lastSentAt = 0;
-    if (millis() - lastSentAt >= 1000UL) // Arithmetic has safe roll-over
+    if (millis() - lastSentAt >= 1000UL)  // Arithmetic has safe roll-over
     {
         lastSentAt = millis();
 
-        // Send exterior temperature 8 deg C to the multifunction display (MFD)
-        SendExteriorTemperatureMessage();
+        SendExteriorTemperatureMessage();  // Send exterior temperature 8 deg C to the MFD
     } // if
 
     // Print some boring statistics every minute or so
     static unsigned long lastDumped = 0;
-    if (millis() - lastDumped >= 60000UL) // Arithmetic has safe roll-over
+    if (millis() - lastDumped >= 60000UL)  // Arithmetic has safe roll-over
     {
         lastDumped = millis();
         VanBus.DumpStats(Serial);
