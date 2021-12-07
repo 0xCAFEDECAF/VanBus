@@ -188,14 +188,15 @@ The following methods are available for ```TVanPacketRxDesc``` packet objects as
 2. [```uint16_t CommandFlags()```](#CommandFlags)
 3. [```const uint8_t* Data()```](#Data)
 4. [```int DataLen()```](#DataLen)
-5. [```uint16_t Crc()```](#Crc)
-6. [```bool CheckCrc()```](#CheckCrc)
-7. [```bool CheckCrcAndRepair()```](#CheckCrcAndRepair)
-8. [```void DumpRaw(Stream& s, char last = '\n')```](#DumpRaw)
-9. [```const TIsrDebugPacket& getIsrDebugPacket()```](#getIsrDebugPacket)
-10. [```const char* CommandFlagsStr()```](#CommandFlagsStr)
-11. [```const char* AckStr()```](#AckStr)
-12. [```const char* ResultStr()```](#ResultStr)
+5. [```unsigned long Millis()```](#Millis)
+6. [```uint16_t Crc()```](#Crc)
+7. [```bool CheckCrc()```](#CheckCrc)
+8. [```bool CheckCrcAndRepair()```](#CheckCrcAndRepair)
+9. [```void DumpRaw(Stream& s, char last = '\n')```](#DumpRaw)
+10. [```const TIsrDebugPacket& getIsrDebugPacket()```](#getIsrDebugPacket)
+11. [```const char* CommandFlagsStr()```](#CommandFlagsStr)
+12. [```const char* AckStr()```](#AckStr)
+13. [```const char* ResultStr()```](#ResultStr)
 
 ---
 
