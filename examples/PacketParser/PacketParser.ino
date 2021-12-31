@@ -2885,8 +2885,10 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // [3] City
             // [4] District (or empty string)
             // [5] Either:
-            //     * "G": (iGnore?) which can be followed by text that is not important for searching on, e.g.
-            //            "GRue de"
+            //     * "G": which can be followed by prefx text that is not important for searching on, e.g.
+            //            "GRue de", as in "Rue de la PAIX"
+            //     * "D": which can be followed by postfix text that is not important for searching on, e.g.
+            //            "Gstr.", as in "ORANIENBURGER str."
             //     * "I": Next entry is not a street name but a building name ??
             // [6] Street name (important part)
             //
