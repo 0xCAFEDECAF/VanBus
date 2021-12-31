@@ -7,6 +7,9 @@
     examples/DisplayNotifications.ino:
     * Re-trigger the shown notification every 7 seconds, so that it is displayed permanently
 
+    examples/PacketParser.ino
+    * Updated comment about sat nav street format
+
 0.2.3
     General:
     * Compiles also for ESP32 architecture (but not tested!)
@@ -38,7 +41,7 @@
     * Added packet category VAN_PACKETS_COM2000_ETC for filtering serial output
     * Various updates and bugfixes
 
-    PacketParser.ino
+    examples/PacketParser.ino
     * Various updates and bugfixes
 
 0.2.1
