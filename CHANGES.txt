@@ -1,7 +1,17 @@
+0.2.4
+    VanBusRx:
+    * Added optional 'longForm' parameter to TVanPacketRxQueue::DumpStats method
+    * Added #define VAN_BUX_RX_VERSION 000002004
+    * Added new method TVanPacketRxDesc::Millis returning packet time stamp in milliseconds
+
+    examples/DisplayNotifications.ino:
+    * Re-trigger the shown notification every 7 seconds, so that it is displayed permanently
+
 0.2.3
     General:
     * Compiles also for ESP32 architecture (but not tested!)
-    LiveWebPage.ino:
+
+    examples/LiveWebPage.ino:
     * Improved compile-time options in Config.h
     * Detecting and handling of button delay and repeat when held-down on IR remote control
     * Various optimizations and improvements in packet parsing and handling (PacketToJson.ino)
@@ -16,10 +26,10 @@
     VanBusRx.h:
     * Added method TVanPacketRxQueue::IsSetup(), to check if the Setup() method was called
 
-    DisplayNotifications.ino:
+    examples/DisplayNotifications.ino:
     * Offer interactivity via menu on Serial
 
-    LiveWebPage.ino:
+    examples/LiveWebPage.ino:
     * Various bugfixes and updates on parsing sat nav data structures
     * Small update in parsing FM tuner data
     * Updates in parsing and presentation of sat nav status and guidance data
@@ -36,24 +46,24 @@
 
     Added parameter 'queueSize' to TVanPacketRxQueue::Setup(...), giving option to set queue size at runtime
 
-    LiveWebPage.ino:
+    examples/LiveWebPage.ino:
     * Added separate 'Config.h' file for Wi-Fi settings
     * Added reading of infrared remote control
     * Added reading of ESP system data
     * Improved way to filter which packets are dumped (in JSON format) to Serial
     * Various packet parsing improvements
 
-    PacketParser.ino:
+    examples/PacketParser.ino:
     * Disabled Wi-Fi to practically eliminate occurrence of packets with CRC errors 
     * Various packet parsing improvements
 
-    DisplayNotifications.ino
+    examples/DisplayNotifications.ino
     * Disabled Wi-Fi to practically eliminate occurrence of packets with CRC errors 
 
-    SendPacket.ino
+    examples/SendPacket.ino
     * Disabled Wi-Fi to practically eliminate occurrence of packets with CRC errors 
 
-    VanBusDump.ino 
+    examples/VanBusDump.ino 
     * Disabled Wi-Fi to practically eliminate occurrence of packets with CRC errors 
 
 0.2.0
