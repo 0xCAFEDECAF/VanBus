@@ -139,42 +139,6 @@ bool TVanPacketRxDesc::CheckCrcAndRepair()
         } // for
     } // for
 
-// 2021-04-12 - Commented out. Seems like "repairing" two separate bits is in fact increasing the probability of
-// getting a CRC "OK" for a packet that is in fact corrupt.
-#if 0
-    // Flip two bits - is this pushing it? Maybe limit the following to the shorter packets, e.g. up to say 15 bytes?
-    for (int atByte1 = 0; atByte1 < size; atByte1++)
-    {
-        // This may take really long...
-        wdt_reset();
- 
-        for (int atBit1 = 0; atBit1 < 8; atBit1++)
-        {
-            uint8_t mask1 = 1 << atBit1;
-            bytes[atByte1] ^= mask1;  // Flip
-
-            for (int atByte2 = 0; atByte2 < size; atByte2++)
-            {
-                for (int atBit2 = 0; atBit2 < 8; atBit2++)
-                {
-                    uint8_t mask2 = 1 << atBit2;
-                    bytes[atByte2] ^= mask2;  // Flip
-                    if (CheckCrc())
-                    {
-                        VanBusRx.nRepaired++;
-                        VanBusRx.nTwoSeparateBitErrors++;
-                        return true;
-                    } // if
-
-                    bytes[atByte2] ^= mask2;  // Flip back
-                } // for
-            } // for
-
-            bytes[atByte1] ^= mask1;  // Flip back
-        } // for
-    } // for
-#endif
-
     return false;
 } // TVanPacketRxDesc::CheckCrcAndRepair
 
@@ -204,9 +168,19 @@ void TVanPacketRxDesc::DumpRaw(Stream& s, char last) const
     s.print(last);
 } // TVanPacketRxDesc::DumpRaw
 
+// Normal bit time (8 microseconds), expressed as number of CPU cycles
+//#define VAN_NORMAL_BIT_TIME_CPU_CYCLES (650 * CPU_F_FACTOR)
+#define VAN_NORMAL_BIT_TIME_CPU_CYCLES (667 * CPU_F_FACTOR)
+
+inline unsigned int ICACHE_RAM_ATTR nBits(uint32_t nCycles)
+{
+    // return (nCycles + 300 * CPU_F_FACTOR) / VAN_NORMAL_BIT_TIME_CPU_CYCLES;
+    return (nCycles + 200 * CPU_F_FACTOR) / VAN_NORMAL_BIT_TIME_CPU_CYCLES;
+} // nBits
+
 // Calculate number of bits from a number of elapsed CPU cycles
 // TODO - does ICACHE_RAM_ATTR have any effect on an inline function?
-inline unsigned int ICACHE_RAM_ATTR nBitsFromCycles(uint32_t nCycles, uint32_t& jitter)
+inline unsigned int ICACHE_RAM_ATTR nBitsTakingIntoAccountJitter(uint32_t nCycles, uint32_t& jitter)
 {
     // Here is the heart of the machine; lots of voodoo magic here...
 
@@ -267,15 +241,9 @@ inline unsigned int ICACHE_RAM_ATTR nBitsFromCycles(uint32_t nCycles, uint32_t& 
         return 5;
     } // if
 
-// Normal bit time (8 microseconds), expressed as number of CPU cycles
-#define VAN_NORMAL_BIT_TIME_CPU_CYCLES (667 * CPU_F_FACTOR)
-
     // We hardly ever get here. And if we do, the "number of bits" is not so important.
-    //unsigned int nBits = (nCycles + 300 * CPU_F_FACTOR) / (650 * CPU_F_FACTOR);
-    unsigned int nBits = (nCycles + 200 * CPU_F_FACTOR) / VAN_NORMAL_BIT_TIME_CPU_CYCLES;
-
-    return nBits;
-} // nBitsFromCycles
+    return nBits(nCycles);
+} // nBitsTakingIntoAccountJitter
 
 void ICACHE_RAM_ATTR SetTxBitTimer()
 {
@@ -346,12 +314,14 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
     static uint32_t jitter = 0;
 
-    // Return quickly when it is a spurious interrupt (shorter than a single bit time)
     uint32_t nCycles = curr - prev;  // Arithmetic has safe roll-over
+
+    // Return quickly when it is a spurious interrupt (shorter than a single bit time)
     if (nCycles + jitter < 400 * CPU_F_FACTOR) return;
 
-    // Return quickly when it is a spurious interrupt (pin level not changed).
+    // Return quickly when it is a spurious interrupt (pin level not changed)
     if (pinLevelChangedTo == prevPinLevelChangedTo) return;
+
     prevPinLevelChangedTo = pinLevelChangedTo;
 
 #ifdef ARDUINO_ARCH_ESP32
@@ -368,8 +338,6 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     prev = curr;
 
     TVanPacketRxDesc* rxDesc = VanBusRx._head;
-    PacketReadState_t state = rxDesc->state;
-    rxDesc->slot = rxDesc - VanBusRx.pool;
 
 #ifdef VAN_RX_ISR_DEBUGGING
     // Record some data to be used for debugging outside this ISR
@@ -381,7 +349,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             isrDebugPacket->samples + isrDebugPacket->at :
             NULL;
 
-    // Only write into buffer if there is space
+    // Only write into sample buffer if there is space
     if (debugIsr != NULL)
     {
         debugIsr->pinLevel = pinLevelChangedTo;
@@ -404,12 +372,36 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     static unsigned int atBit = 0;
     static uint16_t readBits = 0;
 
+    PacketReadState_t state = rxDesc->state;
+
+#ifdef VAN_RX_IFS_DEBUGGING
+    if (state == VAN_RX_VACANT || state == VAN_RX_SEARCHING)
+    {
+        TIfsDebugPacket* ifsDebugPacket = &rxDesc->ifsDebugPacket;
+
+        TIfsDebugData* debugIfs =
+            ifsDebugPacket->at < VAN_ISF_DEBUG_BUFFER_SIZE ?
+                ifsDebugPacket->samples + ifsDebugPacket->at :
+                NULL;
+
+        // Only write into sample buffer if there is space
+        if (debugIfs != NULL)
+        {
+            debugIfs->pinLevel = pinLevelChangedTo;
+            debugIfs->nCycles = nCycles;
+            debugIfs->nBits = nBits(nCycles);
+            ifsDebugPacket->at++;
+        } // if
+
+    } // if
+#endif // VAN_RX_IFS_DEBUGGING
+
     if (state == VAN_RX_VACANT)
     {
-        // Wait until we've seen a series of VAN_LOGICAL_HIGH bits
-        // TODO - wait until we've seen at least IFS bits?
         if (pinLevelChangedTo == VAN_LOGICAL_LOW)
         {
+            // Normal detection: we've seen a series of VAN_LOGICAL_HIGH bits
+
             rxDesc->state = VAN_RX_SEARCHING;
             rxDesc->ack = VAN_NO_ACK;
             atBit = 0;
@@ -418,6 +410,23 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             jitter = 0;
 
             //timer1_disable(); // TODO - necessary?
+        }
+        else if (pinLevelChangedTo == VAN_LOGICAL_HIGH)
+        {
+            unsigned int _nBits = nBits(nCycles);
+
+            //if (_nBits == 4 || _nBits == 3)
+            if (_nBits == 4)
+            {
+                // Late detection
+
+                rxDesc->state = VAN_RX_SEARCHING;
+                rxDesc->ack = VAN_NO_ACK;
+                atBit = 4;
+                readBits = 0;
+                rxDesc->size = 0;
+                jitter = 0;
+            } // if
         } // if
 
     #ifdef ARDUINO_ARCH_ESP32
@@ -473,7 +482,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 #ifdef VAN_RX_ISR_DEBUGGING
     if (debugIsr != NULL) debugIsr->jitter = jitter;
 #endif // VAN_RX_ISR_DEBUGGING
-    unsigned int nBits = nBitsFromCycles(nCycles, jitter);
+    unsigned int nBits = nBitsTakingIntoAccountJitter(nCycles, jitter);
 #ifdef VAN_RX_ISR_DEBUGGING
     if (debugIsr != NULL) debugIsr->nBits = nBits;
 #endif // VAN_RX_ISR_DEBUGGING
@@ -536,21 +545,10 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     #ifdef VAN_RX_ISR_DEBUGGING
         if (debugIsr != NULL) debugIsr->nBits--;
     #endif // VAN_RX_ISR_DEBUGGING
-/*
-    }
-
-    // Experiment: read the pin level again; if it changed during the processing of the current interrupt, then
-    // apparently the interrupt service was called quite late, so the number of bits is in fact one less
-    else if (pinLevelChangedTo != GPIP(VanBusRx.pin))
-    {
-        nBits--;
-        jitter = 500 * CPU_F_FACTOR;
-        if (nCycles > VAN_NORMAL_BIT_TIME_CPU_CYCLES * nBits ) jitter = nCycles - VAN_NORMAL_BIT_TIME_CPU_CYCLES * nBits;
-    #ifdef VAN_RX_ISR_DEBUGGING
-        if (debugIsr != NULL) debugIsr->nBits--;
-    #endif // VAN_RX_ISR_DEBUGGING
-*/
     } // if
+
+    // Be flexible if a bit is lost in the 4 x '0' or 4 x '1' series during SOF detection
+    if (state == VAN_RX_SEARCHING && nBits == 3) nBits = 4;
 
     atBit += nBits;
     readBits <<= nBits;
@@ -574,16 +572,12 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             // Accept also:
             // - 00 0001 1101 (0x01D) : as with all other interrupts, even the first interrupt (0->1) might be
             //   slightly late.
-            // - 01 0011 1101 (0x13D) : spurious bit in the '0' series
+            // - 01 0011 1101 (0x13D) : spurious bit in the 4 x '0' series
             //
             // TODO - test this. Maybe accept also other "slightly-off" patterns?
             //
             if (currentByte != 0x03D
                 && currentByte != 0x01D && currentByte != 0x13D
-                // && currentByte != 0x185 && currentByte != 0x042 && currentByte != 0x14D
-                // && currentByte != 0x1C8 && currentByte != 0x126 && currentByte != 0x04A
-                // && currentByte != 0x0CE && currentByte != 0x172 && currentByte != 0x146
-                // && currentByte != 0x0AA
                )
             {
                 rxDesc->state = VAN_RX_VACANT;
@@ -688,6 +682,8 @@ bool TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
     _head = pool;
     tail = pool;
     end = pool + queueSize;
+
+    for (TVanPacketRxDesc* rxDesc = pool; rxDesc < end; rxDesc++) rxDesc->slot = rxDesc - pool;
 
     attachInterrupt(digitalPinToInterrupt(rxPin), RxPinChangeIsr, CHANGE);
 
@@ -821,6 +817,65 @@ void TVanPacketRxQueue::DumpStats(Stream& s, bool longForm) const
         s.print(F("\n"));
     } // if
 } // TVanPacketRxQueue::DumpStats
+
+#ifdef VAN_RX_IFS_DEBUGGING
+
+bool TIfsDebugPacket::IsAbnormal() const
+{
+    // Normally, a packet is recognized after 5 interrupts (pin level changes)
+    // The 'Dump()' looks e.g. like this:
+    //
+    //    # nCycles -> nBits pinLVL
+    //    0   16766 ->    12 "0"
+    //    1    5224 ->     4 "1"
+    //    2    5018 ->     4 "0"
+    //    3    1462 ->     1 "1"
+    //    4    1400 ->     1 "0"
+
+    // Alternatively, this can also happen:
+    //
+    //   # nCycles -> nBits pinLVL
+    //   0    2302 ->     2 "1"
+    //   1   15826 ->    12 "0"
+    //   2    5188 ->     4 "1"
+    //   3    5052 ->     4 "0"
+    //   4    1428 ->     1 "1"
+    //   5    1406 ->     1 "0"
+
+    bool normal = at <= 5 || (at == 6 && samples[0].pinLevel == 1);
+    return ! normal;
+} // TIfsDebugPacket::IsAbnormal
+
+// Dump data found in the inter-frame space
+void TIfsDebugPacket::Dump(Stream& s) const
+{
+    int i = 0;
+
+    while (i < at)
+    {
+        const TIfsDebugData* ifsData = samples + i;
+        if (i == 0) s.printf_P(PSTR("   # nCycles -> nBits pinLVL\n"));
+
+        s.printf("%4u ", i);
+
+        uint32_t nCycles = ifsData->nCycles;
+        if (nCycles > 999999) s.printf(">999999"); else s.printf("%7lu", nCycles);
+
+        s.print(" -> ");
+
+        unsigned int nBits = ifsData->nBits;
+        if (nBits > 9999) s.printf(">9999"); else s.printf("%5u", nBits);
+
+        unsigned char pinLevelChangedTo = ifsData->pinLevel;
+        s.printf(" \"%u\"", pinLevelChangedTo);
+
+        s.println();
+
+        i++;
+    } // while
+} // TIfsDebugPacket::Dump
+
+#endif // VAN_RX_IFS_DEBUGGING
 
 #ifdef VAN_RX_ISR_DEBUGGING
 

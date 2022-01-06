@@ -31,6 +31,7 @@
 #define VAN_BUX_RX_VERSION 000002004
 
 //#define VAN_RX_ISR_DEBUGGING
+//#define VAN_RX_IFS_DEBUGGING
 
 // VAN_BIT_DOMINANT, VAN_BIT_RECESSIVE: pick the logic
 
@@ -101,6 +102,37 @@ class TIsrDebugPacket
 
 #endif // VAN_RX_ISR_DEBUGGING
 
+#ifdef VAN_RX_IFS_DEBUGGING
+
+// Inter-frame space analysis data
+struct TIfsDebugData
+{
+    uint32_t nCycles:16;
+    uint16_t nBits:8;
+    uint8_t pinLevel:4;
+} __attribute__((packed)); // struct TIfsDebugData
+
+class TIfsDebugPacket
+{
+  public:
+
+    void Init() { at = 0; }
+    bool IsAbnormal() const;
+    void Dump(Stream& s) const;
+    TIfsDebugPacket() { Init(); }  // Constructor
+
+  private:
+
+    #define VAN_ISF_DEBUG_BUFFER_SIZE 20
+    TIfsDebugData samples[VAN_ISF_DEBUG_BUFFER_SIZE];
+    int at;  // Index of next sample to write into
+
+    friend void RxPinChangeIsr();
+    friend class TVanPacketRxDesc;
+}; // TIfsDebugPacket
+
+#endif // VAN_RX_IFS_DEBUGGING
+
 enum PacketReadState_t { VAN_RX_VACANT, VAN_RX_SEARCHING, VAN_RX_LOADING, VAN_RX_WAITING_ACK, VAN_RX_DONE };
 enum PacketReadResult_t { VAN_RX_PACKET_OK, VAN_RX_ERROR_NBITS, VAN_RX_ERROR_MANCHESTER, VAN_RX_ERROR_MAX_PACKET };
 enum PacketAck_t { VAN_ACK, VAN_NO_ACK };
@@ -140,6 +172,10 @@ class TVanPacketRxDesc
     // Raw: #1234 (123/123) 28(33) 0E ABC RA0 01-02-03-04-05-06-07-08-09-10-11-12-13-14-15-16-17-18-19-20-21-22-23-24-25-26-27-28:CC-DD NO_ACK VAN_RX_ERROR_MAX_PACKET CCDD CRC_ERROR
     // + 1 for terminating '\0'
     #define VAN_MAX_DUMP_RAW_SIZE (38 + VAN_MAX_DATA_BYTES * 3 + 45 + 1)
+
+#ifdef VAN_RX_IFS_DEBUGGING
+    const TIfsDebugPacket& getIfsDebugPacket() const { return ifsDebugPacket; }
+#endif // VAN_RX_IFS_DEBUGGING
 
 #ifdef VAN_RX_ISR_DEBUGGING
     const TIsrDebugPacket& getIsrDebugPacket() const { return isrDebugPacket; }
@@ -183,6 +219,10 @@ class TVanPacketRxDesc
     TIsrDebugPacket isrDebugPacket;  // For debugging of packet reception inside ISR
 #endif // VAN_RX_ISR_DEBUGGING
 
+#ifdef VAN_RX_IFS_DEBUGGING
+    TIfsDebugPacket ifsDebugPacket;  // For debugging of inter-frame space
+#endif // VAN_RX_IFS_DEBUGGING
+
     uint32_t seqNo;
     uint16_t slot;  // in RxQueue
 
@@ -195,6 +235,10 @@ class TVanPacketRxDesc
 #ifdef VAN_RX_ISR_DEBUGGING
         isrDebugPacket.Init();
 #endif // VAN_RX_ISR_DEBUGGING
+
+#ifdef VAN_RX_IFS_DEBUGGING
+        ifsDebugPacket.Init();
+#endif // VAN_RX_IFS_DEBUGGING
     } // Init
 
     friend void RxPinChangeIsr();
@@ -314,6 +358,9 @@ class TVanPacketRxQueue
         _head->seqNo = count++;
         _head->millis_ = millis();
         if (++_head == end) _head = pool;  // roll over if needed
+    #ifdef VAN_RX_IFS_DEBUGGING
+        _head->ifsDebugPacket.Init();
+    #endif // VAN_RX_IFS_DEBUGGING
     } // _AdvanceHead
 
     void AdvanceTail()
