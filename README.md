@@ -112,7 +112,7 @@ The following methods are available for the ```VanBus``` object:<a name = "funct
 Interfaces for both receiving and transmitting of packets:
 
 1. [```void Setup(uint8_t rxPin, uint8_t txPin)```](#Setup)
-2. [```void DumpStats(Stream& s)```](#DumpStats)
+2. [```void DumpStats(Stream& s, bool longForm = true)```](#DumpStats)
 
 Interfaces for receiving packets:
 
@@ -132,9 +132,10 @@ Interfaces for transmitting packets:
 
 Start the receiver listening on GPIO pin ```rxPin```. The transmitter will transmit on GPIO pin ```txPin```.
 
-#### 2. ```void DumpStats(Stream& s)``` <a name = "DumpStats"></a>
+#### 2. ```void DumpStats(Stream& s, bool longForm = true)``` <a name = "DumpStats"></a>
 
-Dumps a few packet statistics on the passed stream.
+Dumps a few packet statistics on the passed stream. Passing **false** to the `longForm` parameter generates
+the short form.
 
 #### 3. ```bool Available()``` <a name = "Available"></a>
 
