@@ -30,6 +30,7 @@ typedef struct
 {
     uint8_t recvpin;  // pin for IR data from detector
     uint8_t rcvstate;  // state machine
+    unsigned long millis_;
     unsigned int rawbuf[RAWBUF];  // raw data
     uint8_t rawlen;  // counter of entries in rawbuf
 } TIrParams;
@@ -65,19 +66,26 @@ void ICACHE_RAM_ATTR irPinChangeIsr()
     uint32_t now = system_get_time();
     if (irparams.rcvstate == STATE_IDLE)
     {
-        irparams.rcvstate = STATE_MARK;	
-        irparams.rawbuf[irparams.rawlen++] = 20;		
+        irparams.rcvstate = STATE_MARK;
+        irparams.rawbuf[irparams.rawlen++] = 20;
     }
     else
     {
         uint32_t ticks = (now - lastIrPulse) / USECPERTICK + 1;
 
         // Timeout after
-        #define TIMEOUT_USECS (15000)
+        #define TIMEOUT_USECS (10000)
         #define TIMEOUT_TICKS (TIMEOUT_USECS / USECPERTICK)
 
-        if (ticks > TIMEOUT_TICKS) irparams.rcvstate = STATE_STOP;
-        else if (irparams.rawlen < RAWBUF) irparams.rawbuf[irparams.rawlen++] = ticks;
+        if (ticks > TIMEOUT_TICKS)
+        {
+            irparams.rcvstate = STATE_STOP;
+            irparams.millis_ = millis();
+        }
+        else if (irparams.rawlen < RAWBUF)
+        {
+            irparams.rawbuf[irparams.rawlen++] = ticks;
+        } // if
     }
     lastIrPulse = now;
 } // irPinChangeIsr
@@ -154,7 +162,11 @@ int IRrecv::decode(TIrPacket* results)
         uint32_t now = system_get_time();
         uint32_t then = lastIrPulse;
         uint32_t ticks = (now - then) / USECPERTICK + 1;
-        if (ticks > TIMEOUT_TICKS) irparams.rcvstate = STATE_STOP;
+        if (ticks > TIMEOUT_TICKS)
+        {
+            irparams.rcvstate = STATE_STOP;
+            irparams.millis_ = millis();
+        } // if
     } // if
     interrupts();
 
@@ -162,6 +174,7 @@ int IRrecv::decode(TIrPacket* results)
 
     if (decodeHash(results))
     {
+        results->millis_ = irparams.millis_;
         results->buttonStr = IrButtonStr(results->value);
         if (strlen_P(results->buttonStr) > 0) return IR_DECODED;
     } // if
@@ -230,12 +243,10 @@ const char* ParseIrPacketToJson(const TIrPacket& pkt)
     // JSON buffer overflow?
     if (at >= IR_JSON_BUFFER_SIZE) return "";
 
-    #ifdef PRINT_JSON_BUFFERS_ON_SERIAL
-
+#ifdef PRINT_JSON_BUFFERS_ON_SERIAL
     Serial.print(F("Parsed to JSON object:\n"));
     PrintJsonText(jsonBuffer);
-
-    #endif // PRINT_JSON_BUFFERS_ON_SERIAL
+#endif // PRINT_JSON_BUFFERS_ON_SERIAL
 
     return jsonBuffer;
 } // ParseIrPacketToJson
@@ -283,8 +294,10 @@ bool IrReceive(TIrPacket& irPacket)
     static unsigned long lastValue = 0;
     static unsigned long lastUpdate = 0;
 
+    unsigned long now = irPacket.millis_;  // Retrieve packet reception time stamp from ISR
+
     // Arithmetic has safe roll-over
-    unsigned long lastInterval = millis() - lastUpdate;
+    unsigned long lastInterval = now - lastUpdate;
 
     // Firing interval or IR unit (milliseconds)
     #define IR_BUTTON_HELD_INTV_MS (50UL)
@@ -296,7 +309,7 @@ bool IrReceive(TIrPacket& irPacket)
     irPacket.held = irPacket.value == lastValue && lastInterval < IR_BUTTON_HELD_2_MS;
 
     lastValue = irPacket.value;
-    lastUpdate = millis();
+    lastUpdate = now;
 
 #ifdef DEBUG_IR_RECV
     Serial.printf_P(PSTR("[irRecv] irPacket.value = 0x%lX (%S), lastValue = 0x%lX, lastInterval = %lu, held = %S\n"),
@@ -324,9 +337,9 @@ bool IrReceive(TIrPacket& irPacket)
 
     static IrButtonHeldState_t irButtonRepeatState = IBHS_DELAYING;
 
-    // Wait for 14 packet intervals (14 * 50 = 700 milliseconds) as long as "held" bit is set, achieving a delay
-    // of ~ 0.70 seconds
-    #define IR_DELAY_N_INTERVALS (14)
+    // Wait for 13 packet intervals (13 * 50 = 650 milliseconds) as long as "held" bit is set, achieving a delay
+    // of ~ 0.65 seconds
+    #define IR_DELAY_N_INTERVALS (13)
     static unsigned long countDownDelay = IR_DELAY_N_INTERVALS;
 
     // Wait for 4 packet intervals (4 * 50 = 200 milliseconds) as long as "held" bit is set, achieving a firing

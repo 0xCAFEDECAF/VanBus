@@ -291,11 +291,11 @@ char webpage[] PROGMEM = R"=====(
       <p>In reverse: <b id="in_reverse">---</b></p>
       <p>Trailer: <b id="trailer">---</b></p>
 
-      <p>Coolant temperature: <b id="water_temp">---</b> deg C</p>
+      <p>Coolant temperature: <b id="coolant_temp">---</b> &deg;C</p>
 
       <div style="height:40px;">
         <!-- Linear gauge -->
-        <div id="water_temp_perc" style="height:30px; transform:scaleX(0.6); transform-origin:left center;">
+        <div id="coolant_temp_perc" style="height:30px; transform:scaleX(0.6); transform-origin:left center;">
           <svg>
             <line style="stroke:rgb(41,55,74); stroke-width:30;" x1="0" y1="15" x2="400" y2="15" />
           </svg>
@@ -310,7 +310,7 @@ char webpage[] PROGMEM = R"=====(
 
       <p>Odometer 1: <b id="odometer_1">---</b></p>
       <p>Odometer 2: <b id="odometer_2">---</b></p>
-      <p>Exterior temperature: <b id="exterior_temperature">---</b></p>
+      <p>Exterior temperature: <b id="exterior_temp">---</b> &deg;C</p>
     </div>
     <hr/>
     <div>
@@ -324,14 +324,14 @@ char webpage[] PROGMEM = R"=====(
       <p>Lights</p>
       <p>Instrument cluster: <b id="instrument_cluster">---</b></p>
       <p>Speed regulator wheel: <b id="speed_regulator_wheel">---</b></p>
-      <p>Warning LED: <b id="warning_led">---</b></p>
+      <p>Warning LED: <b id="hazard_lights">---</b></p>
       <p>Diesel glow plugs: <b id="diesel_glow_plugs">---</b></p>
       <p>Door open: <b id="door_open">---</b></p>
-      <p>Service after km: <b id="remaining_km_to_service">---</b></p>
-      <p>Service after km (dash): <b id="remaining_km_to_service_dash">---</b></p>
+      <p>Service after km: <b id="distance_to_service">---</b> km</p>
+      <p>Service after km (dash): <b id="distance_to_service_dash">---</b></p>
       <p>Lights: <b id="lights">---</b></p>
       <p>Auto gearbox: <b id="auto_gearbox">---</b></p>
-      <p>Oil temperature: <b id="oil_temperature">---</b></p>
+      <p>Oil temperature: <b id="oil_temp">---</b> &deg;C</p>
       <p>Fuel level: <b id="fuel_level">---</b></p>
 
       <p>Oil level (raw): <b id="oil_level_raw">---</b></p>
@@ -369,10 +369,10 @@ char webpage[] PROGMEM = R"=====(
       <p>Trip 2 average speed: <b id="avg_speed_2">---</b> km/h</p>
       <p>Average speed (EMA): <b id="exp_moving_avg_speed">---</b> km/h</p>
       <p>Trip 1 distance: <b id="distance_1">---</b> km</p>
-      <p>Trip 1 average fuel consumption: <b id="avg_consumption_lt_100_1">---</b> lt/100 km</p>
+      <p>Trip 1 average fuel consumption: <b id="avg_consumption_1">---</b> lt/100 km</p>
       <p>Trip 2 distance: <b id="distance_2">---</b> km</p>
-      <p>Trip 2 average fuel consumption: <b id="avg_consumption_lt_100_2">---</b> lt/100 km</p>
-      <p>Current fuel consumption: <b id="inst_consumption_lt_100">---</b> lt/100 km</p>
+      <p>Trip 2 average fuel consumption: <b id="avg_consumption_2">---</b> lt/100 km</p>
+      <p>Current fuel consumption: <b id="inst_consumption">---</b> lt/100 km</p>
       <p>Remaining distance in fuel tank: <b id="distance_to_empty">---</b> km</p>
     </div>
     <hr/>
@@ -564,8 +564,8 @@ char webpage[] PROGMEM = R"=====(
       <p>Rear heater 2: <b id="rear_heater_2">---</b></p>
       <p>A/C compressor: <b id="ac_compressor">---</b></p>
       <p>Contact key position: <b id="contact_key_position_ac">---</b></p>
-      <p>Condenser temperature: <b id="condenser_temperature">---</b> deg C</p>
-      <p>Evaporator temperature: <b id="evaporator_temperature">---</b> deg C</p>
+      <p>Condenser temperature: <b id="condenser_temp">---</b> &deg;C</p>
+      <p>Evaporator temperature: <b id="evaporator_temp">---</b> &deg;C</p>
     </div>
     <hr/>
     <div>
@@ -856,12 +856,12 @@ char webpage[] PROGMEM = R"=====(
 
 enum VanPacketFilter_t
 {
-    VAN_PACKETS_ALL,
-    VAN_PACKETS_NONE,
-    VAN_PACKETS_HEAD_UNIT,
-    VAN_PACKETS_AIRCON,
-    VAN_PACKETS_COM2000_ETC,
-    VAN_PACKETS_SAT_NAV
+    VAN_PACKETS_ALL_VAN_PKTS,
+    VAN_PACKETS_NO_VAN_PKTS,
+    VAN_PACKETS_HEAD_UNIT_PKTS,
+    VAN_PACKETS_AIRCON_PKTS,
+    VAN_PACKETS_COM2000_ETC_PKTS,
+    VAN_PACKETS_SAT_NAV_PKTS
 }; // enum VanPacketFilter_t
 
 // serialDumpFilter == 0 means: no filtering; print all
@@ -906,6 +906,15 @@ void HandleDumpFilter()
             F("OK: filtering JSON data"));
 } // HandleDumpFilter
 
+// Defined in Wifi.ino
+void SetupWifi();
+
+// Defined in Esp.ino
+void PrintSystemSpecs();
+const char* EspSystemDataToJson(char* buf, const int n);
+
+// Infrared receiver
+
 // Results returned from the IR decoder
 typedef struct
 {
@@ -915,19 +924,13 @@ typedef struct
     volatile unsigned int* rawbuf;  // Raw intervals in 50 usec ticks
     int rawlen;  // Number of records in rawbuf
     bool held;
+    unsigned long millis_;
 } TIrPacket;
-
-// Defined in Wifi.ino
-void SetupWifi();
 
 // Defined in IRrecv.ino
 void IrSetup();
 const char* ParseIrPacketToJson(const TIrPacket& pkt);
 bool IrReceive(TIrPacket& irPacket);
-
-// Defined in Esp.ino
-void PrintSystemSpecs();
-const char* EspSystemDataToJson(char* buf, const int n);
 
 // Defined in PacketToJson.ino
 extern char jsonBuffer[];
@@ -1006,10 +1009,21 @@ void setup()
     Serial.print(F("Please surf to: http://"));
     Serial.println(WiFi.localIP());
 
+#if ! defined VAN_RX_ISR_DEBUGGING && ! defined VAN_RX_IFS_DEBUGGING
+
     // Having the default VAN packet queue size of 15 (see VanBusRx.h) seems too little given the time that
     // is needed to send a JSON packet over the Wi-Fi; seeing quite some "VAN PACKET QUEUE OVERRUN!" lines.
     // Looks like it should be set to at least 100.
     #define VAN_PACKET_QUEUE_SIZE 100
+
+#else
+
+    // Packet debugging requires a lot of extra memory per slot, so the queue must be small to prevent
+    // "out of memory" errors
+    #define VAN_PACKET_QUEUE_SIZE 15
+
+#endif
+
     VanBusRx.Setup(RX_PIN, VAN_PACKET_QUEUE_SIZE);
     Serial.printf_P(PSTR("VanBusRx queue of size %d is set up\n"), VanBusRx.QueueSize());
 
