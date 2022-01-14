@@ -69,7 +69,6 @@ uint16_t _crc(const uint8_t bytes[], int size);
 
 // ISR invocation data, for debugging purposes
 
-// In theory, there can be 33 * 8 = 264 ISR invocations, but in practice 128 is enough for the vast majority of cases
 struct TIsrDebugData
 {
     uint32_t nCycles:16;
@@ -91,8 +90,11 @@ class TIsrDebugPacket
 
   private:
 
+    // In theory, there can be 33 * 8 = 264 ISR invocations, but in practice 128 is enough
+    // for the vast majority of cases
     #define VAN_ISR_DEBUG_BUFFER_SIZE 128
     TIsrDebugData samples[VAN_ISR_DEBUG_BUFFER_SIZE];
+
     int at;  // Index of next sample to write into
     uint16_t slot;  // in RxQueue
 
