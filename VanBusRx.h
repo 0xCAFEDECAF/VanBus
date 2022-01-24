@@ -79,7 +79,7 @@ struct TIsrDebugData
     uint8_t pinLevelAtReturnFromIsr:4;
 } __attribute__((packed)); // struct TIsrDebugData
 
-// Buffer of ISR invocation data
+// Buffer of ISR invocation debug data
 class TIsrDebugPacket
 {
   public:
@@ -175,13 +175,13 @@ class TVanPacketRxDesc
     // + 1 for terminating '\0'
     #define VAN_MAX_DUMP_RAW_SIZE (38 + VAN_MAX_DATA_BYTES * 3 + 45 + 1)
 
-#ifdef VAN_RX_IFS_DEBUGGING
+  #ifdef VAN_RX_IFS_DEBUGGING
     const TIfsDebugPacket& getIfsDebugPacket() const { return ifsDebugPacket; }
-#endif // VAN_RX_IFS_DEBUGGING
+  #endif // VAN_RX_IFS_DEBUGGING
 
-#ifdef VAN_RX_ISR_DEBUGGING
+  #ifdef VAN_RX_ISR_DEBUGGING
     const TIsrDebugPacket& getIsrDebugPacket() const { return isrDebugPacket; }
-#endif // VAN_RX_ISR_DEBUGGING
+  #endif // VAN_RX_ISR_DEBUGGING
 
     // String representation of various fields.
     // Notes:
@@ -217,13 +217,13 @@ class TVanPacketRxDesc
     PacketAck_t ack;
     unsigned long millis_;  // Packet time stamp in milliseconds
 
-#ifdef VAN_RX_ISR_DEBUGGING
+  #ifdef VAN_RX_ISR_DEBUGGING
     TIsrDebugPacket isrDebugPacket;  // For debugging of packet reception inside ISR
-#endif // VAN_RX_ISR_DEBUGGING
+  #endif // VAN_RX_ISR_DEBUGGING
 
-#ifdef VAN_RX_IFS_DEBUGGING
+  #ifdef VAN_RX_IFS_DEBUGGING
     TIfsDebugPacket ifsDebugPacket;  // For debugging of inter-frame space
-#endif // VAN_RX_IFS_DEBUGGING
+  #endif // VAN_RX_IFS_DEBUGGING
 
     uint32_t seqNo;
     uint16_t slot;  // in RxQueue
@@ -234,13 +234,13 @@ class TVanPacketRxDesc
         state = VAN_RX_VACANT;
         result = VAN_RX_PACKET_OK;
         ack = VAN_NO_ACK;
-#ifdef VAN_RX_ISR_DEBUGGING
+      #ifdef VAN_RX_ISR_DEBUGGING
         isrDebugPacket.Init();
-#endif // VAN_RX_ISR_DEBUGGING
+      #endif // VAN_RX_ISR_DEBUGGING
 
-#ifdef VAN_RX_IFS_DEBUGGING
+      #ifdef VAN_RX_IFS_DEBUGGING
         ifsDebugPacket.Init();
-#endif // VAN_RX_IFS_DEBUGGING
+      #endif // VAN_RX_IFS_DEBUGGING
     } // Init
 
     friend void RxPinChangeIsr();
@@ -360,9 +360,9 @@ class TVanPacketRxQueue
         _head->seqNo = count++;
         _head->millis_ = millis();
         if (++_head == end) _head = pool;  // roll over if needed
-    #ifdef VAN_RX_IFS_DEBUGGING
+      #ifdef VAN_RX_IFS_DEBUGGING
         _head->ifsDebugPacket.Init();
-    #endif // VAN_RX_IFS_DEBUGGING
+      #endif // VAN_RX_IFS_DEBUGGING
     } // _AdvanceHead
 
     void AdvanceTail()
