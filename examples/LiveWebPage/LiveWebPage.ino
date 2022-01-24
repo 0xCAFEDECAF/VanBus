@@ -316,8 +316,8 @@ char webpage[] PROGMEM = R"=====(
       <p>Head Unit Stalk</p>
       <p>NEXT button: <b id="head_unit_stalk_button_next">---</b></p>
       <p>PREV button: <b id="head_unit_stalk_button_prev">---</b></p>
-      <p>VOL_DOWN button: <b id="head_unit_stalk_button_volume_up">---</b></p>
-      <p>VOL_UP button: <b id="head_unit_stalk_button_volume_down">---</b></p>
+      <p>VOL_UP button: <b id="head_unit_stalk_button_volume_up">---</b></p>
+      <p>VOL_DOWN button: <b id="head_unit_stalk_button_volume_down">---</b></p>
       <p>SRC button: <b id="head_unit_stalk_button_source">---</b></p>
       <p>Wheel: <b id="head_unit_stalk_wheel">---</b></p>
       <p>Wheel rollover: <b id="head_unit_stalk_wheel_rollover">---</b></p>
