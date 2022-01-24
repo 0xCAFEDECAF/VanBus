@@ -16,7 +16,7 @@
  * Details
  *
  * This sketch will host a web page, showing all data that has been received and parsed from the VAN bus. The web
- * page is updated continuously ("live") using a web socket (on port 81). Data from the VAN bus is broadcast to the
+ * page is updated continuously ("live") using a web socket (on port 81). Data from the VAN bus is sent to the
  * web socket in JSON format, which is then picked up on the client side by a JavaScript dispatcher script (served
  * in the same web page). The script uses jQuery to place the incoming data on the correct spot in the DOM.
  *
@@ -90,7 +90,6 @@ int RX_PIN = D2;  // GPIO4 - often used as SDA (I2C)
 char jsonBuffer[JSON_BUFFER_SIZE];
 
 ESP8266WebServer webServer;
-WebSocketsServer webSocket = WebSocketsServer(81);
 
 char webpage[] PROGMEM = R"=====(
 <!DOCTYPE html>
@@ -315,7 +314,11 @@ char webpage[] PROGMEM = R"=====(
     <hr/>
     <div>
       <p>Head Unit Stalk</p>
-      <p>Buttons: <b id="head_unit_stalk_buttons">---</b></p>
+      <p>NEXT button: <b id="head_unit_stalk_button_next">---</b></p>
+      <p>PREV button: <b id="head_unit_stalk_button_prev">---</b></p>
+      <p>VOL_DOWN button: <b id="head_unit_stalk_button_volume_up">---</b></p>
+      <p>VOL_UP button: <b id="head_unit_stalk_button_volume_down">---</b></p>
+      <p>SRC button: <b id="head_unit_stalk_button_source">---</b></p>
       <p>Wheel: <b id="head_unit_stalk_wheel">---</b></p>
       <p>Wheel rollover: <b id="head_unit_stalk_wheel_rollover">---</b></p>
     </div>
@@ -794,13 +797,13 @@ char webpage[] PROGMEM = R"=====(
       <p>Right stalk windscreen wipe auto: <b id="com2000_right_stalk_windscreen_wipe_auto">---</b></p>
       <p>Right stalk windscreen wipe normal: <b id="com2000_right_stalk_windscreen_wipe_normal">---</b></p>
       <p>Right stalk windscreen wipe fast: <b id="com2000_right_stalk_windscreen_wipe_fast">---</b></p>
-      <p>Turn signal: <b id="com2000_turn_signal_left">---</b></p>
-      <p>Turn signal: <b id="com2000_turn_signal_right">---</b></p>
-      <p>Head unit stalk: <b id="com2000_head_unit_stalk_button_src">---</b></p>
-      <p>Head unit stalk: <b id="com2000_head_unit_stalk_button_volume_up">---</b></p>
-      <p>Head unit stalk: <b id="com2000_head_unit_stalk_button_volume_down">---</b></p>
-      <p>Head unit stalk: <b id="com2000_head_unit_stalk_button_seek_backward">---</b></p>
-      <p>Head unit stalk: <b id="com2000_head_unit_stalk_button_seek_forward">---</b></p>
+      <p>Turn signal left: <b id="com2000_turn_signal_left">---</b></p>
+      <p>Turn signal right: <b id="com2000_turn_signal_right">---</b></p>
+      <p>Head unit stalk SRC button: <b id="com2000_head_unit_stalk_button_src">---</b></p>
+      <p>Head unit stalk VOL UP button: <b id="com2000_head_unit_stalk_button_volume_up">---</b></p>
+      <p>Head unit stalk VOL DOWN button: <b id="com2000_head_unit_stalk_button_volume_down">---</b></p>
+      <p>Head unit stalk SEET BK button: <b id="com2000_head_unit_stalk_button_seek_backward">---</b></p>
+      <p>Head unit stalk SEEK FWD button: <b id="com2000_head_unit_stalk_button_seek_forward">---</b></p>
       <p>Head unit stalk wheel position: <b id="com2000_head_unit_stalk_wheel_pos">---</b></p>
     </div>
     <hr/>
@@ -937,31 +940,39 @@ extern char jsonBuffer[];
 const char* ParseVanPacketToJson(TVanPacketRxDesc& pkt);
 void PrintJsonText(const char* jsonBuffer);
 
-void BroadcastJsonText(const char* json)
+// Create a web socket server on port 81
+WebSocketsServer webSocket = WebSocketsServer(81);
+
+uint8_t websocketNum = 0xFF;
+
+void SendJsonText(const char* json)
 {
-    if (strlen(json) > 0)
+    if (strlen(json) <= 0) return;
+    if (websocketNum == 0xFF) return;
+
+    delay(1); // Give some time to system to process other things?
+
+    unsigned long start = millis();
+
+    //webSocket.broadcastTXT(json);
+    // No, serve only the last one connected (the others are probably already dead)
+    webSocket.sendTXT(websocketNum, json);
+
+    // Print a message if the websocket transmissino took outrageously long (normally it takes around 1-2 msec).
+    // If that takes really long (seconds or more), the VAN bus Rx queue will overrun (remember, ESP8266 is
+    // a single-thread system).
+    unsigned long duration = millis() - start;
+    if (duration > 100)
     {
-        delay(1); // Give some time to system to process other things?
+        Serial.printf_P(
+            PSTR("Sending %zu JSON bytes via 'webSocket.sendTXT' took: %lu msec\n"),
+            strlen(json),
+            duration);
 
-        unsigned long start = millis();
-
-        webSocket.broadcastTXT(json);
-
-        // Print a message if the websocket broadcast took outrageously long (normally it takes around 1-2 msec).
-        // If that takes really long (seconds or more), the VAN bus Rx queue will overrun.
-        unsigned long duration = millis() - start;
-        if (duration > 100)
-        {
-            Serial.printf_P(
-                PSTR("Sending %zu JSON bytes via 'webSocket.broadcastTXT' took: %lu msec\n"),
-                strlen(json),
-                duration);
-
-            Serial.print(F("JSON object:\n"));
-            PrintJsonText(json);
-        } // if
+        Serial.print(F("JSON object:\n"));
+        PrintJsonText(json);
     } // if
-} // BroadcastJsonText
+} // SendJsonText
 
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length)
 {
@@ -970,6 +981,7 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
         case WStype_DISCONNECTED:
         {
             Serial.printf("Websocket [%u] Disconnected!\n", num);
+            websocketNum = 0xFF;
         }
         break;
 
@@ -978,8 +990,10 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
             IPAddress ip = webSocket.remoteIP(num);
             Serial.printf("Websocket [%u] Connected from %d.%d.%d.%d url: %s\n", num, ip[0], ip[1], ip[2], ip[3], payload);
 
+            websocketNum = num;
+
             // Send ESP system data to client
-            BroadcastJsonText(EspSystemDataToJson(jsonBuffer, JSON_BUFFER_SIZE));
+            SendJsonText(EspSystemDataToJson(jsonBuffer, JSON_BUFFER_SIZE));
         }
         break;
     } // switch
@@ -1037,12 +1051,12 @@ void loop()
 
     // IR receiver
     TIrPacket irPacket;
-    if (IrReceive(irPacket)) BroadcastJsonText(ParseIrPacketToJson(irPacket));
+    if (IrReceive(irPacket)) SendJsonText(ParseIrPacketToJson(irPacket));
 
     // VAN bus receiver
     TVanPacketRxDesc pkt;
     bool isQueueOverrun = false;
-    if (VanBusRx.Receive(pkt, &isQueueOverrun)) BroadcastJsonText(ParseVanPacketToJson(pkt));
+    if (VanBusRx.Receive(pkt, &isQueueOverrun)) SendJsonText(ParseVanPacketToJson(pkt));
     if (isQueueOverrun) Serial.print(F("VAN PACKET QUEUE OVERRUN!\n"));
 
     // Print statistics every 5 seconds
