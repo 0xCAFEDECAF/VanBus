@@ -85,7 +85,7 @@ void setup()
     Serial.begin(115200);
     Serial.println("Starting VAN bus receiver");
 
-#ifdef  ARDUINO_ARCH_ESP8266 
+  #ifdef  ARDUINO_ARCH_ESP8266 
     // Disable Wi-Fi altogether to get rid of long and variable interrupt latency, causing packet CRC errors
     // From: https://esp8266hints.wordpress.com/2017/06/29/save-power-by-reliably-switching-the-esp-wifi-on-and-off/
     WiFi.disconnect(true);
@@ -94,7 +94,7 @@ void setup()
     delay(1);
     WiFi.forceSleepBegin();
     delay(1);
-#endif // ARDUINO_ARCH_ESP8266
+  #endif // ARDUINO_ARCH_ESP8266
 
     VanBusRx.Setup(RX_PIN);
     Serial.printf_P(PSTR("VanBusRx queue of size %d is set up\n"), VanBusRx.QueueSize());
@@ -110,10 +110,10 @@ void loop()
         // Show byte content of packet
         pkt.DumpRaw(Serial);
 
-        #ifdef VAN_RX_ISR_DEBUGGING
+      #ifdef VAN_RX_ISR_DEBUGGING
         // Fully dump bit timings for packets that have CRC ERROR, for further analysis
         if (! crcOk) pkt.getIsrDebugPacket().Dump(Serial);
-        #endif // VAN_RX_ISR_DEBUGGING
+      #endif // VAN_RX_ISR_DEBUGGING
     } // if
 
     // Print some boring statistics every minute or so
