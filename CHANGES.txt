@@ -1,3 +1,19 @@
+0.2.5
+    General:
+    * Updated README.md
+    * Code formatting
+
+    VanBusRx:
+    * Added inter-frame space (IFS) debugging to be able to see why packets are sometimes missed
+    * Improved start of frame (SOF) detection to decrease the number of missed packets
+
+    examples/LiveWebPage.ino:
+    * Improved handling (timing) of IR remote control
+    * Update JSON data (PacketToJson.ino) to be in line with VanLiveConnect
+      (https://github.com/0xCAFEDECAF/VanLiveConnect)
+    * Various fixes in the HTML page (LiveWebPage.ino)
+    * Websocket: send instead of broadcast
+
 0.2.4
     VanBusRx:
     * Added optional 'longForm' parameter to TVanPacketRxQueue::DumpStats method
