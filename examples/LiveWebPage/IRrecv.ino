@@ -243,10 +243,10 @@ const char* ParseIrPacketToJson(const TIrPacket& pkt)
     // JSON buffer overflow?
     if (at >= IR_JSON_BUFFER_SIZE) return "";
 
-#ifdef PRINT_JSON_BUFFERS_ON_SERIAL
+  #ifdef PRINT_JSON_BUFFERS_ON_SERIAL
     Serial.print(F("Parsed to JSON object:\n"));
     PrintJsonText(jsonBuffer);
-#endif // PRINT_JSON_BUFFERS_ON_SERIAL
+  #endif // PRINT_JSON_BUFFERS_ON_SERIAL
 
     return jsonBuffer;
 } // ParseIrPacketToJson
@@ -311,10 +311,10 @@ bool IrReceive(TIrPacket& irPacket)
     lastValue = irPacket.value;
     lastUpdate = now;
 
-#ifdef DEBUG_IR_RECV
+  #ifdef DEBUG_IR_RECV
     Serial.printf_P(PSTR("[irRecv] irPacket.value = 0x%lX (%S), lastValue = 0x%lX, lastInterval = %lu, held = %S\n"),
         irPacket.value, irPacket.buttonStr, lastValue, lastInterval, irPacket.held ? yesStr : noStr);
-#endif // DEBUG_IR_RECV
+  #endif // DEBUG_IR_RECV
 
     // "MENU_BUTTON", "MODE_BUTTON" and "VAL_BUTTON" are never "held". They fire only once.
     if (irPacket.held
