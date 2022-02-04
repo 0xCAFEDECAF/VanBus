@@ -342,7 +342,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
   #ifdef VAN_RX_ISR_DEBUGGING
     // Record some data to be used for debugging outside this ISR
 
-    TIsrDebugPacket* isrDebugPacket = &rxDesc->isrDebugPacket;
+    TIsrDebugPacket* isrDebugPacket = rxDesc->isrDebugPacket;
     isrDebugPacket->slot = rxDesc->slot;
     TIsrDebugData* debugIsr =
         isrDebugPacket->at < VAN_ISR_DEBUG_BUFFER_SIZE ?
@@ -587,10 +587,6 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
                 //SetTxBitTimer();
 
-              #ifdef VAN_RX_ISR_DEBUGGING
-                isrDebugPacket->Init();
-              #endif // VAN_RX_ISR_DEBUGGING
-
               #ifdef ARDUINO_ARCH_ESP32
                 portEXIT_CRITICAL_ISR(&mux);
               #endif // ARDUINO_ARCH_ESP32
@@ -682,6 +678,10 @@ bool TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
     _head = pool;
     tail = pool;
     end = pool + queueSize;
+
+  #ifdef VAN_RX_ISR_DEBUGGING
+    _head->isrDebugPacket = isrDebugPacket;
+  #endif // VAN_RX_ISR_DEBUGGING
 
     for (TVanPacketRxDesc* rxDesc = pool; rxDesc < end; rxDesc++) rxDesc->slot = rxDesc - pool;
 
@@ -881,6 +881,17 @@ void TIfsDebugPacket::Dump(Stream& s) const
 
 void TIsrDebugPacket::Dump(Stream& s) const
 {
+    NO_INTERRUPTS;
+    if (wLock)
+    {
+        // Packet has not (yet) been written to, or is currently being used to write into
+        INTERRUPTS;
+        return;
+    } // if
+
+    rLock = true;
+    INTERRUPTS;
+
     // Parse packet outside ISR
 
     unsigned int atBit = 0;
@@ -1008,6 +1019,8 @@ void TIsrDebugPacket::Dump(Stream& s) const
     } // while
 
     #undef reset()
+
+    rLock = false;  // Assumed to be atomic
 
 } // TIsrDebugPacket::Dump
 

@@ -84,7 +84,7 @@ class TIsrDebugPacket
 {
   public:
 
-    void Init() { at = 0; }
+    void Init() { at = 0; rLock = false; wLock = true; }
     void Dump(Stream& s) const;
     TIsrDebugPacket() { Init(); }  // Constructor
 
@@ -97,9 +97,12 @@ class TIsrDebugPacket
 
     int at;  // Index of next sample to write into
     uint16_t slot;  // in RxQueue
+    mutable bool rLock;
+    bool wLock;
 
     friend void RxPinChangeIsr();
     friend class TVanPacketRxDesc;
+    friend class TVanPacketRxQueue;
 }; // TIsrDebugPacket
 
 #endif // VAN_RX_ISR_DEBUGGING
@@ -180,7 +183,7 @@ class TVanPacketRxDesc
   #endif // VAN_RX_IFS_DEBUGGING
 
   #ifdef VAN_RX_ISR_DEBUGGING
-    const TIsrDebugPacket& getIsrDebugPacket() const { return isrDebugPacket; }
+    const TIsrDebugPacket& getIsrDebugPacket() const { return *isrDebugPacket; }
   #endif // VAN_RX_ISR_DEBUGGING
 
     // String representation of various fields.
@@ -218,7 +221,7 @@ class TVanPacketRxDesc
     unsigned long millis_;  // Packet time stamp in milliseconds
 
   #ifdef VAN_RX_ISR_DEBUGGING
-    TIsrDebugPacket isrDebugPacket;  // For debugging of packet reception inside ISR
+    TIsrDebugPacket* isrDebugPacket;  // For debugging of packet reception inside ISR
   #endif // VAN_RX_ISR_DEBUGGING
 
   #ifdef VAN_RX_IFS_DEBUGGING
@@ -234,9 +237,6 @@ class TVanPacketRxDesc
         state = VAN_RX_VACANT;
         result = VAN_RX_PACKET_OK;
         ack = VAN_NO_ACK;
-      #ifdef VAN_RX_ISR_DEBUGGING
-        isrDebugPacket.Init();
-      #endif // VAN_RX_ISR_DEBUGGING
 
       #ifdef VAN_RX_IFS_DEBUGGING
         ifsDebugPacket.Init();
@@ -300,6 +300,9 @@ class TVanPacketRxQueue
         , txTimerTicks(0)
         , txTimerIsr(NULL)
         , lastMediaAccessAt(0)
+      #ifdef VAN_RX_ISR_DEBUGGING
+        , isrDebugPacket(isrDebugPacketPool)
+      #endif // VAN_RX_ISR_DEBUGGING
         , count(0)
         , nCorrupt(0)
         , nRepaired(0)
@@ -336,6 +339,12 @@ class TVanPacketRxQueue
     timercallback txTimerIsr;
     volatile uint32_t lastMediaAccessAt;  // For carrier sense: CPU cycle counter value when last sensed
 
+  #ifdef VAN_RX_ISR_DEBUGGING
+    #define N_ISR_DEBUG_PACKETS 3
+    TIsrDebugPacket isrDebugPacketPool[N_ISR_DEBUG_PACKETS];
+    TIsrDebugPacket* isrDebugPacket;
+  #endif // VAN_RX_ISR_DEBUGGING
+
     // Some statistics. Numbers can roll over.
     uint32_t count;
     uint32_t nCorrupt;
@@ -356,10 +365,33 @@ class TVanPacketRxQueue
     // Only to be called from ISR, unsafe otherwise
     void ICACHE_RAM_ATTR _AdvanceHead()
     {
+        _head->millis_ = millis();
         _head->state = VAN_RX_DONE;
         _head->seqNo = count++;
-        _head->millis_ = millis();
+
+      #ifdef VAN_RX_ISR_DEBUGGING
+
+        // Keep the ISR debug packet if CRC is wrong, otherwise just overwrite
+        if (! _head->CheckCrc())
+        {
+            isrDebugPacket->wLock = false;  // Indicate this debug packet is free for reading
+
+            // Move to the next debug packet, but skip it if it is currently being read
+            do
+            {
+                isrDebugPacket++;
+                if (isrDebugPacket == isrDebugPacketPool + N_ISR_DEBUG_PACKETS) isrDebugPacket = isrDebugPacketPool;
+            } while (isrDebugPacket->rLock && isrDebugPacket != _head->isrDebugPacket);
+        } // if
+      #endif // VAN_RX_ISR_DEBUGGING
+
         if (++_head == end) _head = pool;  // roll over if needed
+
+      #ifdef VAN_RX_ISR_DEBUGGING
+        isrDebugPacket->Init();
+        _head->isrDebugPacket = isrDebugPacket;
+      #endif // VAN_RX_ISR_DEBUGGING
+
       #ifdef VAN_RX_IFS_DEBUGGING
         _head->ifsDebugPacket.Init();
       #endif // VAN_RX_IFS_DEBUGGING
