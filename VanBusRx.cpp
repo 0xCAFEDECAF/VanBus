@@ -415,8 +415,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         {
             unsigned int _nBits = nBits(nCycles);
 
-            //if (_nBits == 4 || _nBits == 3)
-            if (_nBits == 4)
+            if (_nBits == 4 || _nBits == 3)
             {
                 // Late detection
 
