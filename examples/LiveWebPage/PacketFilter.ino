@@ -10,7 +10,7 @@ bool IsPacketSelected(uint16_t iden, VanPacketFilter_t filter)
     if (filter == VAN_PACKETS_ALL_VAN_PKTS)
     {
         // Show all packets, but discard the following:
-        // (Commented-out IDs will be printed on Serial)
+        // (Commented-out IDENs will be printed on Serial)
         if (
             false
             // || iden == VIN_IDEN
@@ -23,7 +23,7 @@ bool IsPacketSelected(uint16_t iden, VanPacketFilter_t filter)
             // || iden == DASHBOARD_IDEN
             // || iden == DASHBOARD_BUTTONS_IDEN
             // || iden == HEAD_UNIT_IDEN
-            // || iden == TIME_IDEN
+            // || iden == MFD_LANGUAGE_UNITS_IDEN
             // || iden == AUDIO_SETTINGS_IDEN
             // || iden == MFD_STATUS_IDEN
             // || iden == AIRCON1_IDEN
@@ -72,7 +72,7 @@ bool IsPacketSelected(uint16_t iden, VanPacketFilter_t filter)
             // && iden != DASHBOARD_IDEN
             // && iden != DASHBOARD_BUTTONS_IDEN
             // && iden != HEAD_UNIT_IDEN
-            // && iden != TIME_IDEN
+            // && iden != MFD_LANGUAGE_UNITS_IDEN
             // && iden != AUDIO_SETTINGS_IDEN
             // && iden != MFD_STATUS_IDEN
             // && iden != AIRCON1_IDEN
@@ -108,7 +108,7 @@ bool IsPacketSelected(uint16_t iden, VanPacketFilter_t filter)
     if (filter == VAN_PACKETS_HEAD_UNIT_PKTS)
     {
         // Head unit packets (plus anything not recognized)
-        // (Commented-out IDs will be printed on Serial)
+        // (Commented-out IDENs will be printed on Serial)
         if (
             false
             || iden == VIN_IDEN
@@ -121,7 +121,7 @@ bool IsPacketSelected(uint16_t iden, VanPacketFilter_t filter)
             || iden == DASHBOARD_IDEN
             || iden == DASHBOARD_BUTTONS_IDEN
             // || iden == HEAD_UNIT_IDEN
-            || iden == TIME_IDEN
+            || iden == MFD_LANGUAGE_UNITS_IDEN
             // || iden == AUDIO_SETTINGS_IDEN
             // || iden == MFD_STATUS_IDEN
             || iden == AIRCON1_IDEN
@@ -157,7 +157,7 @@ bool IsPacketSelected(uint16_t iden, VanPacketFilter_t filter)
     if (filter == VAN_PACKETS_AIRCON_PKTS)
     {
         // Aircon packets (plus anything not recognized)
-        // (Commented-out IDs will be printed on Serial)
+        // (Commented-out IDENs will be printed on Serial)
         if (
             false
             || iden == VIN_IDEN
@@ -170,7 +170,7 @@ bool IsPacketSelected(uint16_t iden, VanPacketFilter_t filter)
             || iden == DASHBOARD_IDEN
             || iden == DASHBOARD_BUTTONS_IDEN
             || iden == HEAD_UNIT_IDEN
-            || iden == TIME_IDEN
+            || iden == MFD_LANGUAGE_UNITS_IDEN
             || iden == AUDIO_SETTINGS_IDEN
             || iden == MFD_STATUS_IDEN
             // || iden == AIRCON1_IDEN
@@ -206,7 +206,7 @@ bool IsPacketSelected(uint16_t iden, VanPacketFilter_t filter)
     if (filter == VAN_PACKETS_COM2000_ETC_PKTS)
     {
         // COM2000 packets and surroundings (plus anything not recognized)
-        // (Commented-out IDs will be printed on Serial)
+        // (Commented-out IDENs will be printed on Serial)
         if (
             false
             || iden == VIN_IDEN
@@ -219,7 +219,7 @@ bool IsPacketSelected(uint16_t iden, VanPacketFilter_t filter)
             // || iden == DASHBOARD_IDEN
             // || iden == DASHBOARD_BUTTONS_IDEN
             || iden == HEAD_UNIT_IDEN
-            || iden == TIME_IDEN
+            || iden == MFD_LANGUAGE_UNITS_IDEN
             || iden == AUDIO_SETTINGS_IDEN
             // || iden == MFD_STATUS_IDEN
             || iden == AIRCON1_IDEN
@@ -255,7 +255,7 @@ bool IsPacketSelected(uint16_t iden, VanPacketFilter_t filter)
     if (filter == VAN_PACKETS_SAT_NAV_PKTS)
     {
         // SatNav packets (plus anything not recognized)
-        // (Commented-out IDs will be printed on Serial)
+        // (Commented-out IDENs will be printed on Serial)
         if (
             false
             || iden == VIN_IDEN
@@ -268,7 +268,7 @@ bool IsPacketSelected(uint16_t iden, VanPacketFilter_t filter)
             || iden == DASHBOARD_IDEN
             || iden == DASHBOARD_BUTTONS_IDEN
             || iden == HEAD_UNIT_IDEN
-            || iden == TIME_IDEN
+            // || iden == MFD_LANGUAGE_UNITS_IDEN
             || iden == AUDIO_SETTINGS_IDEN
             || iden == MFD_STATUS_IDEN
             || iden == AIRCON1_IDEN

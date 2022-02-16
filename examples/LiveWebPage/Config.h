@@ -28,7 +28,7 @@
 
 #else // ! USE_DHCP
 
-  // Using fixed IP (not DHCP); hostname will not be registered.
+    // Using static (fixed) IP configuration (not DHCP); hostname will not be registered.
 
   #ifdef WINDOWS_ICS  // When using a Windows ICS hotspot
     #define IP_ADDR "192.168.137.2"
@@ -40,9 +40,9 @@
     #define IP_GATEWAY "192.168.43.1" // Dummy value, actual GW can be on any address within the subnet
     #define IP_SUBNET "255.255.255.0"
 
-  #endif // WINDOWS_ICS
+    #endif // ifdef WINDOWS_ICS
 
-#endif // USE_DHCP
+  #endif // ifdef USE_DHCP
 
 inline void WifiConfig()
 {
@@ -93,8 +93,13 @@ inline void WifiConfig()
 // -----
 // Debugging
 
-// Define to see infrared key hash values and timing on the serial port
+// Define to see infrared key hash values and timing on the serial port. Also, the pressed button is shown
+// as three-letter tag in a small box in the bottom left of the MFD.html page.
 #define DEBUG_IR_RECV
+
+// Prints each packet on serial port, highlighting the bytes that differ from the previous
+// packet with the same IDEN value
+#define PRINT_RAW_PACKET_DATA
 
 // Define to see JSON buffers printed on the serial port
 // Note: for some reason, having JSON buffers printed on the serial port seems to reduce the number
@@ -108,6 +113,6 @@ inline void WifiConfig()
 //#define SELECTED_PACKETS VAN_PACKETS_SAT_NAV_PKTS
 //#define SELECTED_PACKETS VAN_PACKETS_NO_VAN_PKTS
 
-#define PRINT_VAN_CRC_ERROR_PACKETS_ON_SERIAL
+//#define PRINT_VAN_CRC_ERROR_PACKETS_ON_SERIAL
 
 #endif // Config_h

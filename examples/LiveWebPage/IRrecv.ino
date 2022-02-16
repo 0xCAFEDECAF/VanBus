@@ -302,9 +302,8 @@ bool IrReceive(TIrPacket& irPacket)
     // Firing interval or IR unit (milliseconds)
     #define IR_BUTTON_HELD_INTV_MS (50UL)
 
-    // Same IR decoded value seen within this time (milliseconds) is seen as "held" button. Sometimes an IR packet
-    // is missed, so we use 2 firing intervals (2 * 50) plus a margin of 25.
-    #define IR_BUTTON_HELD_2_MS (125UL)
+    // Same IR decoded value seen within this time (milliseconds) is seen as "held" button
+    #define IR_BUTTON_HELD_2_MS (80UL)
 
     irPacket.held = irPacket.value == lastValue && lastInterval < IR_BUTTON_HELD_2_MS;
 

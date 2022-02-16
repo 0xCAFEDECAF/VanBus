@@ -276,6 +276,14 @@ char webpage[] PROGMEM = R"=====(
     </div>
     <hr/>
     <div>
+      <p>Multi-functional display (MFD)</p>
+      <p>Language: <b id="mfd_language">---</b></p>
+      <p>Temperature unit: <b id="mfd_temperature_unit">---</b></p>
+      <p>Distance unit: <b id="mfd_distance_unit">---</b></p>
+      <p>Clock unit: <b id="mfd_clock_unit">---</b></p>
+    </div>
+    <hr/>
+    <div>
       <p>Remote control</p>
       <p>Button: <b id="mfd_remote_control">---</b></p>
     </div>
@@ -327,7 +335,7 @@ char webpage[] PROGMEM = R"=====(
       <p>Lights</p>
       <p>Instrument cluster: <b id="instrument_cluster">---</b></p>
       <p>Speed regulator wheel: <b id="speed_regulator_wheel">---</b></p>
-      <p>Warning LED: <b id="hazard_lights">---</b></p>
+      <p>Hazard lights: <b id="hazard_lights">---</b></p>
       <p>Diesel glow plugs: <b id="diesel_glow_plugs">---</b></p>
       <p>Door open: <b id="door_open">---</b></p>
       <p>Service after km: <b id="distance_to_service">---</b> km</p>
@@ -402,7 +410,7 @@ char webpage[] PROGMEM = R"=====(
     <hr/>
     <div>
       <p>Dashboard Buttons</p>
-      <p>Hazard lights: <b id="hazard_lights">---</b></p>
+      <p>Hazard lights button: <b id="hazard_lights_button">---</b></p>
       <p>Door lock: <b id="door_lock">---</b></p>
       <p>Dash light - set brightness: <b id="dashboard_programmed_brightness">---</b></p>
       <p>ESP: <b id="esp">---</b></p>
