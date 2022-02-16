@@ -74,7 +74,7 @@ enum VanPacketParseResult_t
 #define DASHBOARD_IDEN 0x824
 #define DASHBOARD_BUTTONS_IDEN 0x664
 #define HEAD_UNIT_IDEN 0x554
-#define TIME_IDEN 0x984
+#define MFD_LANGUAGE_UNITS_IDEN 0x984
 #define AUDIO_SETTINGS_IDEN 0x4D4
 #define MFD_STATUS_IDEN 0x5E4
 #define AIRCON1_IDEN 0x464
@@ -1691,16 +1691,32 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
         }
         break;
 
-        case TIME_IDEN:
+        case MFD_LANGUAGE_UNITS_IDEN:
         {
             // http://graham.auld.me.uk/projects/vanbus/packets.html#984
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#984
 
-            // TODO - seems to have nothing to do with time. Mine is always the same:
-            //   Raw: #2692 ( 7/15) 10 0E 984 W-0 00-00-00-06-08-D0-C8 NO_ACK OK D0C8 CRC_OK
-            // regardless of the time.
+            // data[0]: always 0x00
+            //
+            // data[1]: always 0x00
+            //
+            // data[2]: always 0x00
+            //
+            // data[3]: MFD language
+            // - 0x00 = French
+            // - 0x01 = English
+            // - 0x02 = German
+            // - 0x03 = Spanish
+            // - 0x04 = Italian
+            // - 0x05 = ??
+            // - 0x06 = Dutch
+            //
+            // data[4]: MFD units:
+            // & 0x02: 0 = degrees Celsius, 1 = degrees Fahrenheit
+            // & 0x04: 0 = kms / metres, 1 = miles / yards
+            // & 0x08: 0 = 12-h clock, 1 = 24-hour clock
 
-            Serial.print(F("--> Time: "));
+            Serial.print(F("--> MFD language and units: "));
 
             if (dataLen != 5)
             {
@@ -1708,12 +1724,20 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
-            Serial.printf_P(PSTR("uptime battery=%u days, time=%uh%um\n"),
-                (uint16_t)data[0] << 8 | data[1],
-                data[3],
-                data[4]
-            );
+            Serial.printf_P(PSTR("language=%S, units=%S %S %S\n"),
 
+                data[3] == 0x00 ? PSTR("FRENCH") :
+                data[3] == 0x01 ? PSTR("ENGLISH") :
+                data[3] == 0x02 ? PSTR("GERMAN") :
+                data[3] == 0x03 ? PSTR("SPANISH") :
+                data[3] == 0x04 ? PSTR("ITALIAN") :
+                data[3] == 0x06 ? PSTR("DUTCH") :
+                ToHexStr(data[3]),
+
+                data[4] & 0x02 ? PSTR("FAHRENHEIT") : PSTR("CELSIUS"),
+                data[4] & 0x04 ? PSTR("MILES_YARDS") : PSTR("KILOMETRES_METRES"),
+                data[4] & 0x08 ? PSTR("24_H_CLOCK") : PSTR("12_H_CLOCK")
+            );
         }
         break;
 
@@ -2277,7 +2301,14 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             //
             // data[4] - always 0x07
             //
-            // data[5] - either 0x01 or 0x06
+            // data[5] - Language:
+            // - 0x00 = French
+            // - 0x01 = English
+            // - 0x02 = German
+            // - 0x03 = Spanish
+            // - 0x04 = Italian
+            // - 0x05 = ??
+            // - 0x06 = Dutch
             //
             // data[6] - either 0x01, 0x02, or 0x04
             //
@@ -2315,7 +2346,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             Serial.printf_P(
                 PSTR(
                     ", destination_reachable=%S, route_computed=%S, on_map=%S, download_finished=%S,\n"
-                    "    disc=%S, gps_fix=%S, gps_fix_lost=%S, gps_scanning=%S"
+                    "    disc=%S, gps_fix=%S, gps_fix_lost=%S, gps_scanning=%S, guidance_language=%S"
                 ),
                 data[1] & 0x10 ? yesStr : noStr,
                 data[1] & 0x20 ? noStr : yesStr,
@@ -2328,7 +2359,15 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
                 data[2] & 0x01 ? yesStr : noStr,
                 data[2] & 0x02 ? yesStr : noStr,
-                data[2] & 0x04 ? yesStr : noStr
+                data[2] & 0x04 ? yesStr : noStr,
+
+                data[5] == 0x00 ? PSTR("FRENCH") :
+                data[5] == 0x01 ? PSTR("ENGLISH") :
+                data[5] == 0x02 ? PSTR("GERMAN") :
+                data[5] == 0x03 ? PSTR("SPANISH") :
+                data[5] == 0x04 ? PSTR("ITALIAN") :
+                data[5] == 0x06 ? PSTR("DUTCH") :
+                ToHexStr(data[5])
             );
 
             // TODO - what is this?
@@ -3460,8 +3499,8 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             } // if
 
             Serial.printf_P(PSTR("\nLight switch: %S%S%S%S%S%S%S%S\n"),
-                data[1] & 0x02 ? PSTR("Fog light switch turned FORWARD, ") : emptyStr,
                 data[1] & 0x01 ? PSTR("Auto light button pressed, ") : emptyStr,
+                data[1] & 0x02 ? PSTR("Fog light switch turned FORWARD, ") : emptyStr,
                 data[1] & 0x04 ? PSTR("Fog light switch turned BACKWARD, ") : emptyStr,
                 data[1] & 0x08 ? PSTR("Main beam handle gently ON, ") : emptyStr,
                 data[1] & 0x10 ? PSTR("Main beam handle fully ON, ") : emptyStr,
@@ -3850,15 +3889,16 @@ void setup()
 
 enum VanPacketFilter_t
 {
-    VAN_PACKETS_ALL_EXCEPT,
-    VAN_PACKETS_NONE_EXCEPT,
-    VAN_PACKETS_HEAD_UNIT,
-    VAN_PACKETS_AIRCON,
-    VAN_PACKETS_SAT_NAV
-}; // enum VanPacketParseResult_t
+    VAN_PACKETS_ALL_VAN_PKTS,
+    VAN_PACKETS_NO_VAN_PKTS,
+    VAN_PACKETS_HEAD_UNIT_PKTS,
+    VAN_PACKETS_AIRCON_PKTS,
+    VAN_PACKETS_COM2000_ETC_PKTS,
+    VAN_PACKETS_SAT_NAV_PKTS
+}; // enum VanPacketFilter_t
 
 // Defined in PacketFilter.ino
-bool isPacketSelected(uint16_t iden, VanPacketFilter_t filter);
+bool IsPacketSelected(uint16_t iden, VanPacketFilter_t filter);
 
 void loop()
 {
@@ -3875,7 +3915,7 @@ void loop()
 
         // Filter on specific IDENs?
         uint16_t iden = pkt.Iden();
-        if (! isPacketSelected(iden, VAN_PACKETS_ALL_EXCEPT)) continue;
+        if (! IsPacketSelected(iden, VAN_PACKETS_ALL_VAN_PKTS)) continue;
 
         // Show packet as parsed by ISR
         VanPacketParseResult_t parseResult = ParseVanPacket(&pkt);
