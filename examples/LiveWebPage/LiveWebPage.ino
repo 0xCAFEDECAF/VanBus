@@ -280,7 +280,7 @@ char webpage[] PROGMEM = R"=====(
       <p>Language: <b id="mfd_language">---</b></p>
       <p>Temperature unit: <b id="mfd_temperature_unit">---</b></p>
       <p>Distance unit: <b id="mfd_distance_unit">---</b></p>
-      <p>Clock unit: <b id="mfd_clock_unit">---</b></p>
+      <p>Time unit: <b id="mfd_time_unit">---</b></p>
     </div>
     <hr/>
     <div>
@@ -597,6 +597,7 @@ char webpage[] PROGMEM = R"=====(
       <p>GPS fix: <b id="satnav_gps_fix">---</b></p>
       <p>GPS fix lost: <b id="satnav_gps_fix_lost">---</b></p>
       <p>GPS scanning: <b id="satnav_gps_scanning">---</b></p>
+      <p>Language: <b id="satnav_language">---</b></p>
       <p>GPS speed: <b id="satnav_gps_speed">---</b></p>
       <p>ZZZ (?): <b id="satnav_zzz">---</b></p>
     </div>

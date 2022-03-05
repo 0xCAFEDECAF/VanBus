@@ -1952,7 +1952,7 @@ VanPacketParseResult_t ParseMfdLanguageUnitsPkt(TVanPacketRxDesc& pkt, char* buf
             "\"mfd_language\": \"%S\",\n"
             "\"mfd_temperature_unit\": \"%S\",\n"
             "\"mfd_distance_unit\": \"%S\",\n"
-            "\"mfd_clock_unit\": \"%S\"\n"
+            "\"mfd_time_unit\": \"%S\"\n"
         "}\n"
     "}\n";
 
@@ -2618,6 +2618,7 @@ VanPacketParseResult_t ParseSatNavStatus2Pkt(TVanPacketRxDesc& pkt, char* buf, c
             "\"satnav_gps_fix\": \"%S\",\n"
             "\"satnav_gps_fix_lost\": \"%S\",\n"
             "\"satnav_gps_scanning\": \"%S\",\n"
+            "\"satnav_language\": \"%S\",\n"
             "\"satnav_gps_speed\": \"%S%u\"";
 
     int at = snprintf_P(buf, n, jsonFormatter,
@@ -2637,6 +2638,14 @@ VanPacketParseResult_t ParseSatNavStatus2Pkt(TVanPacketRxDesc& pkt, char* buf, c
         data[2] & 0x01 ? yesStr : noStr,
         data[2] & 0x02 ? yesStr : noStr,
         data[2] & 0x04 ? yesStr : noStr,
+
+        data[5] == 0x00 ? PSTR("FRENCH") :
+        data[5] == 0x01 ? PSTR("ENGLISH") :
+        data[5] == 0x02 ? PSTR("GERMAN") :
+        data[5] == 0x03 ? PSTR("SPANISH") :
+        data[5] == 0x04 ? PSTR("ITALIAN") :
+        data[5] == 0x06 ? PSTR("DUTCH") :
+        notApplicable3Str,
 
         // 0xE0 as boundary for "reverse": just guessing. Do we ever drive faster than 224 km/h?
         data[16] >= 0xE0 ? dashStr : emptyStr,
