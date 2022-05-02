@@ -72,9 +72,11 @@ uint16_t _crc(const uint8_t bytes[], int size);
 struct TIsrDebugData
 {
     uint32_t nCycles:16;
-    uint32_t nCyclesProcessing:16;
-    uint32_t jitter:16;
+    uint32_t jitterBefore:16;
+    uint32_t jitterAfter:16;
     uint16_t nBits:8;
+    uint16_t flipBits:8;
+    uint8_t prevPinLevel:4;
     uint8_t pinLevel:4;
     uint8_t pinLevelAtReturnFromIsr:4;
 } __attribute__((packed)); // struct TIsrDebugData
@@ -90,9 +92,8 @@ class TIsrDebugPacket
 
   private:
 
-    // In theory, there can be 33 * 8 = 264 ISR invocations, but in practice 128 is enough
-    // for the vast majority of cases
-    #define VAN_ISR_DEBUG_BUFFER_SIZE 128
+    // There can be at most 33 * 8 = 264 ISR invocations
+    #define VAN_ISR_DEBUG_BUFFER_SIZE 264
     TIsrDebugData samples[VAN_ISR_DEBUG_BUFFER_SIZE];
 
     int at;  // Index of next sample to write into
@@ -163,14 +164,14 @@ class TVanPacketRxDesc
     #define VAN_MAX_PACKET_SIZE 33
 
     TVanPacketRxDesc() { Init(); }
-    uint16_t Iden() const;
+    __attribute__((always_inline)) uint16_t Iden() const { return bytes[1] << 4 | bytes[2] >> 4; }
     uint8_t CommandFlags() const;  // See page 17 of http://ww1.microchip.com/downloads/en/DeviceDoc/doc4205.pdf
     const uint8_t* Data() const;
     int DataLen() const;
     unsigned long Millis() { return millis_; }  // Packet time stamp in milliseconds
     uint16_t Crc() const;
     bool CheckCrc() const;
-    bool CheckCrcAndRepair();  // Yes, we can sometimes repair a corrupt packet by flipping one or two bits
+    bool CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)() const = 0);  // Yes, we can sometimes repair a corrupt packet by flipping one or two bits
     void DumpRaw(Stream& s, char last = '\n') const;
 
     // Example of the longest string that can be dumped (not realistic):
@@ -210,6 +211,15 @@ class TVanPacketRxDesc
             result == VAN_RX_ERROR_MAX_PACKET ? "ERROR_MAX_PACKET" :
             "ERROR_??";
     } // ResultStr
+    __attribute__((always_inline)) bool IsSatnavPacket() const
+    {
+        return
+            size >= 3 && 
+            (
+                Iden() == 0x6CE  // SATNAV_REPORT_IDEN
+                || Iden() == 0x64E  // SATNAV_GUIDANCE_IDEN
+            );
+    } // IsSatnavPacket
 
   private:
 
@@ -363,7 +373,7 @@ class TVanPacketRxQueue
     bool ClearQueueOverrun() { ISR_SAFE_SET(_overrun, false); }
 
     // Only to be called from ISR, unsafe otherwise
-    void ICACHE_RAM_ATTR _AdvanceHead()
+    __attribute__((always_inline)) void _AdvanceHead()
     {
         _head->millis_ = millis();
         _head->state = VAN_RX_DONE;
