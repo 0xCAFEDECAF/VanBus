@@ -72,13 +72,14 @@ uint16_t _crc(const uint8_t bytes[], int size);
 struct TIsrDebugData
 {
     uint32_t nCycles:16;
-    uint32_t jitterBefore:16;
-    uint32_t jitterAfter:16;
+    uint32_t jitterBefore:10;
+    uint32_t jitterAfter:10;
     uint16_t nBits:8;
     uint16_t flipBits:8;
-    uint8_t prevPinLevel:4;
-    uint8_t pinLevel:4;
-    uint8_t pinLevelAtReturnFromIsr:4;
+    uint16_t prevPinLevel:2;
+    uint16_t pinLevel:1;
+    uint16_t state:4;
+    uint16_t pinLevelAtReturnFromIsr:1;
 } __attribute__((packed)); // struct TIsrDebugData
 
 // Buffer of ISR invocation debug data
@@ -110,12 +111,13 @@ class TIsrDebugPacket
 
 #ifdef VAN_RX_IFS_DEBUGGING
 
-// Inter-frame space analysis data
+// Data for Inter-frame space analysis
 struct TIfsDebugData
 {
     uint32_t nCycles:16;
     uint16_t nBits:8;
-    uint8_t pinLevel:4;
+    uint16_t pinLevel:1;
+    uint16_t state:4;
 } __attribute__((packed)); // struct TIfsDebugData
 
 class TIfsDebugPacket
@@ -201,7 +203,9 @@ class TVanPacketRxDesc
         );
         return result;
     } // CommandFlagsStr
+
     const char* AckStr() const { return ack == VAN_ACK ? "ACK" : ack == VAN_NO_ACK ? "NO_ACK": "ACK_??"; }
+
     const char* ResultStr() const
     {
         return
@@ -211,6 +215,18 @@ class TVanPacketRxDesc
             result == VAN_RX_ERROR_MAX_PACKET ? "ERROR_MAX_PACKET" :
             "ERROR_??";
     } // ResultStr
+
+    static const char* StateStr(uint8_t state)
+    {
+        return
+            state == VAN_RX_VACANT ? "VACANT" :
+            state == VAN_RX_SEARCHING ? "SEARCHING" :
+            state == VAN_RX_LOADING ? "LOADING" :
+            state == VAN_RX_WAITING_ACK ? "WAITING_ACK" :
+            state == VAN_RX_DONE ? "DONE" :
+            "ERROR_??";
+    } // ResultStr
+
     __attribute__((always_inline)) bool IsSatnavPacket() const
     {
         return
@@ -369,8 +385,7 @@ class TVanPacketRxQueue
     uint32_t GetLastMediaAccessAt() { ISR_SAFE_GET(uint32_t, lastMediaAccessAt); };
     void SetLastMediaAccessAt(uint32_t at) { ISR_SAFE_SET(lastMediaAccessAt, at); };
 
-    bool IsQueueOverrun() const { ISR_SAFE_GET(bool, _overrun); }
-    bool ClearQueueOverrun() { ISR_SAFE_SET(_overrun, false); }
+    bool IsQueueOverrun() { NO_INTERRUPTS; bool result = _overrun; _overrun = false; INTERRUPTS; }
 
     // Only to be called from ISR, unsafe otherwise
     __attribute__((always_inline)) void _AdvanceHead()
