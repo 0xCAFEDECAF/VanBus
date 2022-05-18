@@ -667,7 +667,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (data[7] != 0xFF)
             {
-                Serial.printf_P(PSTR("Fuel level: %u %%\n"), data[7]);  // Never seen this
+                Serial.printf_P(PSTR("    - Fuel level: %u %%\n"), data[7]);  // Never seen this
             } // if
 
             Serial.printf_P(PSTR("    - Oil level: raw=%u,dash=%S\n"),
@@ -2564,7 +2564,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             Serial.print(F("--> SatNav guidance: "));
 
-            if (dataLen != 3 && dataLen != 4 && dataLen != 6 && dataLen != 13 && dataLen != 23)
+            if (dataLen != 3 && dataLen != 4 && dataLen != 6 && dataLen != 13 && dataLen != 16 && dataLen != 23)
             {
                 Serial.println(FPSTR(unexpectedPacketLengthStr));
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
@@ -2579,7 +2579,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             //
             // - data[1]: current instruction (large icon in left of MFD)
             //   0x01: Single turn instruction ("Turn left",  dataLen = 6 or 13)
-            //   0x03: Double turn instruction ("Turn left, then turn right", dataLen = 23)
+            //   0x03: Double turn instruction ("Turn left, then turn right", dataLen = 16 or 23)
             //   0x04: Turn around if possible (dataLen = 3)
             //   0x05: Follow current road until next instruction (dataLen = 4)
             //   0x06: Not on map; follow heading (dataLen = 4)
@@ -2598,9 +2598,18 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // - If data[1] == 0x01 and (data[2] == 0x00 || data[2] == 0x01): one "detailed instruction"; dataLen = 13
             //   * data[4...11]: current instruction ("turn left")
             //
-            // - If data[1] == 0x03: two "detailed instructions"; dataLen = 23
-            //   * data[6...13]: current instruction ("turn left ...")
-            //   * data[14...21]: next instruction ("... then turn right")
+            // - If data[1] == 0x03: two "detailed instructions";
+            //   * dataLen = 16:
+            //     ** data[5]: ??
+            //     ** data[6]:
+            //        0x41: keep left on fork
+            //        0x14: keep right on fork
+            //        0x12: take right exit
+            //     ** data[7...14]: next instruction ("... then turn right")
+            //   * dataLen = 23:
+            //     ** data[5]: ??
+            //     ** data[6...13]: current instruction ("turn left ...")
+            //     ** data[14...21]: next instruction ("... then turn right")
             //
             //   A "detailed instruction" consists of 8 bytes:
             //   * 0   : turn angle in increments of 22.5 degrees, measured clockwise, starting with 0 at 6 o-clock.
