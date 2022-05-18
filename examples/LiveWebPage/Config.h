@@ -12,7 +12,6 @@
 #define WIFI_PASSWORD "WiFiPass"  // Fill in yours
 
 // Define when using DHCP; comment out when using a static (fixed) IP address.
-// Note: only applicable in Wi-Fi station (client) mode.
 #define USE_DHCP
 
 // Define when using a Windows Internet Connection Sharing (ICS) Wi-Fi. Comment out when using Android Wi-Fi hotspot.
