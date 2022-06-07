@@ -28,7 +28,7 @@
 
 #include <Arduino.h>
 
-#define VAN_BUX_RX_VERSION 000002005
+#define VAN_BUS_RX_VERSION 000002006
 
 //#define VAN_RX_ISR_DEBUGGING
 //#define VAN_RX_IFS_DEBUGGING
@@ -72,14 +72,16 @@ uint16_t _crc(const uint8_t bytes[], int size);
 struct TIsrDebugData
 {
     uint32_t nCycles:16;
-    uint32_t jitterBefore:10;
-    uint32_t jitterAfter:10;
+    uint32_t fromJitter:10;
+    uint32_t toJitter:10;
     uint16_t nBits:8;
     uint16_t flipBits:8;
     uint16_t prevPinLevel:2;
     uint16_t pinLevel:1;
-    uint16_t state:4;
+    uint16_t fromState:3;
+    uint16_t toState:3;
     uint16_t pinLevelAtReturnFromIsr:1;
+    uint16_t atBit:8;
 } __attribute__((packed)); // struct TIsrDebugData
 
 // Buffer of ISR invocation debug data
@@ -93,8 +95,9 @@ class TIsrDebugPacket
 
   private:
 
-    // There can be at most 33 * 8 = 264 ISR invocations
-    #define VAN_ISR_DEBUG_BUFFER_SIZE 264
+    // There can be at most 33 * 8 = 264 ISR invocations, but allocate a bit more so that we can see
+    // any prehistory, if present
+    #define VAN_ISR_DEBUG_BUFFER_SIZE 300
     TIsrDebugData samples[VAN_ISR_DEBUG_BUFFER_SIZE];
 
     int at;  // Index of next sample to write into
@@ -117,7 +120,8 @@ struct TIfsDebugData
     uint32_t nCycles:16;
     uint16_t nBits:8;
     uint16_t pinLevel:1;
-    uint16_t state:4;
+    uint16_t fromState:3;
+    uint16_t toState:3;
 } __attribute__((packed)); // struct TIfsDebugData
 
 class TIfsDebugPacket
@@ -131,8 +135,8 @@ class TIfsDebugPacket
 
   private:
 
-    #define VAN_ISF_DEBUG_BUFFER_SIZE 20
-    TIfsDebugData samples[VAN_ISF_DEBUG_BUFFER_SIZE];
+    #define VAN_IFS_DEBUG_BUFFER_SIZE 20
+    TIfsDebugData samples[VAN_IFS_DEBUG_BUFFER_SIZE];
     int at;  // Index of next sample to write into
 
     friend void RxPinChangeIsr();
@@ -141,7 +145,7 @@ class TIfsDebugPacket
 
 #endif // VAN_RX_IFS_DEBUGGING
 
-enum PacketReadState_t { VAN_RX_VACANT, VAN_RX_SEARCHING, VAN_RX_LOADING, VAN_RX_WAITING_ACK, VAN_RX_DONE };
+enum PacketReadState_t { VAN_RX_VACANT = 2, VAN_RX_SEARCHING, VAN_RX_LOADING, VAN_RX_WAITING_ACK, VAN_RX_DONE };
 enum PacketReadResult_t { VAN_RX_PACKET_OK, VAN_RX_ERROR_NBITS, VAN_RX_ERROR_MANCHESTER, VAN_RX_ERROR_MAX_PACKET };
 enum PacketAck_t { VAN_ACK, VAN_NO_ACK };
 

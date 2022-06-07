@@ -255,26 +255,36 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
     // we must compress the "sample time" for the next bit.
     nCycles += jitter;
     jitter = 0;
-    if (nCycles < 1124 * CPU_F_FACTOR)
-    //if (nCycles < 1175 * CPU_F_FACTOR)
+    if (nCycles < 432 * CPU_F_FACTOR)
+    {
+        return 0;
+    }
+    //if (nCycles < 1124 * CPU_F_FACTOR)
+    if (nCycles < 1134 * CPU_F_FACTOR)
     {
         //if (nCycles > 800 * CPU_F_FACTOR) jitter = nCycles - 800 * CPU_F_FACTOR;  // 800 --> 1124 = 324
-        if (nCycles > 786 * CPU_F_FACTOR) jitter = nCycles - 786 * CPU_F_FACTOR;  // 786 --> 1124 = 338
+        if (nCycles > 786 * CPU_F_FACTOR) jitter = nCycles - 786 * CPU_F_FACTOR;  // 786 --> 1134 = 348
         return 1;
     } // if
     if (nCycles < 1744 * CPU_F_FACTOR)
+    //if (nCycles < 1819 * CPU_F_FACTOR)
     {
-        if (nCycles > 1380 * CPU_F_FACTOR) jitter = nCycles - 1380 * CPU_F_FACTOR;  // 1380 --> 1744 = 364
+        //if (nCycles > 1380 * CPU_F_FACTOR) jitter = nCycles - 1380 * CPU_F_FACTOR;  // 1380 --> 1744 = 364
+        if (nCycles > 1377 * CPU_F_FACTOR) jitter = nCycles - 1377 * CPU_F_FACTOR;  // 1380 --> 1744 = 364
         return 2;
     } // if
-    if (nCycles < 2383 * CPU_F_FACTOR)
+    //if (nCycles < 2383 * CPU_F_FACTOR)
+    if (nCycles < 2413 * CPU_F_FACTOR)
     {
-        if (nCycles > 2100 * CPU_F_FACTOR) jitter = nCycles - 2100 * CPU_F_FACTOR;  // 2100 --> 2383 = 283
+        //if (nCycles > 2100 * CPU_F_FACTOR) jitter = nCycles - 2100 * CPU_F_FACTOR;  // 2100 --> 2383 = 283
+        if (nCycles > 2072 * CPU_F_FACTOR) jitter = nCycles - 2072 * CPU_F_FACTOR;  // 2072--> 2413 = 341
         return 3;
     } // if
     if (nCycles < 3045 * CPU_F_FACTOR)
+    //if (nCycles < 3080 * CPU_F_FACTOR)
     {
-        if (nCycles > 2655 * CPU_F_FACTOR) jitter = nCycles - 2655 * CPU_F_FACTOR;  // 2655 --> 3045 = 390
+        //if (nCycles > 2655 * CPU_F_FACTOR) jitter = nCycles - 2655 * CPU_F_FACTOR;  // 2655 --> 3045 = 390
+        if (nCycles > 2731 * CPU_F_FACTOR) jitter = nCycles - 2731 * CPU_F_FACTOR;  // 2731 --> 3045 = 314
         return 4;
     } // if
     //if (nCycles < 3665 * CPU_F_FACTOR)
@@ -341,16 +351,16 @@ portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 void ICACHE_RAM_ATTR RxPinChangeIsr()
 {
     // The logic is:
-    // - if pinLevelChangedTo == VAN_LOGICAL_HIGH, we've just had a series of VAN_LOGICAL_LOW bits.
-    // - if pinLevelChangedTo == VAN_LOGICAL_LOW, we've just had a series of VAN_LOGICAL_HIGH bits.
+    // - if pinLevel == VAN_LOGICAL_HIGH, we've just had a series of VAN_LOGICAL_LOW bits.
+    // - if pinLevel == VAN_LOGICAL_LOW, we've just had a series of VAN_LOGICAL_HIGH bits.
 
   #ifdef ARDUINO_ARCH_ESP32
-    const int pinLevelChangedTo = digitalRead(VanBusRx.pin);
+    const int pinLevel = digitalRead(VanBusRx.pin);
   #else // ! ARDUINO_ARCH_ESP32
-    const int pinLevelChangedTo = GPIP(VanBusRx.pin);  // GPIP() is faster than digitalRead()?
+    const int pinLevel = GPIP(VanBusRx.pin);  // GPIP() is faster than digitalRead()?
   #endif // ARDUINO_ARCH_ESP32
 
-    static int prevPinLevelChangedTo = VAN_BIT_RECESSIVE;
+    static int prevPinLevel = VAN_BIT_RECESSIVE;
 
     static uint32_t prev = 0;
     const uint32_t curr = ESP.getCycleCount();  // Store CPU cycle counter value as soon as possible
@@ -361,22 +371,79 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
     static bool pinLevelChangedDuringInterruptHandling = false;
 
-    // Return quickly when it is a spurious interrupt (shorter than a single bit time)
-    if (nCycles + jitter < 405 * CPU_F_FACTOR) return;
-    if (pinLevelChangedDuringInterruptHandling && nCycles + jitter < 450 * CPU_F_FACTOR) return;
-
-    const bool samePinLevel = (pinLevelChangedTo == prevPinLevelChangedTo);
-
-    if (samePinLevel && nCycles + jitter < 450 * CPU_F_FACTOR) return;
+    TVanPacketRxDesc* rxDesc = VanBusRx._head;
 
     uint16_t flipBits = 0;
+
+  #ifdef VAN_RX_ISR_DEBUGGING
+
+    // Record some data to be used for debugging outside this ISR
+
+    TIsrDebugPacket* isrDebugPacket = rxDesc->isrDebugPacket;
+
+    isrDebugPacket->slot = rxDesc->slot;
+
+    TIsrDebugData* debugIsr =
+        isrDebugPacket->at < VAN_ISR_DEBUG_BUFFER_SIZE ?
+            isrDebugPacket->samples + isrDebugPacket->at :
+            NULL;
+
+    // Only write into sample buffer if there is space
+    if (debugIsr != NULL)
+    {
+        debugIsr->nCycles = _min(nCycles, USHRT_MAX * CPU_F_FACTOR) / CPU_F_FACTOR;
+        debugIsr->fromJitter = 0;
+        debugIsr->nBits = 0;
+        debugIsr->prevPinLevel = prevPinLevel;
+        debugIsr->pinLevel = pinLevel;
+        debugIsr->fromState = rxDesc->state;
+        debugIsr->atBit = 0;
+    } // if
+
+    // Macros useful for debugging
+
+    // Just before returning from this ISR, record some data for debugging
+    #define RETURN \
+    { \
+        if (debugIsr != NULL) \
+        { \
+            debugIsr->toJitter = _min(jitter, (1 << 10 - 1) * CPU_F_FACTOR) / CPU_F_FACTOR; \
+            debugIsr->flipBits = flipBits; \
+            debugIsr->toState = rxDesc->state; \
+            debugIsr->pinLevelAtReturnFromIsr = GPIP(VanBusRx.pin); \
+            isrDebugPacket->at++; \
+        } \
+        return; \
+    }
+
+    #define DEBUG_ISR(TO_, FROM_) if (debugIsr != NULL) debugIsr->TO_ = (FROM_);
+    #define DEBUG_ISR_M(TO_, FROM_, MAX_) if (debugIsr != NULL) debugIsr->TO_ = _min((FROM_), (MAX_));
+
+  #else
+
+    #define RETURN return
+
+    #define DEBUG_ISR(TO_, FROM_)
+    #define DEBUG_ISR_M(TO_, FROM_, MAX_)
+
+  #endif // VAN_RX_ISR_DEBUGGING
+
+    const bool samePinLevel = (pinLevel == prevPinLevel);
+
+    // Return quickly when it is a spurious interrupt (shorter than a single bit time)
+    if (nCycles + jitter < 405 * CPU_F_FACTOR
+        || (pinLevelChangedDuringInterruptHandling && nCycles + jitter < 485 * CPU_F_FACTOR)
+        || (samePinLevel && nCycles + jitter < 457 * CPU_F_FACTOR))
+    {
+        RETURN;
+    } // if
 
   #ifdef ARDUINO_ARCH_ESP32
     portENTER_CRITICAL_ISR(&mux);
   #endif // ARDUINO_ARCH_ESP32
 
     // Media access detection for packet transmission
-    if (pinLevelChangedTo == VAN_BIT_RECESSIVE)
+    if (pinLevel == VAN_BIT_RECESSIVE)
     {
         // Pin level just changed to 'recessive', so that was the end of the media access ('dominant')
         VanBusRx.lastMediaAccessAt = curr;
@@ -384,37 +451,8 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
     prev = curr;
 
-    TVanPacketRxDesc* rxDesc = VanBusRx._head;
 
-  #ifdef VAN_RX_ISR_DEBUGGING
-    // Record some data to be used for debugging outside this ISR
-
-    TIsrDebugPacket* isrDebugPacket = rxDesc->isrDebugPacket;
-    isrDebugPacket->slot = rxDesc->slot;
-    TIsrDebugData* debugIsr = isrDebugPacket->samples + isrDebugPacket->at;
-
-    debugIsr->prevPinLevel = prevPinLevelChangedTo;
-    debugIsr->pinLevel = pinLevelChangedTo;
-    debugIsr->nCycles = _min(nCycles, USHRT_MAX * CPU_F_FACTOR) / CPU_F_FACTOR;
-    debugIsr->jitterBefore = 0;
-
-    // Just before returning from this ISR, record some data for debugging
-    #define RETURN \
-    { \
-        debugIsr->state = state; \
-        debugIsr->jitterAfter = _min(jitter, (1 << 10 - 1) * CPU_F_FACTOR) / CPU_F_FACTOR; \
-        debugIsr->flipBits = flipBits; \
-        debugIsr->pinLevelAtReturnFromIsr = GPIP(VanBusRx.pin); \
-        isrDebugPacket->at++; \
-        return; \
-    }
-
-  #else
-    #define RETURN return
-
-  #endif // VAN_RX_ISR_DEBUGGING
-
-    prevPinLevelChangedTo = pinLevelChangedTo;
+    prevPinLevel = pinLevel;
 
     static unsigned int atBit = 0;
     static uint16_t readBits = 0;
@@ -422,37 +460,55 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     PacketReadState_t state = rxDesc->state;
 
   #ifdef VAN_RX_IFS_DEBUGGING
+
+    TIfsDebugPacket* ifsDebugPacket = &rxDesc->ifsDebugPacket;
+
+    TIfsDebugData* debugIfs =
+        ifsDebugPacket->at < VAN_IFS_DEBUG_BUFFER_SIZE ?
+            ifsDebugPacket->samples + ifsDebugPacket->at :
+            NULL;
+
     if (state == VAN_RX_VACANT || state == VAN_RX_SEARCHING)
     {
-        TIfsDebugPacket* ifsDebugPacket = &rxDesc->ifsDebugPacket;
-
-        TIfsDebugData* debugIfs =
-            ifsDebugPacket->at < VAN_ISF_DEBUG_BUFFER_SIZE ?
-                ifsDebugPacket->samples + ifsDebugPacket->at :
-                NULL;
-
         // Only write into sample buffer if there is space
         if (debugIfs != NULL)
         {
-            debugIfs->state = state;
-            debugIfs->pinLevel = pinLevelChangedTo;
             debugIfs->nCycles = _min(nCycles, USHRT_MAX * CPU_F_FACTOR) / CPU_F_FACTOR;
             const unsigned int _nBits = nBits(nCycles);
             debugIfs->nBits = _min(_nBits, UCHAR_MAX);
+            debugIfs->pinLevel = pinLevel;
+            debugIfs->fromState = state;
+            debugIfs->toState = state;  // Can be overwritten later
             ifsDebugPacket->at++;
         } // if
     } // if
+
+    // Macro useful for debugging
+    #define DEBUG_IFS(TO_, FROM_) if (debugIfs != NULL) debugIfs->TO_ = (FROM_);
+
+  #else
+
+    #define DEBUG_IFS(TO, FROM)
+
   #endif // VAN_RX_IFS_DEBUGGING
 
     if (state == VAN_RX_VACANT)
     {
-        if (pinLevelChangedTo == VAN_LOGICAL_LOW)
+        if (pinLevel == VAN_LOGICAL_LOW)
         {
             // Normal detection: we've seen a series of VAN_LOGICAL_HIGH bits
 
+            DEBUG_ISR(nBits, 0);
+
             rxDesc->state = VAN_RX_SEARCHING;
+
+            DEBUG_IFS(toState, VAN_RX_SEARCHING);
+
             rxDesc->ack = VAN_NO_ACK;
             atBit = 0;
+
+            DEBUG_ISR(atBit, 0);
+
             readBits = 0;
             rxDesc->size = 0;
             jitter = 0;
@@ -461,21 +517,26 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
             //timer1_disable(); // TODO - necessary?
         }
-        else if (pinLevelChangedTo == VAN_LOGICAL_HIGH)
+        else if (pinLevel == VAN_LOGICAL_HIGH)
         {
             const unsigned int _nBits = nBits(nCycles);
 
-          #ifdef VAN_RX_ISR_DEBUGGING
-            debugIsr->nBits = _min(_nBits, UCHAR_MAX);
-          #endif // VAN_RX_ISR_DEBUGGING
+            DEBUG_ISR_M(nBits, _nBits, UCHAR_MAX);
 
             if (_nBits == 4 || _nBits == 3 || _nBits == 5)
             {
                 // Late detection
 
                 rxDesc->state = VAN_RX_SEARCHING;
+
+                DEBUG_IFS(toState, VAN_RX_SEARCHING);
+
                 rxDesc->ack = VAN_NO_ACK;
+
                 atBit = 4;
+
+                DEBUG_ISR(atBit, 4);
+
                 readBits = 0;
                 rxDesc->size = 0;
                 jitter = 0;
@@ -495,15 +556,20 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     {
       #ifdef VAN_RX_ISR_DEBUGGING
         const unsigned int _nBits = nBits(nCycles);
-        debugIsr->nBits = _min(_nBits, UCHAR_MAX);
+        DEBUG_ISR_M(nBits, _nBits, UCHAR_MAX);
       #endif // VAN_RX_ISR_DEBUGGING
 
         // If the "ACK" came too soon, it is not an "ACK" but the first "1" bit of the next byte
-        if (nCycles < 500 * CPU_F_FACTOR)
+        if (pinLevelChangedDuringInterruptHandling || nCycles < 500 * CPU_F_FACTOR)
         {
             atBit = 1;
+
+            DEBUG_ISR(atBit, 1);
+
             readBits = 0x01;
             rxDesc->state = VAN_RX_LOADING;
+
+            DEBUG_IFS(toState, VAN_RX_LOADING);
 
           #ifdef ARDUINO_ARCH_ESP32
             portEXIT_CRITICAL_ISR(&mux);
@@ -541,14 +607,14 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     } // if
 
   #ifdef VAN_RX_ISR_DEBUGGING
-    debugIsr->jitterBefore = _min(jitter, (1 << 10 - 1) * CPU_F_FACTOR) / CPU_F_FACTOR;
+    if (debugIsr != NULL) debugIsr->fromJitter = _min(jitter, (1 << 10 - 1) * CPU_F_FACTOR) / CPU_F_FACTOR;
   #endif // VAN_RX_ISR_DEBUGGING
 
     unsigned int nBits = nBitsTakingIntoAccountJitter(nCycles, jitter);
 
-  #ifdef VAN_RX_ISR_DEBUGGING
-    debugIsr->nBits = _min(nBits, UCHAR_MAX);
-  #endif // VAN_RX_ISR_DEBUGGING
+    if (state == VAN_RX_SEARCHING && nBits == 0) nBits = 1;  // Yet another hack
+
+    DEBUG_ISR_M(nBits, nBits, UCHAR_MAX);
 
     // During packet reception, the "Enhanced Manchester" encoding guarantees at most 5 bits are the same,
     // except during EOD when it can be 6.
@@ -559,6 +625,9 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         if (state == VAN_RX_SEARCHING)
         {
             atBit = 0;
+
+            DEBUG_ISR(atBit, 0);
+
             readBits = 0;
             rxDesc->size = 0;
             jitter = 0;
@@ -581,12 +650,43 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         RETURN;
     } // if
 
-    // Be flexible if a bit is lost in the 4 x '0' or 4 x '1' series during SOF detection
+    // Be flexible during SOF detection
     //if (state == VAN_RX_SEARCHING && (nBits == 3 || nBits == 5)) nBits = 4;
-    if (state == VAN_RX_SEARCHING && (nBits == 3 || nBits == 5 || (atBit == 4 && nBits == 2))) nBits = 4;
+    if (state == VAN_RX_SEARCHING)
+    {
+        if (nBits == 3 || nBits == 5
+            || (atBit == 0 && nBits == 6)
+            || (atBit == 4 && nBits == 2)
+            || (atBit == 4 && nBits == 1)
+            )
+    {
+        nBits = 4;
 
-    // Experimental handling of special situations caused by missing an interrupt
-    if (pinLevelChangedDuringInterruptHandling)
+            DEBUG_ISR(nBits, 4);
+
+            jitter = 0;
+        }
+        else if (atBit == 0 && nBits == 1)
+        {
+            rxDesc->state = VAN_RX_VACANT;
+
+            DEBUG_IFS(toState, VAN_RX_VACANT);
+
+          #ifdef ARDUINO_ARCH_ESP32
+            portEXIT_CRITICAL_ISR(&mux);
+          #endif // ARDUINO_ARCH_ESP32
+
+            RETURN;
+        } // if
+    } // if
+
+    // Experimental handling of special situations caused by a missed interrupt
+    if (nBits == 0)
+    {
+        // Set or clear the last read bit
+        readBits = pinLevel == VAN_LOGICAL_LOW ? readBits | 0x0001 : readBits & 0xFFFE;
+    }
+    else if (pinLevelChangedDuringInterruptHandling)
     {
         // Flip the last read bit
         readBits ^= 0x0001;
@@ -596,52 +696,28 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         if (nBits == 1)
         {
             flipBits = 0x0001;
-
-            prevPinLevelChangedTo = 2; // TODO -> 0 or 1
         }
         else
         {
-            if (nBits == 2)
-            {
-                flipBits = 0x0002;
-            }
-            else if (nBits == 3)
-            {
-                flipBits = 0x0006;
-            }
-            else if (nBits == 4)
-            {
-                flipBits = 0x000E;
-            }
-            else if (nBits == 5)
-            {
-                flipBits = 0x001E;
-            }
-            else if (nBits == 6)
-            {
-                flipBits = 0x003E;
-            } // if
+            // Flip the last 'nBits' except the very last bit, e.g. if nBits == 4 ==> flip the bits -- ---- XXX-
+            flipBits = (1 << nBits) - 1 - 1;
 
-            if (jitter > 318 * CPU_F_FACTOR)
-            {
-                // Interrupt was so late that the pin level has already changed again
-                flipBits |= 0x0001;
-
-                prevPinLevelChangedTo = 2;
-            } // if
+            // If the interrupt was so late that the pin level has already changed again, then flip also the very
+            // last bit
+            if (jitter > 318 * CPU_F_FACTOR) flipBits |= 0x0001;
         } // if
 
-        if ((flipBits & 0x0001) == 0x0001)
-        {
-            prevPinLevelChangedTo = 2;
-        } // if
+        if ((flipBits & 0x0001) == 0x0001) prevPinLevel = 2; // TODO - prevPinLevel = 1 - prevPinLevel
     } // if
 
     atBit += nBits;
+
+    DEBUG_ISR(atBit, atBit);
+
     readBits <<= nBits;
 
-    // Remember: if pinLevelChangedTo == VAN_LOGICAL_LOW, we've just had a series of VAN_LOGICAL_HIGH bits
-    if (pinLevelChangedTo == VAN_LOGICAL_LOW)
+    // Remember: if pinLevel == VAN_LOGICAL_LOW, we've just had a series of VAN_LOGICAL_HIGH bits
+    if (pinLevel == VAN_LOGICAL_LOW)
     {
         uint16_t pattern = (1 << nBits) - 1;
         readBits |= pattern;
@@ -665,6 +741,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             //   slightly late.
             // - 00 0111 1101 (0x07D) : the first interrupt (0->1) is a bit too early
             // - 00 0011 1100 (0x03C) : missed Manchester bit
+            // - 00 0011 1001 (0x039)
             // - 00 0011 1111 (0x03F) : missed bit
             //   -->> TODO - not sure. Will incorrectly accept ...1 0000 1111111111 0000 1111 0 1 as 0E F1 D...
             // - 01 0011 1101 (0x13D) : spurious bit in the 4 x '0' series
@@ -672,10 +749,13 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             if (currentByte != 0x03D
                 && currentByte != 0x01D && currentByte != 0x07D
                 && currentByte != 0x03C //&& currentByte != 0x03F
+                && currentByte != 0x039
                 && currentByte != 0x13D
                )
             {
                 rxDesc->state = VAN_RX_VACANT;
+
+                DEBUG_IFS(toState, VAN_RX_VACANT);
 
                 //SetTxBitTimer();
 
@@ -688,6 +768,8 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
             currentByte = 0x03D;
             rxDesc->state = VAN_RX_LOADING;
+
+            DEBUG_IFS(toState, VAN_RX_LOADING);
         } // if
 
         // Get ready for next byte
@@ -708,15 +790,14 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         {
             rxDesc->state = VAN_RX_WAITING_ACK;
 
+            DEBUG_IFS(toState, VAN_RX_WAITING_ACK);
+
             // Set a timeout for the ACK bit
 
           #ifdef ARDUINO_ARCH_ESP32
 
-            portEXIT_CRITICAL_ISR(&mux);
-
             timerEnd(timer);
             timerAttachInterrupt(timer, WaitAckIsr, true);
-            //timer1_write(12 * 5); // 1.5 time slots = 1.5 * 8 us = 12 us
             timerAlarmWrite(timer, 16 * 5, false); // 2 time slots = 2 * 8 us = 16 us
             timerAlarmEnable(timer);
 
@@ -728,15 +809,12 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             // Clock to timer (prescaler) is always 80MHz, even F_CPU is 160 MHz
             timer1_enable(TIM_DIV16, TIM_EDGE, TIM_SINGLE);
 
-            //timer1_write(12 * 5); // 1.5 time slots = 1.5 * 8 us = 12 us
             timer1_write(16 * 5); // 2 time slots = 2 * 8 us = 16 us
 
           #endif // ARDUINO_ARCH_ESP32
 
-            RETURN;
         } // if
-
-        if (rxDesc->size >= VAN_MAX_PACKET_SIZE)
+        else if (rxDesc->size >= VAN_MAX_PACKET_SIZE)
         {
             rxDesc->result = VAN_RX_ERROR_MAX_PACKET;
             VanBusRx._AdvanceHead();
@@ -756,14 +834,17 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
     // Pin level changed while handling the interrupt?
     const int pinLevelAtReturnFromIsr = GPIP(VanBusRx.pin);
-    pinLevelChangedDuringInterruptHandling = jitter < 200 && pinLevelAtReturnFromIsr != pinLevelChangedTo;
+    pinLevelChangedDuringInterruptHandling = jitter < 200 && pinLevelAtReturnFromIsr != pinLevel;
 
   #ifdef VAN_RX_ISR_DEBUGGING
-    debugIsr->state = rxDesc->state;
-    debugIsr->jitterAfter = _min(jitter, (1 << 10 - 1) * CPU_F_FACTOR) / CPU_F_FACTOR;
-    debugIsr->flipBits = flipBits;
-    debugIsr->pinLevelAtReturnFromIsr = pinLevelAtReturnFromIsr;
-    isrDebugPacket->at++;
+    if (debugIsr != NULL)
+    {
+        debugIsr->toState = rxDesc->state;
+        debugIsr->toJitter = _min(jitter, (1 << 10 - 1) * CPU_F_FACTOR) / CPU_F_FACTOR;
+        debugIsr->flipBits = flipBits;
+        debugIsr->pinLevelAtReturnFromIsr = pinLevelAtReturnFromIsr;
+        isrDebugPacket->at++;
+    } // if
   #endif // VAN_RX_ISR_DEBUGGING
 
     #undef RETURN
@@ -948,7 +1029,7 @@ void TIfsDebugPacket::Dump(Stream& s) const
     while (i < at)
     {
         const TIfsDebugData* ifsData = samples + i;
-        if (i == 0) s.printf_P(PSTR("  # nCycles -> nBits pinLVL       state\n"));
+        if (i == 0) s.printf_P(PSTR("  # nCycles -> nBits pinLVL   fromState     toState\n"));
 
         s.printf("%3u", i);
 
@@ -960,10 +1041,11 @@ void TIfsDebugPacket::Dump(Stream& s) const
         const uint16_t nBits = ifsData->nBits;
         if (nBits >= UCHAR_MAX) s.printf(" >%3u", UCHAR_MAX); else s.printf("%5u", nBits);
 
-        const uint16_t pinLevelChangedTo = ifsData->pinLevel;
-        s.printf("    \"%u\"", pinLevelChangedTo);
+        const uint16_t pinLevel = ifsData->pinLevel;
+        s.printf("    \"%u\"", pinLevel);
 
-        s.printf(" %11.11s", TVanPacketRxDesc::StateStr(ifsData->state));
+        s.printf(" %11.11s", TVanPacketRxDesc::StateStr(ifsData->fromState));
+        s.printf(" %11.11s", TVanPacketRxDesc::StateStr(ifsData->toState));
 
         s.println();
 
@@ -1006,11 +1088,14 @@ void TIsrDebugPacket::Dump(Stream& s) const
 
     while (at > 2 && i < at)
     {
+        // Printing all this can take really long...
+        if (i % 100 == 0) wdt_reset();
+
         const TIsrDebugData* isrData = samples + i;
         if (i == 0)
         {
             // Print headings
-            s.print(F("  # nCycles+jitt = nTotal -> nBits (nLate) pinLVLs      state       data   flip byte\n"));
+            s.print(F("  # nCycles+jitt = nTotal -> nBits atBit (nLate) pinLVLs        fromState     toState data  flip byte\n"));
         } // if
 
         if (i <= 1) reset();
@@ -1020,7 +1105,7 @@ void TIsrDebugPacket::Dump(Stream& s) const
         const uint32_t nCycles = isrData->nCycles;
         if (nCycles >= USHRT_MAX) s.printf("  >%5lu", USHRT_MAX); else s.printf(" %7lu", nCycles);
 
-        const uint32_t jitter = isrData->jitterBefore;
+        const uint32_t jitter = isrData->fromJitter;
         if (jitter != 0)
         {
             s.printf("%+5d", jitter);
@@ -1036,7 +1121,9 @@ void TIsrDebugPacket::Dump(Stream& s) const
         const uint16_t nBits = isrData->nBits;
         if (nBits >= UCHAR_MAX) s.printf(" >%3u", UCHAR_MAX); else s.printf("%5u", nBits);
 
-        const uint32_t addedCycles = isrData->jitterAfter;
+        s.printf(" %5u", isrData->atBit);
+
+        const uint32_t addedCycles = isrData->toJitter;
         if (addedCycles != 0)
         {
             #define MAX_UINT32_STR_SIZE 11
@@ -1049,15 +1136,16 @@ void TIsrDebugPacket::Dump(Stream& s) const
             s.print(F("        "));
         } // if
 
-        const uint16_t pinLevelChangedTo = isrData->pinLevel;
-        s.printf(" \"%u\"->\"%u\",\"%u\"", isrData->prevPinLevel, pinLevelChangedTo, isrData->pinLevelAtReturnFromIsr);
+        const uint16_t pinLevel = isrData->pinLevel;
+        s.printf(" \"%u\"->\"%u\",\"%u\"", isrData->prevPinLevel, pinLevel, isrData->pinLevelAtReturnFromIsr);
 
-        s.printf(" %11.11s ", TVanPacketRxDesc::StateStr(isrData->state));
+        s.printf(" %11.11s", TVanPacketRxDesc::StateStr(isrData->fromState));
+        s.printf(" %11.11s ", TVanPacketRxDesc::StateStr(isrData->toState));
 
         if (nBits > 10)
         {
             // Show we just had a long series of 1's (shown as '1......') or 0's (shown as '-......')
-            s.print(pinLevelChangedTo == VAN_LOGICAL_LOW ? F("1......") : F("-......"));
+            s.print(pinLevel == VAN_LOGICAL_LOW ? F("1......") : F("-......"));
             s.println();
 
             reset();
@@ -1068,13 +1156,13 @@ void TIsrDebugPacket::Dump(Stream& s) const
         // Print the read bits one by one, in a column of 6
         if (nBits > 6)
         {
-            s.print(pinLevelChangedTo == VAN_LOGICAL_LOW ? F("1.....1") : F("-.....-"));
+            s.print(pinLevel == VAN_LOGICAL_LOW ? F("1.....1") : F("-.....-"));
         }
         else
         {
             for (int i = 0; i < nBits; i++)
             {
-                s.print(pinLevelChangedTo == VAN_LOGICAL_LOW ? "1" : "-");
+                s.print(pinLevel == VAN_LOGICAL_LOW ? "1" : "-");
                 if (atBit + i == 9) s.print("|");  // End of byte marker
             } // for
             for (int i = nBits; i < 6; i++) s.print(" ");
@@ -1083,7 +1171,7 @@ void TIsrDebugPacket::Dump(Stream& s) const
         atBit += nBits;
         readBits <<= nBits;
 
-        if (pinLevelChangedTo == VAN_LOGICAL_LOW)
+        if (pinLevel == VAN_LOGICAL_LOW)
         {
             uint16_t pattern = (1 << nBits) - 1;
             readBits |= pattern;
@@ -1094,7 +1182,7 @@ void TIsrDebugPacket::Dump(Stream& s) const
 
         readBits ^= flipBits;
 
-        if (pinLevelChangedTo != isrData->pinLevelAtReturnFromIsr)
+        if (pinLevel != isrData->pinLevelAtReturnFromIsr)
         {
             // Flip the last read bit
             readBits ^= 0x0001;
@@ -1102,7 +1190,7 @@ void TIsrDebugPacket::Dump(Stream& s) const
 
         if (eodSeen)
         {
-            if (pinLevelChangedTo == VAN_LOGICAL_LOW && nBits == 1)
+            if (pinLevel == VAN_LOGICAL_LOW && nBits == 1)
             {
                 s.print(" ACK");
                 reset();
