@@ -3,7 +3,7 @@
  *
  * Written by Erik Tromp
  *
- * Version 0.2.5 - January, 2022
+ * Version 0.3.0 - June, 2022
  *
  * MIT license, all text above must be included in any redistribution.
  */
@@ -71,6 +71,7 @@ uint16_t _crc(const uint8_t bytes[], int size);
 
 struct TIsrDebugData
 {
+    uint16_t nIsrs:8;
     uint32_t nCycles:16;
     uint32_t fromJitter:10;
     uint32_t toJitter:10;
@@ -82,6 +83,7 @@ struct TIsrDebugData
     uint16_t toState:3;
     uint16_t pinLevelAtReturnFromIsr:1;
     uint16_t atBit:8;
+    uint16_t readBits:16;
 } __attribute__((packed)); // struct TIsrDebugData
 
 // Buffer of ISR invocation debug data
@@ -245,6 +247,7 @@ class TVanPacketRxDesc
 
     uint8_t bytes[VAN_MAX_PACKET_SIZE];
     int size;
+    uint16_t nIsrs;
     PacketReadState_t state;
     PacketReadResult_t result;
     PacketAck_t ack;
@@ -264,6 +267,7 @@ class TVanPacketRxDesc
     void Init()
     {
         size = 0;
+        nIsrs = 0;
         state = VAN_RX_VACANT;
         result = VAN_RX_PACKET_OK;
         ack = VAN_NO_ACK;
@@ -338,7 +342,7 @@ class TVanPacketRxQueue
         , nRepaired(0)
         , nOneBitError(0)
         , nTwoConsecutiveBitErrors(0)
-        , nTwoSeparateBitErrors(0)
+        , maxQueued(0)
     { }
 
     bool Setup(uint8_t rxPin, int queueSize = VAN_DEFAULT_RX_QUEUE_SIZE);
@@ -355,6 +359,7 @@ class TVanPacketRxQueue
     uint32_t GetCount() const { ISR_SAFE_GET(uint32_t, count); }
     void DumpStats(Stream& s, bool longForm = true) const;
     int QueueSize() const { return size; }
+    uint16_t GetMaxQueued() const { return maxQueued; }
 
   private:
 
@@ -381,7 +386,7 @@ class TVanPacketRxQueue
     uint32_t nRepaired;
     uint32_t nOneBitError;
     uint32_t nTwoConsecutiveBitErrors;
-    uint32_t nTwoSeparateBitErrors;
+    uint16_t maxQueued;
 
     void RegisterTxTimerTicks(uint32_t ticks) { txTimerTicks = ticks; };
     void RegisterTxIsr(timercallback isr) { ISR_SAFE_SET(txTimerIsr, isr); };
@@ -389,7 +394,7 @@ class TVanPacketRxQueue
     uint32_t GetLastMediaAccessAt() { ISR_SAFE_GET(uint32_t, lastMediaAccessAt); };
     void SetLastMediaAccessAt(uint32_t at) { ISR_SAFE_SET(lastMediaAccessAt, at); };
 
-    bool IsQueueOverrun() { NO_INTERRUPTS; bool result = _overrun; _overrun = false; INTERRUPTS; }
+    bool IsQueueOverrun() { NO_INTERRUPTS; bool result = _overrun; _overrun = false; INTERRUPTS; return result; }
 
     // Only to be called from ISR, unsafe otherwise
     __attribute__((always_inline)) void _AdvanceHead()
@@ -415,6 +420,12 @@ class TVanPacketRxQueue
       #endif // VAN_RX_ISR_DEBUGGING
 
         if (++_head == end) _head = pool;  // roll over if needed
+
+        // Keep track of number of queued (unprocessed) packets
+        int nQueued = _head - tail;
+        if (nQueued == 0 && _head->state == VAN_RX_DONE) nQueued = QueueSize();
+        else if (nQueued < 0) nQueued += QueueSize();
+        if (nQueued > maxQueued) maxQueued = nQueued;
 
       #ifdef VAN_RX_ISR_DEBUGGING
         isrDebugPacket->Init();
