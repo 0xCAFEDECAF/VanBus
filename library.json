@@ -12,7 +12,7 @@
             "name": "Erik Tromp"
     }
     ],
-    "version": "0.2.5",
+    "version": "0.3.0",
     "exclude": "tests",
     "examples": "examples/*/*.ino",
     "frameworks": "arduino",

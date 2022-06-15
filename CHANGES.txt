@@ -1,3 +1,11 @@
+0.3.0
+    VanBusRx:
+    * More flexible SOF detection and smarter handling of jitter and missed interrupts, leading to less
+      CRC error packets
+    * New method GetMaxQueued() returning the maximum number of packets that were queued (not yet handled)
+      since boot time
+    * Improved ISR debugging (enabled with #define VAN_RX_ISR_DEBUGGING)
+
 0.2.5
     General:
     * Updated README.md
