@@ -11,10 +11,10 @@
 #ifndef VanBusVersion_h
 #define VanBusVersion_h
 
-#define VAN_BUS_VERSION "3.0.0"
+#define VAN_BUS_VERSION "0.3.0"
 
-#define VAN_BUS_VERSION_MAJOR 3
-#define VAN_BUS_VERSION_MINOR 0
+#define VAN_BUS_VERSION_MAJOR 0
+#define VAN_BUS_VERSION_MINOR 3
 #define VAN_BUS_VERSION_PATCH 0
 
 #define VAN_BUS_VERSION_INT 000003000
