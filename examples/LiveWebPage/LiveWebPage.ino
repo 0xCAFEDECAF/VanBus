@@ -399,7 +399,8 @@ char webpage[] PROGMEM = R"=====(
       <p>Warnings and notifications</p>
       <p>Active list</p>
       <div id="alarm_list" class="listbox"></div>
-      <p>Message shown on multi-function display: <b id="message_displayed_on_mfd">---</b></p>
+      <p>Message shown on multi-function display: <b id="notification_message_on_mfd">---</b></p>
+      <p>Doors locked: <b id="doors_locked">---</b></p>
     </div>
     <hr/>
     <div>
