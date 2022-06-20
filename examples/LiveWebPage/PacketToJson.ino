@@ -490,44 +490,6 @@ void GuidanceInstructionIconJson(const char* iconName, const uint8_t data[8], ch
         );
 } // GuidanceInstructionIconJson
 
-#if 0
-
-#include <PrintEx.h>
-
-const char* PacketRawToStr(TVanPacketRxDesc& pkt)
-{
-    static char dumpBuffer[MAX_DUMP_RAW_SIZE];
-
-    // Dump to a string-stream
-    GString str(dumpBuffer);
-    PrintAdapter streamer(str);
-    pkt.DumpRaw(streamer, '\0');
-
-    return dumpBuffer;
-} // PacketRawToStr
-
-// Dump the raw packet data into a JSON object
-VanPacketParseResult_t DefaultPacketParser(TVanPacketRxDesc& pkt, char* buf, const int n)
-{
-    const static char jsonFormatter[] PROGMEM =
-    "{\n"
-        "\"event\": \"display\",\n"
-        "\"data\":\n"
-        "{\n"
-            "\"%s\": \"%s\"\n"
-        "}\n"
-    "}\n";
-
-    int at = snprintf_P(buf, n, jsonFormatter, idenStr, PacketRawToStr(pkt));
-
-    // JSON buffer overflow?
-    if (at >= n) return VAN_PACKET_PARSE_JSON_TOO_LONG;
-
-    return VAN_PACKET_PARSE_OK;
-} // DefaultPacketParser
-
-#endif
-
 enum Fuel_t
 {
     FUEL_PETROL,
@@ -583,6 +545,7 @@ VanPacketParseResult_t ParseEnginePkt(TVanPacketRxDesc& pkt, char* buf, const in
 
     const uint8_t* data = pkt.Data();
 
+    int contactKeyPosition = data[1] & 0x03;  // 0 = OFF, 1 = ACC, 2 = START, 3 = ON
     bool economyMode = data[1] & 0x10;
 
     // Coolant water temperature value often falls back to 'invalid' (0xFF), even if a valid value was previously
@@ -628,10 +591,10 @@ VanPacketParseResult_t ParseEnginePkt(TVanPacketRxDesc& pkt, char* buf, const in
         data[0] & 0x80 ? PSTR("FULL") : PSTR("DIMMED (LIGHTS ON)"),
         data[0] & 0x0F,
 
-        (data[1] & 0x03) == 0x00 ? offStr :
-        (data[1] & 0x03) == 0x01 ? PSTR("ACC") :
-        (data[1] & 0x03) == 0x03 ? onStr :
-        (data[1] & 0x03) == 0x02 ? PSTR("START") :
+        contactKeyPosition == 0x00 ? offStr :
+        contactKeyPosition == 0x01 ? PSTR("ACC") :
+        contactKeyPosition == 0x03 ? onStr :
+        contactKeyPosition == 0x02 ? PSTR("START") :
         ToHexStr((uint8_t)(data[1] & 0x03)),
 
         data[1] & 0x04 ? yesStr : noStr,
@@ -931,7 +894,7 @@ VanPacketParseResult_t ParseDeviceReportPkt(TVanPacketRxDesc& pkt, char* buf, co
                     (data[2] & 0x1F) == 0x13 ? PSTR("SEEK_BACKWARD") :
                     (data[2] & 0x1F) == 0x14 ? PSTR("SEEK_FORWARD") :
                     (data[2] & 0x1F) == 0x16 ? PSTR("AUDIO") :
-                    (data[2] & 0x1F) == 0x17 ? PSTR("MAN") :
+                    (data[2] & 0x1F) == 0x17 ? PSTR("MAN") :  // Not seen
                     (data[2] & 0x1F) == 0x1B ? PSTR("TUNER") :
                     (data[2] & 0x1F) == 0x1C ? PSTR("TAPE") :
                     (data[2] & 0x1F) == 0x1D ? PSTR("CD") :
@@ -1028,6 +991,8 @@ VanPacketParseResult_t ParseDeviceReportPkt(TVanPacketRxDesc& pkt, char* buf, co
             // User clicks on "Accept" button (usually bottom left of dialog screen)
             code == 0x0001 ? PSTR("Accept") :
 
+            code == 0x0002 ? ToHexStr(code) :
+
             // Always follows 0x1000
             code == 0x0100 ? PSTR("End_of_button_press") :
 
@@ -1043,6 +1008,8 @@ VanPacketParseResult_t ParseDeviceReportPkt(TVanPacketRxDesc& pkt, char* buf, co
             // (Or: select from list using "Val"?)
             code == 0x2000 ? PSTR("Request_next_sat_nav_report_packet") :
 
+            code == 0x2100 ? ToHexStr(code) :  // ??
+
             // User selects city from list
             code == 0x2101 ? PSTR("Selected_city_from_list") :
 
@@ -1052,6 +1019,9 @@ VanPacketParseResult_t ParseDeviceReportPkt(TVanPacketRxDesc& pkt, char* buf, co
 
             // MFD asks for sat nav guidance data packet (IDEN 0x9CE) and satnav_status_2 (IDEN 0x7CE)
             code == 0x4400 ? PSTR("Request_sat_nav_guidance_data") :
+
+            code == 0x4700 ? ToHexStr(code) :  // Route computed?
+            code == 0x6000 ? ToHexStr(code) :  // ??
 
             ToHexStr(code),
 
@@ -1418,13 +1388,19 @@ VanPacketParseResult_t ParseCarStatus2Pkt(TVanPacketRxDesc& pkt, char* buf, cons
 
     uint8_t currentMsg = data[9];
 
-    // Relying on short-circuit boolean evaluation
-    if (currentMsg <= 0x7F && strlen_P(msgTable[currentMsg]) > 0)
-    {
-        // The message to be shown in the popup on the MFD
-        at += at >= n ? 0 :
-            snprintf_P(buf + at, n - at, PSTR(",\n\"notification_message_on_mfd\": \"%S\""), msgTable[currentMsg]);
-    } // if
+    // The message to be shown in the popup on the MFD
+    at += at >= n ? 0 :
+        snprintf_P(buf + at, n - at,
+            PSTR(",\n\"notification_message_on_mfd\": \"%S\""),
+
+            // Relying on short-circuit boolean evaluation
+            currentMsg <= 0x7F && strlen_P(msgTable[currentMsg]) > 0 ? msgTable[currentMsg] : emptyStr
+        );
+
+    // Separately report "doors locked" status
+    bool doorsLocked = data[8] & 0x01;
+    at += at >= n ? 0 :
+        snprintf_P(buf + at, n - at, PSTR(",\n\"doors_locked\": \"%S\""), doorsLocked ? yesStr : noStr);
 
     at += at >= n ? 0 : snprintf_P(buf + at, n - at, PSTR("\n}\n}\n"));
 
@@ -1529,7 +1505,7 @@ VanPacketParseResult_t ParseDashboardButtonsPkt(TVanPacketRxDesc& pkt, char* buf
     char floatBuf[3][MAX_FLOAT_SIZE];
     int at = snprintf_P(buf, n, jsonFormatter,
         data[0] & 0x02 ? onStr : offStr,
-        data[2] & 0x40 ? PSTR("LOCKED") : PSTR("UNLOCKED"),
+        data[2] & 0x40 ? onStr : offStr,
         data[2] & 0x0F,
         data[3] & 0x02 ? onStr : offStr,
 
@@ -4424,18 +4400,24 @@ bool IsPacketDataDuplicate(TVanPacketRxDesc& pkt, IdenHandler_t* handler)
     {
         Serial.printf_P(PSTR("---> Received: %s packet (IDEN %03X)\n"), handler->idenStr, iden);
 
-        // The first time, handler->prevDataLen will be -1, so only the "FULL: " line will be printed
+        // The first time, handler->prevData will be NULL, so only the "FULL: " line will be printed
+        //if (handler->prevData != NULL)
+
+        // The first time, or after an call to ResetPacketPrevData, handler->prevDataLen will be -1, so only
+        // the "FULL: " line will be printed
         if (handler->prevData != NULL && handler->prevDataLen >= 0)
         {
             // First line: print the new packet's data where it differs from the previous packet
             Serial.printf_P(PSTR("DIFF: %03X %1X (%s) "), iden, pkt.CommandFlags(), pkt.CommandFlagsStr());
             if (dataLen > 0)
             {
-                int n = handler->prevDataLen < dataLen ? handler->prevDataLen : dataLen;
+                int n = handler->prevDataLen;
                 for (int i = 0; i < n; i++)
                 {
-                    char diffByte[3] = "  ";
-                    if (data[i] != handler->prevData[i])
+                    char diffByte[] = "\u00b7\u00b7";  // \u00b7 is center dot character
+
+                    // Relying on short-circuit boolean evaluation
+                    if (i >= dataLen || data[i] != handler->prevData[i])
                     {
                         snprintf_P(diffByte, sizeof(diffByte), PSTR("%02X"), handler->prevData[i]);
                     } // if
@@ -4492,6 +4474,7 @@ static IdenHandler_t handlers[] =
     // 3. Number of expected bytes (or -1 if varying/unknown),
     // 4. Ignore duplicates (boolean)
     // 5. handler function
+    // 6. prevDataLen: must be initialized to -1 to indicate "unknown"
     { VIN_IDEN, "vin", 17, true, &ParseVinPkt, -1 },
     { ENGINE_IDEN, "engine", 7, true, &ParseEnginePkt, -1 },
     { HEAD_UNIT_STALK_IDEN, "head_unit_stalk", 2, true, &ParseHeadUnitStalkPkt, -1 },

@@ -9,7 +9,7 @@ const char PROGMEM unknownStr[] = "UNKNOWN";
 
 void PrintSystemSpecs()
 {
-    Serial.printf_P(PSTR("CPU Speed: %u MHz\n"), system_get_cpu_freq());
+    Serial.printf_P(PSTR("CPU Speed: %u MHz (CPU_F_FACTOR = %d)\n"), system_get_cpu_freq(), CPU_F_FACTOR);
     Serial.printf_P(PSTR("SDK: %s\n"), system_get_sdk_version());
 
     uint32_t realSize = ESP.getFlashChipRealSize();
@@ -27,6 +27,9 @@ void PrintSystemSpecs()
         ideMode == FM_DOUT ? doutStr :
         unknownStr);
     Serial.printf_P(PSTR("Flash chip configuration %S\n"), ideSize != realSize ? PSTR("wrong!") : PSTR("ok."));
+
+    Serial.print(F("Wi-Fi MAC address: "));
+    Serial.println(WiFi.macAddress());
 } // PrintSystemSpecs
 
 const char* EspSystemDataToJson(char* buf, const int n)
@@ -40,6 +43,8 @@ const char* EspSystemDataToJson(char* buf, const int n)
         "\"event\": \"display\",\n"
         "\"data\":\n"
         "{\n"
+            "\"esp_last_reset_reason\": \"%s\",\n"
+            "\"esp_last_reset_info\": \"%s\",\n"
             "\"esp_boot_version\": \"%u\",\n"
             "\"esp_cpu_speed\": \"%u MHz\",\n"
             "\"esp_sdk_version\": \"%s\",\n"
@@ -62,6 +67,9 @@ const char* EspSystemDataToJson(char* buf, const int n)
 
     char floatBuf[3][MAX_FLOAT_SIZE];
     int at = snprintf_P(buf, n, jsonFormatter,
+
+        ESP.getResetReason().c_str(),
+        ESP.getResetInfo().c_str(),
 
         ESP.getBootVersion(),
         ESP.getCpuFreqMHz(), // system_get_cpu_freq(),

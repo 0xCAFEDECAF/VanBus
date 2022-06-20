@@ -59,7 +59,7 @@ bool IsPacketSelected(uint16_t iden, VanPacketFilter_t filter)
     if (filter == VAN_PACKETS_NO_VAN_PKTS)
     {
         // Show no packets, except the following:
-        // (Commented-out IDs will NOT be printed on Serial)
+        // (Commented-out IDENs will NOT be printed on Serial)
         if (
             true
             // && iden != VIN_IDEN
