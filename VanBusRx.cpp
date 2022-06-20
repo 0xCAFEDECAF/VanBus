@@ -902,7 +902,7 @@ void TVanPacketRxQueue::DumpStats(Stream& s, bool longForm) const
                 ? "---" 
                 : FloatToStr(floatBuf, 100.0 * nRepaired / nCorrupt, 0));
 
-        s.printf_P(PSTR(" [SB_err: %lu, DCB_err: %lu"), nOneBitError, nTwoConsecutiveBitErrors);
+        s.printf_P(PSTR(" [SB_err: %lu, DCB_err: %lu]"), nOneBitError, nTwoConsecutiveBitErrors);
 
         s.printf_P(
             PSTR(", overall: %lu (%s%%)"),
