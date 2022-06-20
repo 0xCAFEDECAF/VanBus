@@ -27,8 +27,7 @@
 #define VanBusRx_h
 
 #include <Arduino.h>
-
-#define VAN_BUS_RX_VERSION 000002006
+#include "VanBusVersion.h"
 
 //#define VAN_RX_ISR_DEBUGGING
 //#define VAN_RX_IFS_DEBUGGING
@@ -55,6 +54,7 @@
 
 // F_CPU is set by the Arduino IDE option as chosen in menu Tools > CPU Frequency. It is always a multiple of 80000000.
 #define CPU_F_FACTOR (F_CPU / 80000000)
+#define CPU_CYCLES(_X) (_X) * CPU_F_FACTOR
 
 #define VAN_NO_PIN_ASSIGNED (0xFF)
 
@@ -421,7 +421,7 @@ class TVanPacketRxQueue
 
         if (++_head == end) _head = pool;  // roll over if needed
 
-        // Keep track of number of queued (unprocessed) packets
+        // Keep track of queue fill level
         int nQueued = _head - tail;
         if (nQueued == 0 && _head->state == VAN_RX_DONE) nQueued = QueueSize();
         else if (nQueued < 0) nQueued += QueueSize();
