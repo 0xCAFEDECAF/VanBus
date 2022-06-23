@@ -218,12 +218,11 @@ void TVanPacketRxDesc::DumpRaw(Stream& s, char last) const
 } // TVanPacketRxDesc::DumpRaw
 
 // Normal bit time (8 microseconds), expressed as number of CPU cycles
-#define VAN_NORMAL_BIT_TIME_CPU_CYCLES (667 * CPU_F_FACTOR)
+#define VAN_NORMAL_BIT_TIME_CPU_CYCLES (CPU_CYCLES(667))
 
 inline __attribute__((always_inline)) unsigned int nBits(uint32_t nCycles)
 {
-    // return (nCycles + 300 * CPU_F_FACTOR) / VAN_NORMAL_BIT_TIME_CPU_CYCLES;
-    return (nCycles + 200 * CPU_F_FACTOR) / VAN_NORMAL_BIT_TIME_CPU_CYCLES;
+    return (nCycles + CPU_CYCLES(200)) / VAN_NORMAL_BIT_TIME_CPU_CYCLES;
 } // nBits
 
 // Calculate number of bits from a number of elapsed CPU cycles
@@ -241,34 +240,34 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
     // Sometimes, samples are stretched, because the ISR is called too late. If that happens,
     // we must compress the "sample time" for the next bit.
     jitter = 0;
-    if (nCycles < 471 * CPU_F_FACTOR)
+    if (nCycles < CPU_CYCLES(471))
     {
-        if (nCycles > 230 * CPU_F_FACTOR) jitter = nCycles - 230 * CPU_F_FACTOR;
+        if (nCycles > CPU_CYCLES(230)) jitter = nCycles - CPU_CYCLES(230);
         return 0;
     }
-    if (nCycles < 1228 * CPU_F_FACTOR)
+    if (nCycles < CPU_CYCLES(1228))
     {
-        if (nCycles > 718 * CPU_F_FACTOR) jitter = nCycles - 718 * CPU_F_FACTOR;  // 718 --> 1228 = 510
+        if (nCycles > CPU_CYCLES(718)) jitter = nCycles - CPU_CYCLES(718);  // 718 --> 1228 = 510
         return 1;
     } // if
-    if (nCycles < 1815 * CPU_F_FACTOR)
+    if (nCycles < CPU_CYCLES(1826))
     {
-        if (nCycles > 1371 * CPU_F_FACTOR) jitter = nCycles - 1371 * CPU_F_FACTOR;  // 1371 --> 1815 = 444
+        if (nCycles > CPU_CYCLES(1371)) jitter = nCycles - CPU_CYCLES(1371);  // 1371 --> 1826 = 455
         return 2;
     } // if
-    if (nCycles < 2470 * CPU_F_FACTOR)
+    if (nCycles < CPU_CYCLES(2470))
     {
-        if (nCycles > 2014 * CPU_F_FACTOR) jitter = nCycles - 2014 * CPU_F_FACTOR;  // 2014--> 2470 = 456
+        if (nCycles > CPU_CYCLES(2037)) jitter = nCycles - CPU_CYCLES(2037);  // 2037--> 2470 = 433
         return 3;
     } // if
-    if (nCycles < 3090 * CPU_F_FACTOR)
+    if (nCycles < CPU_CYCLES(3090))
     {
-        if (nCycles > 2668 * CPU_F_FACTOR) jitter = nCycles - 2668 * CPU_F_FACTOR;  // 2668 --> 3090 = 422
+        if (nCycles > CPU_CYCLES(2668)) jitter = nCycles - CPU_CYCLES(2668);  // 2668 --> 3090 = 422
         return 4;
     } // if
-    if (nCycles < 3680 * CPU_F_FACTOR)
+    if (nCycles < CPU_CYCLES(3680))
     {
-        if (nCycles > 3292 * CPU_F_FACTOR) jitter = nCycles - 3292 * CPU_F_FACTOR;  // 3292 --> 3680 = 388
+        if (nCycles > CPU_CYCLES(3315)) jitter = nCycles - CPU_CYCLES(3315);  // 3315 --> 3680 = 365
         return 5;
     } // if
 
@@ -318,7 +317,7 @@ void ICACHE_RAM_ATTR WaitAckIsr()
     SetTxBitTimer();
 
     NO_INTERRUPTS;
-    VanBusRx._AdvanceHead();
+    if (VanBusRx._head->state == VAN_RX_WAITING_ACK) VanBusRx._AdvanceHead();
     INTERRUPTS;
 } // WaitAckIsr
 
@@ -353,17 +352,32 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     const uint32_t nCyclesMeasured = curr - prev;  // Arithmetic has safe roll-over
     prev = curr;
 
+    // Retrieve context
+    TVanPacketRxDesc* rxDesc = VanBusRx._head;
+    const PacketReadState_t state = rxDesc->state;
+
     // Conversion from elapsed CPU cycles to number of bits, including built-up jitter
     static uint32_t jitter = 0;
-    const uint32_t nCycles = nCyclesMeasured + jitter;
+    uint32_t nCycles = nCyclesMeasured + jitter;
+
+    // During SOF, timing is slightly different
+    if (state == VAN_RX_SEARCHING)
+    {
+        if (nCycles > CPU_CYCLES(2240) && nCycles < CPU_CYCLES(2470)) nCycles += CPU_CYCLES(230);
+        else if (nCycles < CPU_CYCLES(800)) nCycles -= CPU_CYCLES(50);
+    }
+    else
+    {
+        if (nCyclesMeasured > CPU_CYCLES(1000) && nCyclesMeasured < CPU_CYCLES(1220)) nCycles += CPU_CYCLES(30);
+    } // if
+
   #ifdef VAN_RX_ISR_DEBUGGING
     const uint32_t prevJitter = jitter;
   #endif // VAN_RX_ISR_DEBUGGING
+
     unsigned int nBits = nBitsTakingIntoAccountJitter(nCycles, jitter);
 
-    TVanPacketRxDesc* rxDesc = VanBusRx._head;
     rxDesc->nIsrs++;
-    const PacketReadState_t state = rxDesc->state;
 
   #ifdef VAN_RX_ISR_DEBUGGING
 
@@ -397,7 +411,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     #define RETURN \
     { \
         const int pinLevelAtReturnFromIsr = GPIP(VanBusRx.pin); \
-        pinLevelChangedDuringInterruptHandling = jitter < 100 * CPU_F_FACTOR && pinLevelAtReturnFromIsr != pinLevel; \
+        pinLevelChangedDuringInterruptHandling = jitter < CPU_CYCLES(100) && pinLevelAtReturnFromIsr != pinLevel; \
         \
         if (debugIsr != NULL) \
         { \
@@ -421,7 +435,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     #define RETURN \
     { \
         const int pinLevelAtReturnFromIsr = GPIP(VanBusRx.pin); \
-        pinLevelChangedDuringInterruptHandling = jitter < 100 * CPU_F_FACTOR && pinLevelAtReturnFromIsr != pinLevel; \
+        pinLevelChangedDuringInterruptHandling = jitter < CPU_CYCLES(100) && pinLevelAtReturnFromIsr != pinLevel; \
         EXIT_CRITICAL_ISR; \
         return; \
     }
@@ -487,8 +501,8 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         // If the "ACK" came too soon or lasted more than 1 time slot, it is not an "ACK" but the first
         // "1" bit of the next byte
         if (pinLevelChangedDuringInterruptHandling
-            || nCycles < 650 * CPU_F_FACTOR
-            || nCycles > 1000 * CPU_F_FACTOR)
+            || nCycles < CPU_CYCLES(650)
+            || nCycles > CPU_CYCLES(1000))
         {
           #ifdef ARDUINO_ARCH_ESP32
             timerEnd(timer);
@@ -521,7 +535,6 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             rxDesc->state = VAN_RX_SEARCHING;
             DEBUG_IFS(toState, VAN_RX_SEARCHING);
 
-            //rxDesc->ack = VAN_NO_ACK;
             if (nBits == 7 || nBits == 8) atBit = nBits; else atBit = 0;
             jitter = 0;
 
@@ -535,8 +548,6 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
                 rxDesc->state = VAN_RX_SEARCHING;
                 DEBUG_IFS(toState, VAN_RX_SEARCHING);
-
-                //rxDesc->ack = VAN_NO_ACK;
 
                 atBit = nBits;
                 if (nBits > 5) jitter = 0;
@@ -603,7 +614,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
             // If the interrupt was so late that the pin level has already changed again, then flip also the very
             // last bit
-            if (jitter > 318 * CPU_F_FACTOR) flipBits |= 0x0001;
+            if (jitter > CPU_CYCLES(318)) flipBits |= 0x0001;
         } // if
 
         if ((flipBits & 0x0001) == 0x0001) prevPinLevel = 2; // TODO - prevPinLevel = 1 - prevPinLevel
@@ -626,28 +637,28 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         // The bit timing is slightly different during SOF: apply alternative jitter calculations
         if (nBits == 3)
         {
-            if (jitter > 168 * CPU_F_FACTOR) jitter = jitter - 168 * CPU_F_FACTOR; else jitter = 0;
+            if (jitter > CPU_CYCLES(168)) jitter = jitter - CPU_CYCLES(168); else jitter = 0;
         }
         else if (atBit == 4)
         {
             if (nBits == 4)
             {
-                if (nCyclesMeasured > 2624 * CPU_F_FACTOR) jitter = nCyclesMeasured - 2624 * CPU_F_FACTOR;
+                if (nCyclesMeasured > CPU_CYCLES(2624)) jitter = nCyclesMeasured - CPU_CYCLES(2624);
             }
         }
         else if (atBit == 7 || atBit == 8)
         {
             if (nBits == 1)
             {
-                if (jitter > 120 * CPU_F_FACTOR) jitter = jitter - 120 * CPU_F_FACTOR; else jitter = 0;
+                if (jitter > CPU_CYCLES(130)) jitter = jitter - CPU_CYCLES(130); else jitter = 0;
             }
             else if (nBits == 2)
             {
-                if (jitter > 168 * CPU_F_FACTOR) jitter = jitter - 168 * CPU_F_FACTOR; else jitter = 0;
+                if (jitter > CPU_CYCLES(168)) jitter = jitter - CPU_CYCLES(168); else jitter = 0;
             }
             else if (nBits == 4)
             {
-                if (nCyclesMeasured > 2514 * CPU_F_FACTOR) jitter = nCyclesMeasured - 2514 * CPU_F_FACTOR;
+                if (nCyclesMeasured > CPU_CYCLES(2514)) jitter = nCyclesMeasured - CPU_CYCLES(2514);
             } // if
         } // if
 
@@ -656,16 +667,15 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         {
             atBit = 10;
         }
-        else if (atBit == 8 && (readBits & 0x00F) == 0x00D)  // e.g. ---1 11-1 or --11 11-1 or ---- 11-1
+        else if (atBit == 8 && (readBits & 0x00F) == 0x00D)  // e.g. ---1 11-1, --11 11-1, ---- 11-1
         {
             atBit = 10;
         }
-        else if (atBit == 9 && (readBits & 0x003) == 0x001)  // e.g.  - --11 11-1 or - ---- ---1 or - ---- -1-1
+        else if (atBit == 9 && (readBits & 0x003) == 0x001)  // e.g. - --11 11-1, - ---- ---1, - ---- -1-1
         {
-            //readBits = 0x03D;
             atBit = 10;
         }
-        else if (atBit == 10 && (readBits & 0x006) == 0x002) // e.g. -- -111 1-1- or -- -111 1-11 or -- ---- 1-11
+        else if (atBit == 10 && (readBits & 0x006) == 0x002) // e.g. -- -111 1-1-, -- -111 1-11, -- ---- 1-11
         {
             atBit = 11;
         } // if
@@ -741,12 +751,10 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         if ((currentByte & 0x003) == 0 && atBit == 0 && rxDesc->size >= 5
 
             // Experiment for 3 last "0"-bits: too short means it is not EOD
-            && (nBits != 3 || nCycles > 1963 * CPU_F_FACTOR))
+            && (nBits != 3 || nCycles > CPU_CYCLES(1963)))
         {
             rxDesc->state = VAN_RX_WAITING_ACK;
             DEBUG_IFS(toState, VAN_RX_WAITING_ACK);
-
-            //jitter = 0;
 
             // Set a timeout for the ACK bit
 
@@ -754,7 +762,6 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
             timerEnd(timer);
             timerAttachInterrupt(timer, WaitAckIsr, true);
-            // timerAlarmWrite(timer, 16 * 5, false); // 2 time slots = 2 * 8 us = 16 us
             timerAlarmWrite(timer, 24 * 5, false); // 3 time slots = 3 * 8 us = 24 us
             timerAlarmEnable(timer);
 
@@ -765,8 +772,6 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
             // Clock to timer (prescaler) is always 80MHz, even F_CPU is 160 MHz
             timer1_enable(TIM_DIV16, TIM_EDGE, TIM_SINGLE);
-
-            //timer1_write(16 * 5); // 2 time slots = 2 * 8 us = 16 us
             timer1_write(24 * 5); // 3 time slots = 3 * 8 us = 24 us
 
           #endif // ARDUINO_ARCH_ESP32
@@ -778,8 +783,6 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             VanBusRx._AdvanceHead();
 
             jitter = 0;
-
-            //RETURN;
         } // if
     } // if
 

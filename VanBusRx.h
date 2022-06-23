@@ -58,6 +58,7 @@
 
 #define VAN_NO_PIN_ASSIGNED (0xFF)
 
+void WaitAckIsr();
 void RxPinChangeIsr();
 
 #define MAX_FLOAT_SIZE 12
@@ -277,6 +278,7 @@ class TVanPacketRxDesc
       #endif // VAN_RX_IFS_DEBUGGING
     } // Init
 
+    friend void WaitAckIsr();
     friend void RxPinChangeIsr();
     friend class TVanPacketRxQueue;
 }; // class TVanPacketRxDesc
