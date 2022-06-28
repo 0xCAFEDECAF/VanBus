@@ -250,9 +250,9 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
         if (nCycles > CPU_CYCLES(718)) jitter = nCycles - CPU_CYCLES(718);  // 718 --> 1228 = 510
         return 1;
     } // if
-    if (nCycles < CPU_CYCLES(1826))
+    if (nCycles < CPU_CYCLES(1820))
     {
-        if (nCycles > CPU_CYCLES(1371)) jitter = nCycles - CPU_CYCLES(1371);  // 1371 --> 1826 = 455
+        if (nCycles > CPU_CYCLES(1371)) jitter = nCycles - CPU_CYCLES(1371);  // 1371 --> 1820 = 449
         return 2;
     } // if
     if (nCycles < CPU_CYCLES(2470))
@@ -267,7 +267,7 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
     } // if
     if (nCycles < CPU_CYCLES(3680))
     {
-        if (nCycles > CPU_CYCLES(3315)) jitter = nCycles - CPU_CYCLES(3315);  // 3315 --> 3680 = 365
+        if (nCycles > CPU_CYCLES(3280)) jitter = nCycles - CPU_CYCLES(3280);  // 3280 --> 3680 = 400
         return 5;
     } // if
 
