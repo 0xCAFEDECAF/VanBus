@@ -138,7 +138,7 @@ class TIfsDebugPacket
 
   private:
 
-    #define VAN_IFS_DEBUG_BUFFER_SIZE 20
+    #define VAN_IFS_DEBUG_BUFFER_SIZE 30
     TIfsDebugData samples[VAN_IFS_DEBUG_BUFFER_SIZE];
     int at;  // Index of next sample to write into
 

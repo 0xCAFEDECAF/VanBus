@@ -240,9 +240,9 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
     // Sometimes, samples are stretched, because the ISR is called too late. If that happens,
     // we must compress the "sample time" for the next bit.
     jitter = 0;
-    if (nCycles < CPU_CYCLES(471))
+    if (nCycles < CPU_CYCLES(482))
     {
-        if (nCycles > CPU_CYCLES(230)) jitter = nCycles - CPU_CYCLES(230);
+        if (nCycles > CPU_CYCLES(106)) jitter = nCycles - CPU_CYCLES(106);
         return 0;
     }
     if (nCycles < CPU_CYCLES(1228))
@@ -250,24 +250,24 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
         if (nCycles > CPU_CYCLES(718)) jitter = nCycles - CPU_CYCLES(718);  // 718 --> 1228 = 510
         return 1;
     } // if
-    if (nCycles < CPU_CYCLES(1820))
+    if (nCycles < CPU_CYCLES(1893))
     {
-        if (nCycles > CPU_CYCLES(1371)) jitter = nCycles - CPU_CYCLES(1371);  // 1371 --> 1820 = 449
+        if (nCycles > CPU_CYCLES(1371)) jitter = nCycles - CPU_CYCLES(1371);  // 1371 --> 1893 = 522
         return 2;
     } // if
     if (nCycles < CPU_CYCLES(2470))
     {
-        if (nCycles > CPU_CYCLES(2037)) jitter = nCycles - CPU_CYCLES(2037);  // 2037--> 2470 = 433
+        if (nCycles > CPU_CYCLES(2015)) jitter = nCycles - CPU_CYCLES(2015);  // 2015--> 2470 = 455
         return 3;
     } // if
-    if (nCycles < CPU_CYCLES(3090))
+    if (nCycles < CPU_CYCLES(3142))
     {
-        if (nCycles > CPU_CYCLES(2668)) jitter = nCycles - CPU_CYCLES(2668);  // 2668 --> 3090 = 422
+        if (nCycles > CPU_CYCLES(2650)) jitter = nCycles - CPU_CYCLES(2650);  // 2650 --> 3142 = 492
         return 4;
     } // if
-    if (nCycles < CPU_CYCLES(3680))
+    if (nCycles < CPU_CYCLES(3795))
     {
-        if (nCycles > CPU_CYCLES(3280)) jitter = nCycles - CPU_CYCLES(3280);  // 3280 --> 3680 = 400
+        if (nCycles > CPU_CYCLES(3280)) jitter = nCycles - CPU_CYCLES(3280);  // 3280 --> 3795 = 515
         return 5;
     } // if
 
@@ -364,11 +364,11 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     if (state == VAN_RX_SEARCHING)
     {
         if (nCycles > CPU_CYCLES(2240) && nCycles < CPU_CYCLES(2470)) nCycles += CPU_CYCLES(230);
-        else if (nCycles < CPU_CYCLES(800)) nCycles -= CPU_CYCLES(50);
+        else if (nCycles > CPU_CYCLES(600) && nCycles < CPU_CYCLES(800)) nCycles -= CPU_CYCLES(50);
     }
     else
     {
-        if (nCyclesMeasured > CPU_CYCLES(1000) && nCyclesMeasured < CPU_CYCLES(1220)) nCycles += CPU_CYCLES(30);
+        if (nCyclesMeasured > CPU_CYCLES(1010) && nCyclesMeasured < CPU_CYCLES(1198)) nCycles += CPU_CYCLES(30);
     } // if
 
   #ifdef VAN_RX_ISR_DEBUGGING
@@ -593,7 +593,8 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     {
         if (state == VAN_RX_SEARCHING)
         {
-            nBits = 1;
+            nBits = 1; // Seems to work best in vehicle
+            DEBUG_ISR(nBits, 1);
         }
         else
         {
@@ -607,7 +608,12 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         {
             flipBits = 0x0001;
         }
-        else if (nBits > 1)
+        else if (nBits == 2)
+        {
+            // Flip the last 'nBits' except the very last bit, e.g. flip the bits -- ---- --X-
+            flipBits = 0x0002;
+        }
+        else if (nBits > 2)
         {
             // Flip the last 'nBits' except the very last bit, e.g. if nBits == 4 ==> flip the bits -- ---- XXX-
             flipBits = (1 << nBits) - 1 - 1;
@@ -617,7 +623,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             if (jitter > CPU_CYCLES(318)) flipBits |= 0x0001;
         } // if
 
-        if ((flipBits & 0x0001) == 0x0001) prevPinLevel = 2; // TODO - prevPinLevel = 1 - prevPinLevel
+        if ((flipBits & 0x0001) == 0x0001) prevPinLevel = 2; // next ISR, samePinLevel must always be false.
     } // if
 
     readBits <<= nBits;
@@ -772,7 +778,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
             // Clock to timer (prescaler) is always 80MHz, even F_CPU is 160 MHz
             timer1_enable(TIM_DIV16, TIM_EDGE, TIM_SINGLE);
-            timer1_write(24 * 5); // 3 time slots = 3 * 8 us = 24 us
+            timer1_write(40 * 5); // 5 time slots = 5 * 8 us = 40 us
 
           #endif // ARDUINO_ARCH_ESP32
 
@@ -984,6 +990,18 @@ void TIfsDebugPacket::Dump(Stream& s) const
 
         s.printf(" %11.11s", TVanPacketRxDesc::StateStr(ifsData->fromState));
         s.printf(" %11.11s", TVanPacketRxDesc::StateStr(ifsData->toState));
+
+        s.print(" ");
+
+        if (nBits > 6)
+        {
+            s.print(pinLevel == VAN_LOGICAL_LOW ? F("1.....1") : F("-.....-"));
+        }
+        else
+        {
+            for (int i = 0; i < nBits; i++) s.print(pinLevel == VAN_LOGICAL_LOW ? "1" : "-");
+            for (int i = nBits; i < 6; i++) s.print(" ");
+        } // if
 
         s.println();
 
