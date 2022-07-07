@@ -237,17 +237,19 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
     //   1 cycle @ 80 MHz = 0.0000000125 sec = 0.0125 usec
     // --> So, 1 VAN-bus bit is 8.0 / 0.0125 = 640 cycles
 
-    // Sometimes, samples are stretched, because the ISR is called too late. If that happens,
-    // we must compress the "sample time" for the next bit.
+    // Sometimes, samples are stretched, because the ISR is called too late: ESP8266 interrupt service latency can
+    // vary. If that happens, we must compress the "sample time" for the next bit.
+
+    // All timing values were found by trial and error
     jitter = 0;
     if (nCycles < CPU_CYCLES(482))
     {
         if (nCycles > CPU_CYCLES(106)) jitter = nCycles - CPU_CYCLES(106);
         return 0;
     }
-    if (nCycles < CPU_CYCLES(1228))
+    if (nCycles < CPU_CYCLES(1237))
     {
-        if (nCycles > CPU_CYCLES(718)) jitter = nCycles - CPU_CYCLES(718);  // 718 --> 1228 = 510
+        if (nCycles > CPU_CYCLES(718)) jitter = nCycles - CPU_CYCLES(718);  // 718 --> 1237 = 519
         return 1;
     } // if
     if (nCycles < CPU_CYCLES(1893))
@@ -260,9 +262,9 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
         if (nCycles > CPU_CYCLES(2015)) jitter = nCycles - CPU_CYCLES(2015);  // 2015--> 2470 = 455
         return 3;
     } // if
-    if (nCycles < CPU_CYCLES(3142))
+    if (nCycles < CPU_CYCLES(3164))
     {
-        if (nCycles > CPU_CYCLES(2650)) jitter = nCycles - CPU_CYCLES(2650);  // 2650 --> 3142 = 492
+        if (nCycles > CPU_CYCLES(2639)) jitter = nCycles - CPU_CYCLES(2650);  // 2639 --> 3164 = 525
         return 4;
     } // if
     if (nCycles < CPU_CYCLES(3795))
@@ -360,11 +362,11 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     static uint32_t jitter = 0;
     uint32_t nCycles = nCyclesMeasured + jitter;
 
-    // During SOF, timing is slightly different
+    // During SOF, timing is slightly different. Timing values were found by trial and error.
     if (state == VAN_RX_SEARCHING)
     {
         if (nCycles > CPU_CYCLES(2240) && nCycles < CPU_CYCLES(2470)) nCycles += CPU_CYCLES(230);
-        else if (nCycles > CPU_CYCLES(600) && nCycles < CPU_CYCLES(800)) nCycles -= CPU_CYCLES(50);
+        else if (nCycles > CPU_CYCLES(600) && nCycles < CPU_CYCLES(800)) nCycles -= CPU_CYCLES(30);
     }
     else
     {
@@ -588,7 +590,8 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         RETURN;
     } // if
 
-    // Experimental handling of special situations caused by a missed interrupt or a very late ISR invocation
+    // Experimental handling of special situations caused by a missed interrupt or a very late ISR invocation.
+    // All cases were found by trial and error.
     if (nBits == 0)
     {
         if (state == VAN_RX_SEARCHING)
@@ -668,7 +671,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             } // if
         } // if
 
-        // Be flexible in SOF detection. All cases found by trial and error.
+        // Be flexible in SOF detection. All cases were found by trial and error.
         if (atBit == 7 && readBits == 0x00D)  // e.g. --- 11-1
         {
             atBit = 10;
@@ -676,6 +679,10 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         else if (atBit == 8 && (readBits & 0x00F) == 0x00D)  // e.g. ---1 11-1, --11 11-1, ---- 11-1
         {
             atBit = 10;
+        }
+        else if (atBit == 9 && (readBits & 0x00E) == 0x00A)  // e.g. - -111 1-11
+        {
+            atBit = 11;
         }
         else if (atBit == 9 && (readBits & 0x003) == 0x001)  // e.g. - --11 11-1, - ---- ---1, - ---- -1-1
         {
