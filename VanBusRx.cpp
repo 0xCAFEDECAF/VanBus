@@ -264,7 +264,7 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
     } // if
     if (nCycles < CPU_CYCLES(3164))
     {
-        if (nCycles > CPU_CYCLES(2639)) jitter = nCycles - CPU_CYCLES(2650);  // 2639 --> 3164 = 525
+        if (nCycles > CPU_CYCLES(2639)) jitter = nCycles - CPU_CYCLES(2639);  // 2639 --> 3164 = 525
         return 4;
     } // if
     if (nCycles < CPU_CYCLES(3795))
@@ -367,6 +367,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     {
         if (nCycles > CPU_CYCLES(2240) && nCycles < CPU_CYCLES(2470)) nCycles += CPU_CYCLES(230);
         else if (nCycles > CPU_CYCLES(600) && nCycles < CPU_CYCLES(800)) nCycles -= CPU_CYCLES(30);
+        else if (nCycles > CPU_CYCLES(1100) && nCycles < CPU_CYCLES(1300)) nCycles -= CPU_CYCLES(50);
     }
     else
     {
