@@ -182,7 +182,7 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
 
 // Dumps the raw packet bytes to a stream (e.g. 'Serial').
 // Optionally specify the last character; default is "\n" (newline).
-// If the last character is "\n", will also print the ASCII representation of each byte, if possible.
+// If the last character is "\n", will also print the ASCII representation of each byte (if possible).
 void TVanPacketRxDesc::DumpRaw(Stream& s, char last) const
 {
     s.printf("Raw: #%04u (%*u/%u) %2d(%2d) ",
@@ -207,7 +207,8 @@ void TVanPacketRxDesc::DumpRaw(Stream& s, char last) const
     if (last == '\n')
     {
         // Print also ASCII character representation of each byte, if possible, otherwise a small center-dot
-        s.print("\n                                         ");
+
+        s.printf("\n%*s", VanBusRx.size > 100 ? 43 : VanBusRx.size > 10 ? 41 : 39, " ");
         for (int i = 3; i < size - 2; i++)
         {
             if (bytes[i] >= 0x20 && bytes[i] <= 0x7E) s.printf("%2c ", bytes[i]); else s.print(" \u00b7 ");
@@ -247,9 +248,9 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
         if (nCycles > CPU_CYCLES(106)) jitter = nCycles - CPU_CYCLES(106);
         return 0;
     }
-    if (nCycles < CPU_CYCLES(1237))
+    if (nCycles < CPU_CYCLES(1293))
     {
-        if (nCycles > CPU_CYCLES(718)) jitter = nCycles - CPU_CYCLES(718);  // 718 --> 1237 = 519
+        if (nCycles > CPU_CYCLES(718)) jitter = nCycles - CPU_CYCLES(718);  // 718 --> 1293 = 575
         return 1;
     } // if
     if (nCycles < CPU_CYCLES(1893))
@@ -367,11 +368,11 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     {
         if (nCycles > CPU_CYCLES(2240) && nCycles < CPU_CYCLES(2470)) nCycles += CPU_CYCLES(230);
         else if (nCycles > CPU_CYCLES(600) && nCycles < CPU_CYCLES(800)) nCycles -= CPU_CYCLES(30);
-        else if (nCycles > CPU_CYCLES(1100) && nCycles < CPU_CYCLES(1300)) nCycles -= CPU_CYCLES(50);
+        else if (nCycles > CPU_CYCLES(1100) && nCycles < CPU_CYCLES(1290)) nCycles -= CPU_CYCLES(40);
     }
     else
     {
-        if (nCyclesMeasured > CPU_CYCLES(1010) && nCyclesMeasured < CPU_CYCLES(1198)) nCycles += CPU_CYCLES(30);
+        if (nCyclesMeasured > CPU_CYCLES(1010) && nCyclesMeasured < CPU_CYCLES(1293)) nCycles += CPU_CYCLES(60);
     } // if
 
   #ifdef VAN_RX_ISR_DEBUGGING
@@ -399,8 +400,8 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     if (debugIsr != NULL)
     {
         debugIsr->nIsrs = _min(rxDesc->nIsrs, UCHAR_MAX);
-        debugIsr->nCycles = _min(nCyclesMeasured, USHRT_MAX * CPU_F_FACTOR) / CPU_F_FACTOR;
-        debugIsr->fromJitter = _min(prevJitter, (1 << 10 - 1) * CPU_F_FACTOR) / CPU_F_FACTOR;
+        debugIsr->nCycles = _min(nCyclesMeasured / CPU_F_FACTOR, USHRT_MAX);
+        debugIsr->fromJitter = _min(prevJitter / CPU_F_FACTOR, (1 << 10) - 1);
         debugIsr->nBits = _min(nBits, UCHAR_MAX);
         debugIsr->prevPinLevel = prevPinLevel;
         debugIsr->pinLevel = pinLevel;
@@ -418,7 +419,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         \
         if (debugIsr != NULL) \
         { \
-            debugIsr->toJitter = _min(jitter, (1 << 10 - 1) * CPU_F_FACTOR) / CPU_F_FACTOR; \
+            debugIsr->toJitter = _min(jitter / CPU_F_FACTOR, (1 << 10) - 1); \
             debugIsr->flipBits = flipBits; \
             debugIsr->toState = rxDesc->state; \
             debugIsr->pinLevelAtReturnFromIsr = pinLevelAtReturnFromIsr; \
@@ -481,7 +482,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         // Only write into sample buffer if there is space
         if (debugIfs != NULL)
         {
-            debugIfs->nCycles = _min(nCyclesMeasured, USHRT_MAX * CPU_F_FACTOR) / CPU_F_FACTOR;
+            debugIfs->nCycles = _min(nCyclesMeasured / CPU_F_FACTOR, USHRT_MAX);
             debugIfs->nBits = _min(nBits, UCHAR_MAX);
             debugIfs->pinLevel = pinLevel;
             debugIfs->fromState = state;
@@ -545,7 +546,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         }
         else if (pinLevel == VAN_LOGICAL_HIGH)
         {
-            if (nBits == 4 || nBits == 3 || nBits == 5 || nBits == 6 || nBits == 7 || nBits == 9)
+            if (nBits >= 2)
             {
                 // Late detection
 
@@ -599,6 +600,8 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         {
             nBits = 1; // Seems to work best in vehicle
             DEBUG_ISR(nBits, 1);
+
+            jitter = 0;
         }
         else
         {
