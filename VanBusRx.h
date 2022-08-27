@@ -265,6 +265,8 @@ class TVanPacketRxDesc
     uint32_t seqNo;
     uint16_t slot;  // in RxQueue
 
+    int uncertainBit1;
+
     void Init()
     {
         size = 0;
@@ -272,6 +274,9 @@ class TVanPacketRxDesc
         state = VAN_RX_VACANT;
         result = VAN_RX_PACKET_OK;
         ack = VAN_NO_ACK;
+
+      #define NO_UNCERTAIN_BIT (0)
+        uncertainBit1 = NO_UNCERTAIN_BIT;
 
       #ifdef VAN_RX_IFS_DEBUGGING
         ifsDebugPacket.Init();
@@ -342,8 +347,10 @@ class TVanPacketRxQueue
         , count(0)
         , nCorrupt(0)
         , nRepaired(0)
-        , nOneBitError(0)
+        , nOneBitErrors(0)
         , nTwoConsecutiveBitErrors(0)
+        , nTwoSeparateBitErrors(0)
+        , nUncertainBitErrors(0)
         , maxQueued(0)
     { }
 
@@ -386,8 +393,10 @@ class TVanPacketRxQueue
     uint32_t count;
     uint32_t nCorrupt;
     uint32_t nRepaired;
-    uint32_t nOneBitError;
+    uint32_t nOneBitErrors;
     uint32_t nTwoConsecutiveBitErrors;
+    uint32_t nTwoSeparateBitErrors;
+    uint32_t nUncertainBitErrors;
     uint16_t maxQueued;
 
     void RegisterTxTimerTicks(uint32_t ticks) { txTimerTicks = ticks; };

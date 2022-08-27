@@ -115,63 +115,167 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
 
     if (CheckCrc()) return true;
 
-    // Byte 0 can be skipped; it does not count for CRC
-    for (int atByte = 1; atByte < size; atByte++)
+    // One cycle without the uncertain bit flipped, plus (optionally) one cycle with the uncertain bit flipped
+    for (int i = 0; i < (uncertainBit1 == NO_UNCERTAIN_BIT ? 1 : 2); i++)
     {
-        for (int atBit = 0; atBit < 8; atBit++)
+        int uncertainAtByte;
+        uint8_t uncertainMask;
+
+        // Second cycle?
+        if (i == 1)
         {
-            uint8_t mask = 1 << atBit;
-            bytes[atByte] ^= mask;  // Flip
+            // Flip the bit which is at the position that is marked as "uncertain"
 
-            // Is there a way to quickly re-calculate the CRC value when bit is flipped?
-            if (CheckCrc())
-            {
-                if (wantToCount == 0 || (this->*wantToCount)())
-                {
-                    VanBusRx.nRepaired++;
-                    VanBusRx.nOneBitError++;
-                    VanBusRx.nCorrupt++;
-                } // if
-                return true;
-            } // if
+            uncertainAtByte = (uncertainBit1 - 1) >> 3;
 
-            // Try also to flip the preceding bit
-            if (atBit != 7)
+            int uncertainAtBit = (uncertainBit1 - 1) & 0x07;  // 0 = MSB, 7 = LSB
+            uncertainAtBit = 7 - uncertainAtBit;  // 0 = LSB, 7 = MSB
+
+            uncertainMask = 1 << uncertainAtBit;
+            bytes[uncertainAtByte] ^= uncertainMask;  // Flip
+        } // if
+
+        // Byte 0 can be skipped; it does not count for CRC
+        for (int atByte = 1; atByte < size; atByte++)
+        {
+            for (int atBit = 0; atBit < 8; atBit++)
             {
-                uint8_t mask2 = 1 << (atBit + 1);
-                bytes[atByte] ^= mask2;  // Flip
+                uint8_t mask = 1 << atBit;
+                bytes[atByte] ^= mask;  // Flip
+
+                // Is there a way to quickly re-calculate the CRC value when bit is flipped?
                 if (CheckCrc())
                 {
                     if (wantToCount == 0 || (this->*wantToCount)())
                     {
                         VanBusRx.nRepaired++;
-                        VanBusRx.nTwoConsecutiveBitErrors++;
+                        VanBusRx.nOneBitErrors++;
+                        if (i == 1) VanBusRx.nUncertainBitErrors++;
                         VanBusRx.nCorrupt++;
                     } // if
                     return true;
                 } // if
 
-                bytes[atByte] ^= mask2;  // Flip back
+                // Try also to flip the preceding bit
+                if (atBit != 7)
+                {
+                    uint8_t mask2 = 1 << (atBit + 1);
+                    bytes[atByte] ^= mask2;  // Flip
+                    if (CheckCrc())
+                    {
+                        if (wantToCount == 0 || (this->*wantToCount)())
+                        {
+                            VanBusRx.nRepaired++;
+                            VanBusRx.nTwoConsecutiveBitErrors++;
+                            if (i == 1) VanBusRx.nUncertainBitErrors++;
+                            VanBusRx.nCorrupt++;
+                        } // if
+                        return true;
+                    } // if
+
+                    bytes[atByte] ^= mask2;  // Flip back
+                }
+                else // atBit == 7
+                {
+                    // atByte > 0, so atByte - 1 is safe
+                    bytes[atByte - 1] ^= 1 << 0;  // Flip
+                    if (CheckCrc())
+                    {
+                        if (wantToCount == 0 || (this->*wantToCount)())
+                        {
+                            VanBusRx.nRepaired++;
+                            VanBusRx.nTwoConsecutiveBitErrors++;
+                            if (i == 1) VanBusRx.nUncertainBitErrors++;
+                            VanBusRx.nCorrupt++;
+                        } // if
+                        return true;
+                    } // if
+
+                    bytes[atByte - 1] ^= 1 << 0;  // Flip back
+                } // if
+
+                bytes[atByte] ^= mask;  // Flip back
+            } // for
+        } // for
+
+        if (i == 1) bytes[uncertainAtByte] ^= uncertainMask;  // Flip back (just to be tidy)
+    } // for
+
+    // Flip two bits. Getting to this point happens very rarely, luckily...
+    for (int atByte1 = 0; atByte1 < size; atByte1++)
+    {
+        // This may take really long...
+        wdt_reset();
+
+        bool prevBit1 = false;
+
+        for (int atBit1 = 0; atBit1 < 8; atBit1++)
+        {
+            // Only flip the last bit in a sequence of equal bits; take into account the Manchester bits
+
+            uint8_t currMask1 = 1 << atBit1;
+            bool currBit1 = (bytes[atByte1] & currMask1) != 0;
+            if (prevBit1 != currBit1) continue;
+
+            // After bit 3 or bit 7, there was the Manchester bit
+            if (atBit1 == 3 || atBit1 == 7)
+            {
+                prevBit1 = ! currBit1;
             }
-            else // atByte > 0
+            else
             {
-                // atBit == 7
-                bytes[atByte - 1] ^= 1 << 0;  // Flip
-                if (CheckCrc())
-                {
-                    if (wantToCount == 0 || (this->*wantToCount)())
-                    {
-                        VanBusRx.nRepaired++;
-                        VanBusRx.nTwoConsecutiveBitErrors++;
-                        VanBusRx.nCorrupt++;
-                    } // if
-                    return true;
-                } // if
-
-                bytes[atByte - 1] ^= 1 << 0;  // Flip back
+                prevBit1 = currBit1;
+                uint8_t nextMask1 = 1 << (atBit1 + 1);
+                bool nextBit1 = (bytes[atByte1] & nextMask1) != 0;
+                if (currBit1 == nextBit1) continue;
             } // if
 
-            bytes[atByte] ^= mask;  // Flip back
+            bytes[atByte1] ^= currMask1;  // Flip
+
+            // Flip second bit
+            for (int atByte2 = atByte1; atByte2 < size; atByte2++)
+            {
+                bool prevBit2 = false;
+
+                for (int atBit2 = 0; atBit2 < 8; atBit2++)
+                {
+                    // Only flip the last bit in a sequence of equal bits; take into account the Manchester bits
+
+                    uint8_t currMask2 = 1 << atBit2;
+                    bool currBit2 = (bytes[atByte2] & currMask2) != 0;
+                    if (prevBit2 != currBit2) continue;
+                    prevBit2 = currBit2;
+
+                    // After bit 3 or bit 7, there was the Manchester bit
+                    if (atBit2 == 3 || atBit2 == 7)
+                    {
+                        prevBit2 = ! currBit2;
+                    }
+                    else
+                    {
+                        prevBit2 = currBit2;
+                        uint8_t nextMask2 = 1 << (atBit2 + 1);
+                        bool nextBit2 = (bytes[atByte2] & nextMask2) != 0;
+                        if (currBit2 == nextBit2) continue;
+                    } // if
+
+                    bytes[atByte2] ^= currMask2;  // Flip
+                    if (CheckCrc())
+                    {
+                        if (wantToCount == 0 || (this->*wantToCount)())
+                        {
+                            VanBusRx.nRepaired++;
+                            VanBusRx.nTwoSeparateBitErrors++;
+                            VanBusRx.nCorrupt++;
+                        } // if
+                        return true;
+                    } // if
+
+                    bytes[atByte2] ^= currMask2;  // Flip back
+                } // for
+            } // for
+
+            bytes[atByte1] ^= currMask1;  // Flip back
         } // for
     } // for
 
@@ -203,6 +307,8 @@ void TVanPacketRxDesc::DumpRaw(Stream& s, char last) const
     s.print(ResultStr());
     s.printf(" %04X", Crc());
     s.printf(" %s", CheckCrc() ? "CRC_OK" : "CRC_ERROR");
+
+    if (uncertainBit1 != NO_UNCERTAIN_BIT) s.printf(" uBit=%u", uncertainBit1);
 
     if (last == '\n')
     {
@@ -250,17 +356,17 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
     }
     if (nCycles < CPU_CYCLES(1293))
     {
-        if (nCycles > CPU_CYCLES(718)) jitter = nCycles - CPU_CYCLES(718);  // 718 --> 1293 = 575
+        if (nCycles > CPU_CYCLES(708)) jitter = nCycles - CPU_CYCLES(708);  // 708 --> 1293 = 585
         return 1;
     } // if
     if (nCycles < CPU_CYCLES(1893))
     {
-        if (nCycles > CPU_CYCLES(1371)) jitter = nCycles - CPU_CYCLES(1371);  // 1371 --> 1893 = 522
+        if (nCycles > CPU_CYCLES(1354)) jitter = nCycles - CPU_CYCLES(1354);  // 1354 --> 1893 = 539
         return 2;
     } // if
     if (nCycles < CPU_CYCLES(2470))
     {
-        if (nCycles > CPU_CYCLES(2015)) jitter = nCycles - CPU_CYCLES(2015);  // 2015--> 2470 = 455
+        if (nCycles > CPU_CYCLES(2005)) jitter = nCycles - CPU_CYCLES(2005);  // 2005--> 2470 = 465
         return 3;
     } // if
     if (nCycles < CPU_CYCLES(3164))
@@ -270,7 +376,7 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
     } // if
     if (nCycles < CPU_CYCLES(3795))
     {
-        if (nCycles > CPU_CYCLES(3280)) jitter = nCycles - CPU_CYCLES(3280);  // 3280 --> 3795 = 515
+        if (nCycles > CPU_CYCLES(3272)) jitter = nCycles - CPU_CYCLES(3272);  // 3272 --> 3795 = 523
         return 5;
     } // if
 
@@ -372,7 +478,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     }
     else
     {
-        if (nCyclesMeasured > CPU_CYCLES(1010) && nCyclesMeasured < CPU_CYCLES(1293)) nCycles += CPU_CYCLES(60);
+        if (nCyclesMeasured > CPU_CYCLES(1010) && nCyclesMeasured < CPU_CYCLES(1293) && jitter > 20) nCycles += CPU_CYCLES(60);
     } // if
 
   #ifdef VAN_RX_ISR_DEBUGGING
@@ -636,6 +742,13 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     readBits <<= nBits;
     atBit += nBits;
 
+    // Calculate the position of the last received bit (in order of reception: MSB first)
+    int bitPosition = rxDesc->size * 8 + atBit;
+
+    // Count only the "real" bits, not the Manchester bits
+    if (atBit > 4) bitPosition--;
+    if (atBit > 9) bitPosition--;
+
     if (pinLevel == VAN_LOGICAL_LOW)
     {
         // Just had a series of VAN_LOGICAL_HIGH bits
@@ -643,19 +756,41 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         readBits |= pattern;
     } // if
 
-    readBits ^= flipBits;
+    if (flipBits == 0 && nBits == 3 && (atBit == 5 || atBit == 10) && rxDesc->uncertainBit1 == NO_UNCERTAIN_BIT)
+    {
+        // 4-th or 8-th bit same as Manchester bit? Then mark that bit position as candidate for
+        // later repair by the CheckCrcAndRepair(...) method.
+        rxDesc->uncertainBit1 = bitPosition;  // Position 1 = MSB, bit 8 = LSB
+    } // if
+
+    if (flipBits != 0)
+    {
+        readBits ^= flipBits;
+
+        if (nBits > 1 && rxDesc->uncertainBit1 == NO_UNCERTAIN_BIT)
+        {
+            // The last bit is very uncertain: mark the bit position as candidate for later repair by the
+            // CheckCrcAndRepair(...) method
+            rxDesc->uncertainBit1 = bitPosition;  // Position 1 = MSB, bit 8 = LSB
+
+            // Note: the one-but-last bit is also very uncertain, but for now we mark only the last bit.
+            // In a later version, more than one "uncertain bit" marking may be implemented.
+        } // if
+    } // if
 
     if (state == VAN_RX_SEARCHING)
     {
         // The bit timing is slightly different during SOF: apply alternative jitter calculations
         if (nBits == 3)
         {
+            // Decrease jitter value by 168, but don't go below 0
             if (jitter > CPU_CYCLES(168)) jitter = jitter - CPU_CYCLES(168); else jitter = 0;
         }
         else if (atBit == 4)
         {
             if (nBits == 4)
             {
+                // Timing seems to be 2624 for the first 4-bit sequence during SOF (normally 2639)
                 if (nCyclesMeasured > CPU_CYCLES(2624)) jitter = nCyclesMeasured - CPU_CYCLES(2624);
             }
         }
@@ -663,14 +798,17 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         {
             if (nBits == 1)
             {
+                // Decrease jitter value by 130, but don't go below 0
                 if (jitter > CPU_CYCLES(130)) jitter = jitter - CPU_CYCLES(130); else jitter = 0;
             }
             else if (nBits == 2)
             {
+                // Decrease jitter value by 168, but don't go below 0
                 if (jitter > CPU_CYCLES(168)) jitter = jitter - CPU_CYCLES(168); else jitter = 0;
             }
             else if (nBits == 4)
             {
+                // Timing seems to be 2514 for the second 4-bit sequence during SOF (normally 2639)
                 if (nCyclesMeasured > CPU_CYCLES(2514)) jitter = nCyclesMeasured - CPU_CYCLES(2514);
             } // if
         } // if
@@ -922,7 +1060,11 @@ void TVanPacketRxQueue::DumpStats(Stream& s, bool longForm) const
                 ? "---" 
                 : FloatToStr(floatBuf, 100.0 * nRepaired / nCorrupt, 0));
 
-        s.printf_P(PSTR(" [SB_err: %lu, DCB_err: %lu]"), nOneBitError, nTwoConsecutiveBitErrors);
+        s.printf_P(PSTR(" [SB: %lu, DCB: %lu, DSB: %lu], UCB: %lu"),
+            nOneBitErrors,
+            nTwoConsecutiveBitErrors,
+            nTwoSeparateBitErrors,
+            nUncertainBitErrors);
 
         s.printf_P(
             PSTR(", overall: %lu (%s%%)"),
