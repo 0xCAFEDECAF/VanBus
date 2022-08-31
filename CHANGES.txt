@@ -25,7 +25,7 @@
       these packets
     * Improved repeat-handling (held-down button) of IR remote control
     * Updated JSON data (PacketToJson.ino) to be in line with VanLiveConnect
-    * Print also ESP MAC address on startup, pass ESP reset reason and reset info via JSON dat
+    * Print also ESP MAC address on startup, pass ESP reset reason and reset info via JSON data
 
     examples/PacketParser:
     * Renamed TIME_IDEN (IDEN 984) to MFD_LANGUAGE_UNITS_IDEN and updated the parsing of these packets

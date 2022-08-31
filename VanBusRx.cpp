@@ -356,7 +356,7 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
     }
     if (nCycles < CPU_CYCLES(1293))
     {
-        if (nCycles > CPU_CYCLES(708)) jitter = nCycles - CPU_CYCLES(708);  // 708 --> 1293 = 585
+        if (nCycles > CPU_CYCLES(718)) jitter = nCycles - CPU_CYCLES(718);  // 718 --> 1293 = 575
         return 1;
     } // if
     if (nCycles < CPU_CYCLES(1893))
