@@ -3,7 +3,7 @@
  *
  * Written by Erik Tromp
  *
- * Version 0.3.0 - June, 2022
+ * Version 0.3.0 - September, 2022
  *
  * MIT license, all text above must be included in any redistribution.
  */
@@ -354,9 +354,9 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
         if (nCycles > CPU_CYCLES(106)) jitter = nCycles - CPU_CYCLES(106);
         return 0;
     }
-    if (nCycles < CPU_CYCLES(1293))
+    if (nCycles < CPU_CYCLES(1292))
     {
-        if (nCycles > CPU_CYCLES(718)) jitter = nCycles - CPU_CYCLES(718);  // 718 --> 1293 = 575
+        if (nCycles > CPU_CYCLES(718)) jitter = nCycles - CPU_CYCLES(718);  // 718 --> 1292 = 574
         return 1;
     } // if
     if (nCycles < CPU_CYCLES(1893))
@@ -366,17 +366,17 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
     } // if
     if (nCycles < CPU_CYCLES(2470))
     {
-        if (nCycles > CPU_CYCLES(2005)) jitter = nCycles - CPU_CYCLES(2005);  // 2005--> 2470 = 465
+        if (nCycles > CPU_CYCLES(2002)) jitter = nCycles - CPU_CYCLES(2002);  // 2002 --> 2470 = 468
         return 3;
     } // if
-    if (nCycles < CPU_CYCLES(3164))
+    if (nCycles < CPU_CYCLES(3170))
     {
-        if (nCycles > CPU_CYCLES(2639)) jitter = nCycles - CPU_CYCLES(2639);  // 2639 --> 3164 = 525
+        if (nCycles > CPU_CYCLES(2639)) jitter = nCycles - CPU_CYCLES(2639);  // 2639 --> 3170 = 531
         return 4;
     } // if
     if (nCycles < CPU_CYCLES(3795))
     {
-        if (nCycles > CPU_CYCLES(3272)) jitter = nCycles - CPU_CYCLES(3272);  // 3272 --> 3795 = 523
+        if (nCycles > CPU_CYCLES(3262)) jitter = nCycles - CPU_CYCLES(3262);  // 3262 --> 3795 = 533
         return 5;
     } // if
 
@@ -478,7 +478,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     }
     else
     {
-        if (nCyclesMeasured > CPU_CYCLES(1010) && nCyclesMeasured < CPU_CYCLES(1293) && jitter > 20) nCycles += CPU_CYCLES(60);
+        if (nCyclesMeasured > CPU_CYCLES(1010) && nCyclesMeasured < CPU_CYCLES(1293) && jitter > 6) nCycles += CPU_CYCLES(60);
     } // if
 
   #ifdef VAN_RX_ISR_DEBUGGING
@@ -814,7 +814,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         } // if
 
         // Be flexible in SOF detection. All cases were found by trial and error.
-        if (atBit == 7 && readBits == 0x00D)  // e.g. --- 11-1
+        if (atBit == 7 && (readBits & 0x00F) == 0x00D)  // e.g. --- 11-1, -11 11-1
         {
             atBit = 10;
         }
