@@ -92,8 +92,7 @@ inline void WifiConfig()
 // -----
 // Debugging
 
-// Define to see infrared key hash values and timing on the serial port. Also, the pressed button is shown
-// as three-letter tag in a small box in the bottom left of the MFD.html page.
+// Define to see infrared key hash values and timing on the serial port
 #define DEBUG_IR_RECV
 
 // Prints each packet on serial port, highlighting the bytes that differ from the previous
