@@ -10,26 +10,36 @@
     * Improved ISR debugging (as enabled with #define VAN_RX_ISR_DEBUGGING): better functionality and
       reduced RAM usage
     * TVanPacketRxDesc::IsQueueOverrun(): reads and clears overrun bit within same invocation
-    * TVanPacketRxDesc::CheckCrcAndRepair:
-      - added optional parameter 'wantToCount', a pointer-to-method of class TVanPacketRxDesc, returning a
+    * TVanPacketRxDesc::CheckCrcAndRepair(...):
+      - Added optional parameter 'wantToCount', a pointer-to-method of class TVanPacketRxDesc, returning a
         boolean. It can be used to limit the repair statistics to take only specific types of packets into
         account.
-      - re-introduced repair by flipping of two (non-consecutive) bits. Happens very rarely, luckily...
-    * TVanPacketRxDesc::DumpRaw:
+      - Process a new member field, 'uncertainBit1', which the RX pin ISR can set when it is not certain
+        about a bit value.
+      - Re-introduced repair by flipping of two (non-consecutive) bits (but only the last bit in a sequence
+        of same bit values is flipped).
+    * TVanPacketRxDesc::DumpRaw(...):
       - print the command flags also as HEX value
       - also print the ASCII character representation of each byte, if possible
     * TVanPacketRxQueue::DumpStats: print also the highest fill level of the RX queue
+    * Use compiler directive 'inline __attribute__((always_inline))' for routines that are called by the
+      RX pin ISR.
+    * nBitsTakingIntoAccountJitter(...): updates in the bit timing criteria
 
     examples/LiveWebPage:
     * Renamed TIME_IDEN (IDEN 984) to MFD_LANGUAGE_UNITS_IDEN and updated the parsing and displaying of
       these packets
     * Improved repeat-handling (held-down button) of IR remote control
     * Updated JSON data (PacketToJson.ino) to be in line with VanLiveConnect
-    * Print also ESP MAC address on startup, pass ESP reset reason and reset info via JSON data
+      (https://github.com/0xCAFEDECAF/VanLiveConnect)
+    * Print also ESP MAC address and CPU factor on startup, pass ESP reset reason and reset info via
+      JSON data
 
     examples/PacketParser:
     * Renamed TIME_IDEN (IDEN 984) to MFD_LANGUAGE_UNITS_IDEN and updated the parsing of these packets
     * SATNAV_STATUS_2_IDEN (IDEN 7CE) packets: added parsing of newly found field "guidance_language"
+    * SATNAV_GUIDANCE_IDEN (IDEN 64E) packets: added handling of 16-byte packets with two detailed
+      instructions ("take left/right fork/exit, then ...")
     * enum VanPacketFilter_t: added item VAN_PACKETS_SAT_NAV_PKTS
 
 0.2.5
