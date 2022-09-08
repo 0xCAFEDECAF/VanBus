@@ -16,13 +16,15 @@
 
 ## 🎈 Description<a name = "description"></a>
 
-This module allows you to receive and transmit packets on the "VAN" bus of your Peugeot or Citroen vehicle.
+This module allows you to receive and transmit packets on the ["VAN" bus] of your Peugeot or Citroen vehicle.
 
 VAN bus is pretty similar to CAN bus. It was used in many cars (Peugeot, Citroen) made by PSA.
 
 In the beginning of 2000's the PSA group (Peugeot and Citroen) used VAN bus as a communication protocol
 between the various comfort-related equipment. Later, around 2005, they started to replace this protocol
 in their newer cars with the CAN bus protocol, however some models had VAN bus inside them until 2009.
+[This overview](https://github.com/morcibacsi/PSAVanCanBridge#compatibility) lists vehicles that are
+supposedly fitted with a VAN (comfort) bus.
 
 Only ESP8266 / ESP8285 is supported. ESP32 is NOT supported by this library; for boards with those MCUs there is this
 excellent library: [ESP32 RMT peripheral Vehicle Area Network (VAN bus) reader].
@@ -321,13 +323,14 @@ This library is open-source and licensed under the [MIT license](http://opensour
 
 Do whatever you like with it, but contributions are appreciated!
 
+## See also
+
+- [VAN Live Connect](https://github.com/0xCAFEDECAF/VanLiveConnect) - Live data from your PSA vehicle (Peugeot,
+  Citroën) on your smartphone or tablet, directly from the VAN bus.
+
+["VAN" bus]: https://en.wikipedia.org/wiki/Vehicle_Area_Network
 [MCP2551]: http://ww1.microchip.com/downloads/en/devicedoc/21667d.pdf
 [level converter]: https://www.tinytronics.nl/shop/en/dc-dc-converters/level-converters/i2c-uart-bi-directional-logic-level-converter-5v-3.3v-2-channel-with-supply
 [SN65HVD230]: https://www.ti.com/lit/ds/symlink/sn65hvd230.pdf?ts=1592992149874
 [voltage divider]: https://www.quora.com/How-many-pins-on-Arduino-Uno-give-a3-3v-pin-output
 [ESP32 RMT peripheral Vehicle Area Network (VAN bus) reader]: https://github.com/morcibacsi/esp32_rmt_van_rx
-
-## See also
-
-- [VAN Live Connect](https://github.com/0xCAFEDECAF/VanLiveConnect) - Live data from your PSA vehicle (Peugeot,
-  Citroën) on your smartphone or tablet, directly from the VAN bus.
