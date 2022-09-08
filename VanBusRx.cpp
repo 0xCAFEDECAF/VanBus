@@ -202,33 +202,35 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
     } // for
 
     // Flip two bits. Getting to this point happens very rarely, luckily...
-    for (int atByte1 = 0; atByte1 < size; atByte1++)
+    for (int atByte1 = 1; atByte1 < size; atByte1++)
     {
         // This may take really long...
         wdt_reset();
 
         bool prevBit1 = false;
 
-        for (int atBit1 = 0; atBit1 < 8; atBit1++)
+        for (int atBit1 = 7; atBit1 >= 0; atBit1--)
         {
             // Only flip the last bit in a sequence of equal bits; take into account the Manchester bits
 
             uint8_t currMask1 = 1 << atBit1;
             bool currBit1 = (bytes[atByte1] & currMask1) != 0;
-            if (prevBit1 != currBit1) continue;
+            bool skip1 = prevBit1 != currBit1;
 
-            // After bit 3 or bit 7, there was the Manchester bit
-            if (atBit1 == 3 || atBit1 == 7)
+            // After bit 4 or bit 0, there was the Manchester bit
+            if (atBit1 == 4 || atBit1 == 0)
             {
                 prevBit1 = ! currBit1;
             }
             else
             {
                 prevBit1 = currBit1;
-                uint8_t nextMask1 = 1 << (atBit1 + 1);
+                uint8_t nextMask1 = 1 << (atBit1 - 1);
                 bool nextBit1 = (bytes[atByte1] & nextMask1) != 0;
-                if (currBit1 == nextBit1) continue;
+                skip1 = skip1 || (currBit1 == nextBit1);
             } // if
+
+            if (skip1) continue;
 
             bytes[atByte1] ^= currMask1;  // Flip
 
@@ -237,27 +239,28 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
             {
                 bool prevBit2 = false;
 
-                for (int atBit2 = 0; atBit2 < 8; atBit2++)
+                for (int atBit2 = 7; atBit2 >= 0; atBit2--)
                 {
                     // Only flip the last bit in a sequence of equal bits; take into account the Manchester bits
 
                     uint8_t currMask2 = 1 << atBit2;
                     bool currBit2 = (bytes[atByte2] & currMask2) != 0;
-                    if (prevBit2 != currBit2) continue;
-                    prevBit2 = currBit2;
+                    bool skip2 = prevBit2 != currBit2;
 
-                    // After bit 3 or bit 7, there was the Manchester bit
-                    if (atBit2 == 3 || atBit2 == 7)
+                    // After bit 4 or bit 0, there was the Manchester bit
+                    if (atBit2 == 4 || atBit2 == 0)
                     {
                         prevBit2 = ! currBit2;
                     }
                     else
                     {
                         prevBit2 = currBit2;
-                        uint8_t nextMask2 = 1 << (atBit2 + 1);
+                        uint8_t nextMask2 = 1 << (atBit2 - 1);
                         bool nextBit2 = (bytes[atByte2] & nextMask2) != 0;
-                        if (currBit2 == nextBit2) continue;
+                        skip2 = skip2 || (currBit2 == nextBit2);
                     } // if
+
+                    if (skip2) continue;
 
                     bytes[atByte2] ^= currMask2;  // Flip
                     if (CheckCrc())
@@ -349,7 +352,7 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
 
     // All timing values were found by trial and error
     jitter = 0;
-    if (nCycles < CPU_CYCLES(482))
+    if (nCycles < CPU_CYCLES(484))
     {
         if (nCycles > CPU_CYCLES(106)) jitter = nCycles - CPU_CYCLES(106);
         return 0;
@@ -361,17 +364,17 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
     } // if
     if (nCycles < CPU_CYCLES(1893))
     {
-        if (nCycles > CPU_CYCLES(1354)) jitter = nCycles - CPU_CYCLES(1354);  // 1354 --> 1893 = 539
+        if (nCycles > CPU_CYCLES(1344)) jitter = nCycles - CPU_CYCLES(1344);  // 1344 --> 1893 = 549
         return 2;
     } // if
-    if (nCycles < CPU_CYCLES(2470))
+    if (nCycles < CPU_CYCLES(2516))
     {
-        if (nCycles > CPU_CYCLES(2002)) jitter = nCycles - CPU_CYCLES(2002);  // 2002 --> 2470 = 468
+        if (nCycles > CPU_CYCLES(2002)) jitter = nCycles - CPU_CYCLES(2002);  // 2002 --> 2516 = 514
         return 3;
     } // if
     if (nCycles < CPU_CYCLES(3170))
     {
-        if (nCycles > CPU_CYCLES(2639)) jitter = nCycles - CPU_CYCLES(2639);  // 2639 --> 3170 = 531
+        if (nCycles > CPU_CYCLES(2632)) jitter = nCycles - CPU_CYCLES(2632);  // 2632 --> 3170 = 538
         return 4;
     } // if
     if (nCycles < CPU_CYCLES(3795))
@@ -473,12 +476,12 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     if (state == VAN_RX_SEARCHING)
     {
         if (nCycles > CPU_CYCLES(2240) && nCycles < CPU_CYCLES(2470)) nCycles += CPU_CYCLES(230);
-        else if (nCycles > CPU_CYCLES(600) && nCycles < CPU_CYCLES(800)) nCycles -= CPU_CYCLES(30);
-        else if (nCycles > CPU_CYCLES(1100) && nCycles < CPU_CYCLES(1290)) nCycles -= CPU_CYCLES(40);
+        else if (nCycles > CPU_CYCLES(600) && nCycles < CPU_CYCLES(800)) nCycles -= CPU_CYCLES(20);
+        else if (nCycles > CPU_CYCLES(1100) && nCycles < CPU_CYCLES(1290)) nCycles -= CPU_CYCLES(30);
     }
     else
     {
-        if (nCyclesMeasured > CPU_CYCLES(1010) && nCyclesMeasured < CPU_CYCLES(1293) && jitter > 6) nCycles += CPU_CYCLES(60);
+        if (nCyclesMeasured > CPU_CYCLES(968) && nCyclesMeasured < CPU_CYCLES(1293)) nCycles += CPU_CYCLES(60);
     } // if
 
   #ifdef VAN_RX_ISR_DEBUGGING
@@ -608,11 +611,16 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
     if (state == VAN_RX_WAITING_ACK)
     {
-        // If the "ACK" came too soon or lasted more than 1 time slot, it is not an "ACK" but the first
-        // "1" bit of the next byte
-        if (pinLevelChangedDuringInterruptHandling
+        if (
+            // If another bit came after the "ACK", it is not an "ACK" but the first "1" bit of the next byte
+            (rxDesc->ack == VAN_ACK && pinLevel == VAN_LOGICAL_LOW)
+
+            // If the "ACK" came too soon or lasted more than 1 time slot, it is not an "ACK" but the first
+            // "1" bit of the next byte
+            || pinLevelChangedDuringInterruptHandling
             || nCycles < CPU_CYCLES(650)
-            || nCycles > CPU_CYCLES(1000))
+            || nCycles > CPU_CYCLES(1000)
+           )
         {
           #ifdef ARDUINO_ARCH_ESP32
             timerEnd(timer);
@@ -620,6 +628,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             timer1_disable();
           #endif // ARDUINO_ARCH_ESP32
 
+            // Go back to state VAN_RX_LOADING
             rxDesc->state = VAN_RX_LOADING;
             DEBUG_IFS(toState, VAN_RX_LOADING);
 
@@ -733,7 +742,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
             // If the interrupt was so late that the pin level has already changed again, then flip also the very
             // last bit
-            if (jitter > CPU_CYCLES(318)) flipBits |= 0x0001;
+            if (jitter > CPU_CYCLES(280)) flipBits |= 0x0001;
         } // if
 
         if ((flipBits & 0x0001) == 0x0001) prevPinLevel = 2; // next ISR, samePinLevel must always be false.
@@ -790,8 +799,9 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         {
             if (nBits == 4)
             {
-                // Timing seems to be 2624 for the first 4-bit sequence during SOF (normally 2639)
-                if (nCyclesMeasured > CPU_CYCLES(2624)) jitter = nCyclesMeasured - CPU_CYCLES(2624);
+                // Timing seems to be around 2590 for the first 4-bit sequence ("----") during SOF
+                // (normally it is around 2639)
+                if (nCyclesMeasured > CPU_CYCLES(2600)) jitter = nCyclesMeasured - CPU_CYCLES(2600);
             }
         }
         else if (atBit == 7 || atBit == 8)
@@ -808,8 +818,9 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             }
             else if (nBits == 4)
             {
-                // Timing seems to be 2514 for the second 4-bit sequence during SOF (normally 2639)
-                if (nCyclesMeasured > CPU_CYCLES(2514)) jitter = nCyclesMeasured - CPU_CYCLES(2514);
+                // Timing seems to be around 2530 for the second 4-bit sequence ("1111") during SOF
+                // (normally it is around 2639)
+                if (nCyclesMeasured > CPU_CYCLES(2535)) jitter = nCyclesMeasured - CPU_CYCLES(2535);
             } // if
         } // if
 
