@@ -115,6 +115,33 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
 
     if (CheckCrc()) return true;
 
+    if (uncertainBit1 != NO_UNCERTAIN_BIT)
+    {
+        // Flip the bit which is at the position that is marked as "uncertain"
+
+        int uncertainAtByte = (uncertainBit1 - 1) >> 3;
+
+        int uncertainAtBit = (uncertainBit1 - 1) & 0x07;  // 0 = MSB, 7 = LSB
+        uncertainAtBit = 7 - uncertainAtBit;  // 0 = LSB, 7 = MSB
+
+        uint8_t uncertainMask = 1 << uncertainAtBit;
+        bytes[uncertainAtByte] ^= uncertainMask;  // Flip
+
+        if (CheckCrc())
+        {
+            if (wantToCount == 0 || (this->*wantToCount)())
+            {
+                VanBusRx.nRepaired++;
+                VanBusRx.nOneBitErrors++;
+                VanBusRx.nUncertainBitErrors++;
+                VanBusRx.nCorrupt++;
+            } // if
+            return true;
+        } // if
+
+        bytes[uncertainAtByte] ^= uncertainMask;  // Flip back
+    } // if
+
     // One cycle without the uncertain bit flipped, plus (optionally) one cycle with the uncertain bit flipped
     for (int i = 0; i < (uncertainBit1 == NO_UNCERTAIN_BIT ? 1 : 2); i++)
     {
@@ -198,7 +225,7 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
             } // for
         } // for
 
-        if (i == 1) bytes[uncertainAtByte] ^= uncertainMask;  // Flip back (just to be tidy)
+        if (i == 1) bytes[uncertainAtByte] ^= uncertainMask;  // Flip back
     } // for
 
     // Flip two bits. Getting to this point happens very rarely, luckily...
@@ -364,22 +391,25 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
     } // if
     if (nCycles < CPU_CYCLES(1893))
     {
-        if (nCycles > CPU_CYCLES(1344)) jitter = nCycles - CPU_CYCLES(1344);  // 1344 --> 1893 = 549
+        if (nCycles > CPU_CYCLES(1352)) jitter = nCycles - CPU_CYCLES(1352);  // 1352 --> 1893 = 541
         return 2;
     } // if
-    if (nCycles < CPU_CYCLES(2516))
+
+  #define THREE_BIT_BOUNDARY CPU_CYCLES(2520)
+    if (nCycles < THREE_BIT_BOUNDARY)
     {
-        if (nCycles > CPU_CYCLES(2002)) jitter = nCycles - CPU_CYCLES(2002);  // 2002 --> 2516 = 514
+        if (nCycles > CPU_CYCLES(1998)) jitter = nCycles - CPU_CYCLES(1998);  // 1998 --> 2520 = 522
         return 3;
     } // if
+
     if (nCycles < CPU_CYCLES(3170))
     {
-        if (nCycles > CPU_CYCLES(2632)) jitter = nCycles - CPU_CYCLES(2632);  // 2632 --> 3170 = 538
+        if (nCycles > CPU_CYCLES(2639)) jitter = nCycles - CPU_CYCLES(2639);  // 2639 --> 3170 = 531
         return 4;
     } // if
-    if (nCycles < CPU_CYCLES(3795))
+    if (nCycles < CPU_CYCLES(3800))
     {
-        if (nCycles > CPU_CYCLES(3262)) jitter = nCycles - CPU_CYCLES(3262);  // 3262 --> 3795 = 533
+        if (nCycles > CPU_CYCLES(3262)) jitter = nCycles - CPU_CYCLES(3262);  // 3262 --> 3800 = 538
         return 5;
     } // if
 
@@ -475,20 +505,22 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     // During SOF, timing is slightly different. Timing values were found by trial and error.
     if (state == VAN_RX_SEARCHING)
     {
-        if (nCycles > CPU_CYCLES(2240) && nCycles < CPU_CYCLES(2470)) nCycles += CPU_CYCLES(230);
+        if (nCycles > CPU_CYCLES(2240) && nCycles < THREE_BIT_BOUNDARY) nCycles += THREE_BIT_BOUNDARY - CPU_CYCLES(2240);
         else if (nCycles > CPU_CYCLES(600) && nCycles < CPU_CYCLES(800)) nCycles -= CPU_CYCLES(20);
-        else if (nCycles > CPU_CYCLES(1100) && nCycles < CPU_CYCLES(1290)) nCycles -= CPU_CYCLES(30);
+        else if (nCycles > CPU_CYCLES(1100) && nCycles < CPU_CYCLES(1290)) nCycles -= CPU_CYCLES(20);
     }
     else
     {
         if (nCyclesMeasured > CPU_CYCLES(968) && nCyclesMeasured < CPU_CYCLES(1293)) nCycles += CPU_CYCLES(60);
     } // if
 
-  #ifdef VAN_RX_ISR_DEBUGGING
     const uint32_t prevJitter = jitter;
-  #endif // VAN_RX_ISR_DEBUGGING
 
     unsigned int nBits = nBitsTakingIntoAccountJitter(nCycles, jitter);
+
+    // Experiment
+    if (jitter < CPU_CYCLES(10)) jitter = 0;
+    else if (jitter < prevJitter + CPU_CYCLES(10)) jitter -= CPU_CYCLES(10);
 
     rxDesc->nIsrs++;
 
@@ -801,7 +833,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             {
                 // Timing seems to be around 2590 for the first 4-bit sequence ("----") during SOF
                 // (normally it is around 2639)
-                if (nCyclesMeasured > CPU_CYCLES(2600)) jitter = nCyclesMeasured - CPU_CYCLES(2600);
+                if (nCyclesMeasured > CPU_CYCLES(2624)) jitter = nCyclesMeasured - CPU_CYCLES(2624); else jitter = 0;
             }
         }
         else if (atBit == 7 || atBit == 8)
@@ -820,7 +852,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             {
                 // Timing seems to be around 2530 for the second 4-bit sequence ("1111") during SOF
                 // (normally it is around 2639)
-                if (nCyclesMeasured > CPU_CYCLES(2535)) jitter = nCyclesMeasured - CPU_CYCLES(2535);
+                if (nCyclesMeasured > CPU_CYCLES(2514)) jitter = nCyclesMeasured - CPU_CYCLES(2514); else jitter = 0;
             } // if
         } // if
 
@@ -1084,7 +1116,7 @@ void TVanPacketRxQueue::DumpStats(Stream& s, bool longForm) const
                 ? "-.---" 
                 : FloatToStr(floatBuf, 100.0 * overallCorrupt / pktCount, 3));
 
-        s.printf_P(PSTR(", maxQueued: %u/%u\n"), GetMaxQueued(), QueueSize());
+        s.printf_P(PSTR(", maxQueued: %d/%d\n"), GetMaxQueued(), QueueSize());
     }
     else
     {

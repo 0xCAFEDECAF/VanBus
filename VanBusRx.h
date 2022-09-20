@@ -351,6 +351,7 @@ class TVanPacketRxQueue
         , nTwoConsecutiveBitErrors(0)
         , nTwoSeparateBitErrors(0)
         , nUncertainBitErrors(0)
+        , nQueued(0)
         , maxQueued(0)
     { }
 
@@ -365,10 +366,12 @@ class TVanPacketRxQueue
     void Enable();
 
     bool IsSetup() const { return pin != VAN_NO_PIN_ASSIGNED; }
-    uint32_t GetCount() const { ISR_SAFE_GET(uint32_t, count); }
+    uint32_t GetCount() const { return count; }  // TODO - use ISR_SAFE_GET ?
+
     void DumpStats(Stream& s, bool longForm = true) const;
     int QueueSize() const { return size; }
-    uint16_t GetMaxQueued() const { return maxQueued; }
+    int GetNQueued() const { return nQueued; }  // TODO - use ISR_SAFE_GET ?
+    int GetMaxQueued() const { return maxQueued; }  // TODO - use ISR_SAFE_GET ?
 
   private:
 
@@ -397,7 +400,8 @@ class TVanPacketRxQueue
     uint32_t nTwoConsecutiveBitErrors;
     uint32_t nTwoSeparateBitErrors;
     uint32_t nUncertainBitErrors;
-    uint16_t maxQueued;
+    int nQueued;
+    int maxQueued;
 
     void RegisterTxTimerTicks(uint32_t ticks) { txTimerTicks = ticks; };
     void RegisterTxIsr(timercallback isr) { ISR_SAFE_SET(txTimerIsr, isr); };
@@ -433,10 +437,11 @@ class TVanPacketRxQueue
         if (++_head == end) _head = pool;  // roll over if needed
 
         // Keep track of queue fill level
-        int nQueued = _head - tail;
-        if (nQueued == 0 && _head->state == VAN_RX_DONE) nQueued = QueueSize();
-        else if (nQueued < 0) nQueued += QueueSize();
-        if (nQueued > maxQueued) maxQueued = nQueued;
+        int _nQueued = _head - tail;
+        if (_nQueued < 0) _nQueued += QueueSize();
+        else if (_nQueued == 0 && _head->state == VAN_RX_DONE) _nQueued = QueueSize();
+        if (_nQueued > maxQueued) maxQueued = _nQueued;
+        nQueued = _nQueued;
 
       #ifdef VAN_RX_ISR_DEBUGGING
         isrDebugPacket->Init();
