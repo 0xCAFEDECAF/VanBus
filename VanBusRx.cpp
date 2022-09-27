@@ -379,19 +379,22 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
 
     // All timing values were found by trial and error
     jitter = 0;
+
     if (nCycles < CPU_CYCLES(484))
     {
         if (nCycles > CPU_CYCLES(106)) jitter = nCycles - CPU_CYCLES(106);
         return 0;
     }
+
     if (nCycles < CPU_CYCLES(1292))
     {
         if (nCycles > CPU_CYCLES(718)) jitter = nCycles - CPU_CYCLES(718);  // 718 --> 1292 = 574
         return 1;
     } // if
+
     if (nCycles < CPU_CYCLES(1893))
     {
-        if (nCycles > CPU_CYCLES(1352)) jitter = nCycles - CPU_CYCLES(1352);  // 1352 --> 1893 = 541
+        if (nCycles > CPU_CYCLES(1349)) jitter = nCycles - CPU_CYCLES(1349);  // 1349 --> 1893 = 544
         return 2;
     } // if
 
@@ -407,6 +410,7 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
         if (nCycles > CPU_CYCLES(2639)) jitter = nCycles - CPU_CYCLES(2639);  // 2639 --> 3170 = 531
         return 4;
     } // if
+
     if (nCycles < CPU_CYCLES(3800))
     {
         if (nCycles > CPU_CYCLES(3262)) jitter = nCycles - CPU_CYCLES(3262);  // 3262 --> 3800 = 538
@@ -414,6 +418,12 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
     } // if
 
     // We hardly ever get here
+    if (nCycles < CPU_CYCLES(4468))
+    {
+        if (nCycles > CPU_CYCLES(3930)) jitter = nCycles - CPU_CYCLES(3930);  // 3930 --> 4468 = 538
+        return 6;
+    } // if
+
     const unsigned int _nBits = nBits(nCycles);
     if (nCycles > _nBits * VAN_NORMAL_BIT_TIME_CPU_CYCLES) jitter = nCycles - _nBits * VAN_NORMAL_BIT_TIME_CPU_CYCLES;
 
@@ -505,13 +515,14 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     // During SOF, timing is slightly different. Timing values were found by trial and error.
     if (state == VAN_RX_SEARCHING)
     {
-        if (nCycles > CPU_CYCLES(2240) && nCycles < THREE_BIT_BOUNDARY) nCycles += THREE_BIT_BOUNDARY - CPU_CYCLES(2240);
+        if (nCycles > CPU_CYCLES(2240) && nCycles < THREE_BIT_BOUNDARY) nCycles = THREE_BIT_BOUNDARY;
         else if (nCycles > CPU_CYCLES(600) && nCycles < CPU_CYCLES(800)) nCycles -= CPU_CYCLES(20);
         else if (nCycles > CPU_CYCLES(1100) && nCycles < CPU_CYCLES(1290)) nCycles -= CPU_CYCLES(20);
     }
     else
     {
-        if (nCyclesMeasured > CPU_CYCLES(968) && nCyclesMeasured < CPU_CYCLES(1293)) nCycles += CPU_CYCLES(60);
+        if (nCyclesMeasured > CPU_CYCLES(968) && nCyclesMeasured < CPU_CYCLES(1293)) nCycles += CPU_CYCLES(35);
+        else if (nCyclesMeasured > CPU_CYCLES(910) && nCyclesMeasured < CPU_CYCLES(969)) nCycles += CPU_CYCLES(10);
     } // if
 
     const uint32_t prevJitter = jitter;
@@ -520,7 +531,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
     // Experiment
     if (jitter < CPU_CYCLES(10)) jitter = 0;
-    else if (jitter < prevJitter + CPU_CYCLES(10)) jitter -= CPU_CYCLES(10);
+    else if (jitter > prevJitter - CPU_CYCLES(20) && jitter < prevJitter + CPU_CYCLES(20)) jitter -= CPU_CYCLES(10);
 
     rxDesc->nIsrs++;
 
@@ -833,7 +844,8 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             {
                 // Timing seems to be around 2590 for the first 4-bit sequence ("----") during SOF
                 // (normally it is around 2639)
-                if (nCyclesMeasured > CPU_CYCLES(2624)) jitter = nCyclesMeasured - CPU_CYCLES(2624); else jitter = 0;
+                //if (nCyclesMeasured > CPU_CYCLES(2624)) jitter = nCyclesMeasured - CPU_CYCLES(2624); else jitter = 0;
+                if (nCycles > CPU_CYCLES(2624)) jitter = nCycles - CPU_CYCLES(2624); else jitter = 0;
             }
         }
         else if (atBit == 7 || atBit == 8)
@@ -852,7 +864,8 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             {
                 // Timing seems to be around 2530 for the second 4-bit sequence ("1111") during SOF
                 // (normally it is around 2639)
-                if (nCyclesMeasured > CPU_CYCLES(2514)) jitter = nCyclesMeasured - CPU_CYCLES(2514); else jitter = 0;
+                //if (nCyclesMeasured > CPU_CYCLES(2514)) jitter = nCyclesMeasured - CPU_CYCLES(2514); else jitter = 0;
+                if (nCycles > CPU_CYCLES(2514)) jitter = nCycles - CPU_CYCLES(2514); else jitter = 0;
             } // if
         } // if
 
