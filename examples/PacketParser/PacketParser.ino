@@ -2590,6 +2590,9 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // last received packet with data[1] == 0x05 ("Follow current road until next instruction").
             //
             // - If data[1] == 0x01 and data[2] == 0x02: fork or exit instruction; dataLen = 6
+            //   * data[3]:
+            //     0x20: ??
+            //     0x53: ??
             //   * data[4]:
             //     0x41: keep left on fork
             //     0x14: keep right on fork
