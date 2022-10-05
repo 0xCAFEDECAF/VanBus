@@ -515,7 +515,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     // During SOF, timing is slightly different. Timing values were found by trial and error.
     if (state == VAN_RX_SEARCHING)
     {
-        if (nCycles > CPU_CYCLES(2240) && nCycles < THREE_BIT_BOUNDARY) nCycles = THREE_BIT_BOUNDARY;
+        if (nCycles > CPU_CYCLES(2260) && nCycles < THREE_BIT_BOUNDARY) nCycles = THREE_BIT_BOUNDARY;
         else if (nCycles > CPU_CYCLES(600) && nCycles < CPU_CYCLES(800)) nCycles -= CPU_CYCLES(20);
         else if (nCycles > CPU_CYCLES(1100) && nCycles < CPU_CYCLES(1290)) nCycles -= CPU_CYCLES(20);
     }
@@ -533,8 +533,6 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     if (jitter < CPU_CYCLES(10)) jitter = 0;
     else if (jitter > prevJitter - CPU_CYCLES(20) && jitter < prevJitter + CPU_CYCLES(20)) jitter -= CPU_CYCLES(10);
 
-    rxDesc->nIsrs++;
-
   #ifdef VAN_RX_ISR_DEBUGGING
 
     // Record some data to be used for debugging outside this ISR
@@ -551,7 +549,6 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     // Only write into sample buffer if there is space
     if (debugIsr != NULL)
     {
-        debugIsr->nIsrs = _min(rxDesc->nIsrs, UCHAR_MAX);
         debugIsr->nCycles = _min(nCyclesMeasured / CPU_F_FACTOR, USHRT_MAX);
         debugIsr->fromJitter = _min(prevJitter / CPU_F_FACTOR, (1 << 10) - 1);
         debugIsr->nBits = _min(nBits, UCHAR_MAX);
@@ -926,6 +923,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
                 // Accept also (found through trial and error):
                 && currentByte != 0x01D // 00 0001 1101
                 && currentByte != 0x039 // 00 0011 1001
+                && currentByte != 0x019 // 00 0001 1001
                 && currentByte != 0x03B // 00 0011 1011
                 && currentByte != 0x03C // 00 0011 1100
                 && currentByte != 0x01E // 00 0001 1110
@@ -1256,12 +1254,12 @@ void TIsrDebugPacket::Dump(Stream& s) const
         if (i == 0)
         {
             // Print headings
-            s.print(F("  # ISR nCycles+jitt = nTotal -> nBits atBit (nLate) pinLVLs        fromState     toState data  flip byte\n"));
+            s.print(F("  # nCycles+jitt = nTotal -> nBits atBit (nLate) pinLVLs        fromState     toState data  flip byte\n"));
         } // if
 
         if (i <= 1) reset();
 
-        s.printf("%3u%4u", i, isrData->nIsrs);
+        s.printf("%3u", i);
 
         const uint32_t nCycles = isrData->nCycles;
         if (nCycles >= USHRT_MAX) s.printf("  >%5lu", USHRT_MAX); else s.printf(" %7lu", nCycles);

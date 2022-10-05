@@ -33,14 +33,19 @@
 //#define VAN_RX_IFS_DEBUGGING
 
 // VAN_BIT_DOMINANT, VAN_BIT_RECESSIVE: pick the logic
+#ifndef VAN_BIT_INVERTED_WIRING
+#define VAN_BIT_INVERTED_WIRING 1
+#endif
 
-// MCP2551 CAN_H pin connected to VAN_DATA, CAN_L connected to VAN_DATA_BAR
-//#define VAN_BIT_DOMINANT HIGH
-//#define VAN_BIT_RECESSIVE LOW
-
-// MCP2551 CAN_H pin connected to VAN_DATA_BAR, CAN_L connected to VAN_DATA
-#define VAN_BIT_DOMINANT LOW
-#define VAN_BIT_RECESSIVE HIGH
+#if VAN_BIT_INVERTED_WIRING == 1
+  // MCP2551 CAN_H pin connected to VAN_DATA_BAR, CAN_L connected to VAN_DATA
+  #define VAN_BIT_DOMINANT LOW
+  #define VAN_BIT_RECESSIVE HIGH
+#else
+  // MCP2551 CAN_H pin connected to VAN_DATA, CAN_L connected to VAN_DATA_BAR
+  #define VAN_BIT_DOMINANT HIGH
+  #define VAN_BIT_RECESSIVE LOW
+#endif
 
 // The CAN bus has two states: dominant and recessive.
 // - For the MCP2551 device: "The dominant and recessive states correspond to the low and high state of the TXD input,
@@ -58,6 +63,8 @@
 
 #define VAN_NO_PIN_ASSIGNED (0xFF)
 
+// Forward declarations
+
 void WaitAckIsr();
 void RxPinChangeIsr();
 
@@ -66,13 +73,14 @@ char* FloatToStr(char* buffer, float f, int prec = 1);
 
 uint16_t _crc(const uint8_t bytes[], int size);
 
+class Stream;
+
 #ifdef VAN_RX_ISR_DEBUGGING
 
 // ISR invocation data, for debugging purposes
 
 struct TIsrDebugData
 {
-    uint16_t nIsrs:8;
     uint32_t nCycles:16;
     uint32_t fromJitter:10;
     uint32_t toJitter:10;
@@ -152,8 +160,6 @@ enum PacketReadState_t { VAN_RX_VACANT = 2, VAN_RX_SEARCHING, VAN_RX_LOADING, VA
 enum PacketReadResult_t { VAN_RX_PACKET_OK, VAN_RX_ERROR_NBITS, VAN_RX_ERROR_MANCHESTER, VAN_RX_ERROR_MAX_PACKET };
 enum PacketAck_t { VAN_ACK, VAN_NO_ACK };
 
-class Stream;
-
 // VAN packet Rx descriptor
 class TVanPacketRxDesc
 {
@@ -167,7 +173,7 @@ class TVanPacketRxDesc
     // - CRC + EOD = 18 + 2 TS = 2 bytes
     // - ACK  = 2 TS
     // - EOF  = 8 TS
-    // Total 1 + 1.5 + 0.5 + 28 + 2 = 33 bytes excl. ACK and EOF
+    // Total 1 + 1.5 + 0.5 + 28 + 2 = 33 bytes excluding ACK and EOF
 
     #define VAN_MAX_DATA_BYTES 28
     #define VAN_MAX_PACKET_SIZE 33
@@ -248,7 +254,6 @@ class TVanPacketRxDesc
 
     uint8_t bytes[VAN_MAX_PACKET_SIZE];
     int size;
-    uint16_t nIsrs;
     PacketReadState_t state;
     PacketReadResult_t result;
     PacketAck_t ack;
@@ -270,7 +275,6 @@ class TVanPacketRxDesc
     void Init()
     {
         size = 0;
-        nIsrs = 0;
         state = VAN_RX_VACANT;
         result = VAN_RX_PACKET_OK;
         ack = VAN_NO_ACK;
