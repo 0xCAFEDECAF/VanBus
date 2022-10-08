@@ -229,12 +229,13 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
     } // for
 
     // Flip two bits. Getting to this point happens very rarely, luckily...
+
+    bool prevBit1 = false;
+
     for (int atByte1 = 1; atByte1 < size; atByte1++)
     {
         // This may take really long...
         wdt_reset();
-
-        bool prevBit1 = false;
 
         for (int atBit1 = 7; atBit1 >= 0; atBit1--)
         {
@@ -262,10 +263,11 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
             bytes[atByte1] ^= currMask1;  // Flip
 
             // Flip second bit
+
+            bool prevBit2 = false;
+
             for (int atByte2 = atByte1; atByte2 < size; atByte2++)
             {
-                bool prevBit2 = false;
-
                 for (int atBit2 = 7; atBit2 >= 0; atBit2--)
                 {
                     // Only flip the last bit in a sequence of equal bits; take into account the Manchester bits
@@ -388,7 +390,7 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
 
     if (nCycles < CPU_CYCLES(1292))
     {
-        if (nCycles > CPU_CYCLES(718)) jitter = nCycles - CPU_CYCLES(718);  // 718 --> 1292 = 574
+        if (nCycles > CPU_CYCLES(712)) jitter = nCycles - CPU_CYCLES(712);  // 712 --> 1292 = 580
         return 1;
     } // if
 
@@ -398,22 +400,22 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
         return 2;
     } // if
 
-  #define THREE_BIT_BOUNDARY CPU_CYCLES(2520)
+  #define THREE_BIT_BOUNDARY CPU_CYCLES(2523)
     if (nCycles < THREE_BIT_BOUNDARY)
     {
-        if (nCycles > CPU_CYCLES(1998)) jitter = nCycles - CPU_CYCLES(1998);  // 1998 --> 2520 = 522
+        if (nCycles > CPU_CYCLES(1998)) jitter = nCycles - CPU_CYCLES(1998);  // 1998 --> 2523 = 525
         return 3;
     } // if
 
-    if (nCycles < CPU_CYCLES(3170))
+    if (nCycles < CPU_CYCLES(3176))
     {
-        if (nCycles > CPU_CYCLES(2639)) jitter = nCycles - CPU_CYCLES(2639);  // 2639 --> 3170 = 531
+        if (nCycles > CPU_CYCLES(2639)) jitter = nCycles - CPU_CYCLES(2639);  // 2639 --> 3176 = 537
         return 4;
     } // if
 
-    if (nCycles < CPU_CYCLES(3800))
+    if (nCycles < CPU_CYCLES(3804))
     {
-        if (nCycles > CPU_CYCLES(3262)) jitter = nCycles - CPU_CYCLES(3262);  // 3262 --> 3800 = 538
+        if (nCycles > CPU_CYCLES(3262)) jitter = nCycles - CPU_CYCLES(3262);  // 3262 --> 3804 = 542
         return 5;
     } // if
 
@@ -521,7 +523,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     }
     else
     {
-        if (nCyclesMeasured > CPU_CYCLES(968) && nCyclesMeasured < CPU_CYCLES(1293)) nCycles += CPU_CYCLES(35);
+        if (nCyclesMeasured > CPU_CYCLES(968) && nCyclesMeasured < CPU_CYCLES(1292)) nCycles += CPU_CYCLES(36);
         else if (nCyclesMeasured > CPU_CYCLES(910) && nCyclesMeasured < CPU_CYCLES(969)) nCycles += CPU_CYCLES(10);
     } // if
 
