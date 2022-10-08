@@ -210,7 +210,7 @@ void TVanPacketTxDesc::Dump() const
     if (nCollisions > 0) Serial.printf(", nCollisions=%lu, firstCollisionAtBit=%lu", nCollisions, firstCollisionAtBit);
 
     Serial.printf("%s%s\n", bitOk ? "" : ", NO bitOk", bitError ? ", bitError" : "");
-} // TVanPacketTxDesc::DumpStats
+} // TVanPacketTxDesc::Dump
 
 void TVanPacketTxQueue::StartBitSendTimer()
 {

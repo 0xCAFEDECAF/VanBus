@@ -42,10 +42,10 @@ class TVanBus
     // Interfaces for both Tx and Rx
     static void Setup(uint8_t rxPin, uint8_t txPin) { VanBusTx.Setup(rxPin, txPin); }
 
-    static void DumpStats(Stream& s)
+    static void DumpStats(Stream& s, bool longForm = true)
     {
         VanBusTx.DumpStats(s);
-        VanBusRx.DumpStats(s);
+        VanBusRx.DumpStats(s, longForm);
     } // DumpStats
 
     // -----
