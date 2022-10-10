@@ -404,8 +404,8 @@ class TVanPacketRxQueue
     uint32_t nTwoConsecutiveBitErrors;
     uint32_t nTwoSeparateBitErrors;
     uint32_t nUncertainBitErrors;
-    int nQueued;
-    int maxQueued;
+    volatile int nQueued;
+    volatile int maxQueued;
 
     void RegisterTxTimerTicks(uint32_t ticks) { txTimerTicks = ticks; };
     void RegisterTxIsr(timercallback isr) { ISR_SAFE_SET(txTimerIsr, isr); };

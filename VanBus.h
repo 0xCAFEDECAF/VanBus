@@ -58,6 +58,9 @@ class TVanBus
     } // Receive
 
     static uint32_t GetRxCount() { return VanBusRx.GetCount(); }
+    static int QueueSize() { return VanBusRx.QueueSize(); }
+    static int GetNQueued() { return VanBusRx.GetNQueued(); }
+    static int GetMaxQueued() { return VanBusRx.GetMaxQueued(); }
 
     // -----
     // Tx interfaces
