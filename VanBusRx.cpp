@@ -311,6 +311,43 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
         } // for
     } // for
 
+    // Flip three equal bits in a row (seen this only once, ever)
+
+    for (int atByte = 1; atByte < size; atByte++)
+    {
+        const int atBits[] = {7, 6, 3, 2};  // No use to flip around the Manchester bits
+
+        for (int i = 0; i < 4; i++)
+        {
+            int atBit = atBits[i];
+
+            // Guess the compiler will be really good at optimizing this
+            uint8_t mask = 1 << atBit--;
+            mask |= 1 << atBit--;
+            mask |= 1 << atBit;
+
+            uint8_t bits = (bytes[atByte] & mask) >> atBit;
+
+            // Only proceed if we see three consecutive same bit values
+            if (bits != 0x00 && bits != 0x07) break;
+            
+            bytes[atByte] ^= mask;  // Flip
+
+            if (CheckCrc())
+            {
+                if (wantToCount == 0 || (this->*wantToCount)())
+                {
+                    VanBusRx.nRepaired++;
+                    VanBusRx.nThreeConsecutiveSameBitErrors++;
+                    VanBusRx.nCorrupt++;
+                } // if
+                return true;
+            } // if
+
+            bytes[atByte] ^= mask;  // Flip back
+        } // for
+    } // for
+
     if (wantToCount == 0 || (this->*wantToCount)()) VanBusRx.nCorrupt++;
 
     return false;
@@ -409,17 +446,17 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
 
     if (nCycles < CPU_CYCLES(3176))
     {
-        if (nCycles > CPU_CYCLES(2639)) jitter = nCycles - CPU_CYCLES(2639);  // 2639 --> 3176 = 537
+        if (nCycles > CPU_CYCLES(2636)) jitter = nCycles - CPU_CYCLES(2636);  // 2636 --> 3176 = 540
         return 4;
     } // if
 
-    if (nCycles < CPU_CYCLES(3804))
+    if (nCycles < CPU_CYCLES(3819))
     {
-        if (nCycles > CPU_CYCLES(3262)) jitter = nCycles - CPU_CYCLES(3262);  // 3262 --> 3804 = 542
+        if (nCycles > CPU_CYCLES(3262)) jitter = nCycles - CPU_CYCLES(3262);  // 3262 --> 3819 = 557
         return 5;
     } // if
 
-    // We hardly ever get here
+    // We hardly ever get to this point
     if (nCycles < CPU_CYCLES(4468))
     {
         if (nCycles > CPU_CYCLES(3930)) jitter = nCycles - CPU_CYCLES(3930);  // 3930 --> 4468 = 538
@@ -532,8 +569,8 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     unsigned int nBits = nBitsTakingIntoAccountJitter(nCycles, jitter);
 
     // Experiment
-    if (jitter < CPU_CYCLES(10)) jitter = 0;
-    else if (jitter > prevJitter - CPU_CYCLES(20) && jitter < prevJitter + CPU_CYCLES(20)) jitter -= CPU_CYCLES(10);
+    if (jitter < CPU_CYCLES(22)) jitter = 0;
+    else if (jitter > prevJitter - CPU_CYCLES(30) && jitter < prevJitter + CPU_CYCLES(10)) jitter -= CPU_CYCLES(20);
 
   #ifdef VAN_RX_ISR_DEBUGGING
 
@@ -923,6 +960,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             if (currentByte != 0x03D
 
                 // Accept also (found through trial and error):
+                && currentByte != 0x009 // 00 0000 1001
                 && currentByte != 0x01D // 00 0001 1101
                 && currentByte != 0x039 // 00 0011 1001
                 && currentByte != 0x019 // 00 0001 1001
@@ -1116,9 +1154,10 @@ void TVanPacketRxQueue::DumpStats(Stream& s, bool longForm) const
                 ? "---" 
                 : FloatToStr(floatBuf, 100.0 * nRepaired / nCorrupt, 0));
 
-        s.printf_P(PSTR(" [SB: %lu, DCB: %lu, DSB: %lu], UCB: %lu"),
+        s.printf_P(PSTR(" [SB:%lu, DCB:%lu, TCB:%lu, DSB:%lu], UCB:%lu"),
             nOneBitErrors,
             nTwoConsecutiveBitErrors,
+            nThreeConsecutiveSameBitErrors,
             nTwoSeparateBitErrors,
             nUncertainBitErrors);
 
