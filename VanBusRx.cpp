@@ -3,7 +3,7 @@
  *
  * Written by Erik Tromp
  *
- * Version 0.3.0 - September, 2022
+ * Version 0.3.1 - October, 2022
  *
  * MIT license, all text above must be included in any redistribution.
  */
@@ -880,7 +880,6 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             {
                 // Timing seems to be around 2590 for the first 4-bit sequence ("----") during SOF
                 // (normally it is around 2639)
-                //if (nCyclesMeasured > CPU_CYCLES(2624)) jitter = nCyclesMeasured - CPU_CYCLES(2624); else jitter = 0;
                 if (nCycles > CPU_CYCLES(2624)) jitter = nCycles - CPU_CYCLES(2624); else jitter = 0;
             }
         }
@@ -900,7 +899,6 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             {
                 // Timing seems to be around 2530 for the second 4-bit sequence ("1111") during SOF
                 // (normally it is around 2639)
-                //if (nCyclesMeasured > CPU_CYCLES(2514)) jitter = nCyclesMeasured - CPU_CYCLES(2514); else jitter = 0;
                 if (nCycles > CPU_CYCLES(2514)) jitter = nCycles - CPU_CYCLES(2514); else jitter = 0;
             } // if
         } // if

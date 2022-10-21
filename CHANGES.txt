@@ -1,3 +1,25 @@
+0.3.1
+    General:
+    * Updated README.md
+
+    VanBus.h:
+    * TVanBus::DumpStats(...): pass also optional parameter "longForm"
+    * class TVanBus: add member functions 'QueueSize()', 'GetNQueued()' and 'GetMaxQueued()'
+
+    VanBusRx.cpp:
+    * TVanPacketRxDesc::CheckCrcAndRepair(...): try to fix packet by flipping three equal bits in a row
+    * TVanPacketRxDesc::CheckCrcAndRepair(...): multiple fixes in the "Flip two bits" part
+    * TVanPacketRxDesc::CheckCrcAndRepair(...): check first with only the "uncertain bit" flipped
+    * Better handling of unexpected new bit coming after an "ACK" (in which case it is not an "ACK" but the
+      first "1" bit of the next byte)
+    * Add extra pattern for SOF detection 
+    * Small updates in the bit timing criteria
+
+    VanBusRx.h:
+    * Added new method TVanPacketRxQueue::GetNQueued(), returning current number of packets waiting in Rx queue
+    * class TVanPacketRxQueue: 'nQueued' and 'maxQueued' must be declared volatile
+    * Remove unnecessary debugging data/code(isrData->nIsrs)
+
 0.3.0
     General:
     * Added new header file 'VanBusVersion.h'
