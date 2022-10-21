@@ -12,7 +12,7 @@
     * TVanPacketRxDesc::CheckCrcAndRepair(...): check first with only the "uncertain bit" flipped
     * Better handling of unexpected new bit coming after an "ACK" (in which case it is not an "ACK" but the
       first "1" bit of the next byte)
-    * Add extra pattern for SOF detection 
+    * Add extra patterns for SOF detection 
     * Small updates in the bit timing criteria
 
     VanBusRx.h:
