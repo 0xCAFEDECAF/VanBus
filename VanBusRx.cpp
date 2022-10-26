@@ -444,9 +444,9 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
         return 3;
     } // if
 
-    if (nCycles < CPU_CYCLES(3176))
+    if (nCycles < CPU_CYCLES(3178))
     {
-        if (nCycles > CPU_CYCLES(2636)) jitter = nCycles - CPU_CYCLES(2636);  // 2636 --> 3176 = 540
+        if (nCycles > CPU_CYCLES(2636)) jitter = nCycles - CPU_CYCLES(2636);  // 2636 --> 3178 = 542
         return 4;
     } // if
 

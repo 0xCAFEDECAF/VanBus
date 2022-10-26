@@ -440,14 +440,10 @@ class TVanPacketRxQueue
         } // if
       #endif // VAN_RX_ISR_DEBUGGING
 
-        if (++_head == end) _head = pool;  // roll over if needed
+        if (++_head == end) _head = pool;  // Roll over if needed
 
         // Keep track of queue fill level
-        int _nQueued = _head - tail;
-        if (_nQueued < 0) _nQueued += QueueSize();
-        else if (_nQueued == 0 && _head->state == VAN_RX_DONE) _nQueued = QueueSize();
-        if (_nQueued > maxQueued) maxQueued = _nQueued;
-        nQueued = _nQueued;
+        if (++nQueued > maxQueued) maxQueued = nQueued;
 
       #ifdef VAN_RX_ISR_DEBUGGING
         isrDebugPacket->Init();
@@ -461,7 +457,8 @@ class TVanPacketRxQueue
 
     void AdvanceTail()
     {
-        if (++tail == end) tail = pool;  // roll over if needed
+        if (++tail == end) tail = pool;  // Roll over if needed
+        ISR_SAFE_SET(nQueued, nQueued - 1);
     } // AdvanceTail
 
     friend void FinishPacketTransmission(TVanPacketTxDesc* txDesc);
