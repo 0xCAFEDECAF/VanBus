@@ -341,6 +341,7 @@ class TVanPacketRxQueue
     // Constructor
     TVanPacketRxQueue()
         : pin(VAN_NO_PIN_ASSIGNED)
+        , enabled(false)
         , _overrun(false)
         , txTimerTicks(0)
         , txTimerIsr(NULL)
@@ -369,6 +370,7 @@ class TVanPacketRxQueue
     // VAN bus receiver like this, the CRC error rate seems to increase...
     void Disable();
     void Enable();
+    bool IsEnabled() { return enabled; }
 
     bool IsSetup() const { return pin != VAN_NO_PIN_ASSIGNED; }
     uint32_t GetCount() const { return count; }  // TODO - use ISR_SAFE_GET ?
@@ -381,6 +383,7 @@ class TVanPacketRxQueue
   private:
 
     uint8_t pin;
+    bool enabled;
     int size;
     TVanPacketRxDesc* pool;
     TVanPacketRxDesc* volatile _head;

@@ -419,21 +419,22 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
     // All timing values were found by trial and error
     jitter = 0;
 
-    if (nCycles < CPU_CYCLES(484))
+    if (nCycles < CPU_CYCLES(508))
     {
         if (nCycles > CPU_CYCLES(106)) jitter = nCycles - CPU_CYCLES(106);
         return 0;
-    }
+    } // if
 
-    if (nCycles < CPU_CYCLES(1292))
+  #define ONE_BIT_BOUNDARY CPU_CYCLES(1292)
+    if (nCycles < ONE_BIT_BOUNDARY)
     {
         if (nCycles > CPU_CYCLES(712)) jitter = nCycles - CPU_CYCLES(712);  // 712 --> 1292 = 580
         return 1;
     } // if
 
-    if (nCycles < CPU_CYCLES(1893))
+    if (nCycles < CPU_CYCLES(1890))
     {
-        if (nCycles > CPU_CYCLES(1349)) jitter = nCycles - CPU_CYCLES(1349);  // 1349 --> 1893 = 544
+        if (nCycles > CPU_CYCLES(1349)) jitter = nCycles - CPU_CYCLES(1349);  // 1349 --> 1890 = 541
         return 2;
     } // if
 
@@ -444,9 +445,9 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
         return 3;
     } // if
 
-    if (nCycles < CPU_CYCLES(3178))
+    if (nCycles < CPU_CYCLES(3173))
     {
-        if (nCycles > CPU_CYCLES(2636)) jitter = nCycles - CPU_CYCLES(2636);  // 2636 --> 3178 = 542
+        if (nCycles > CPU_CYCLES(2636)) jitter = nCycles - CPU_CYCLES(2636);  // 2636 --> 3173 = 537
         return 4;
     } // if
 
@@ -543,6 +544,24 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     const uint32_t nCyclesMeasured = curr - prev;  // Arithmetic has safe roll-over
     prev = curr;
 
+    const bool samePinLevel = (pinLevel == prevPinLevel);
+    prevPinLevel = pinLevel;
+
+    // Prevent CPU monopolization by noise on bus
+    static int noiseCounter = 0;
+    if (nCyclesMeasured < 484 || samePinLevel)
+    {
+        if (++noiseCounter > 6)
+        {
+            VanBusRx.Disable();
+            return;
+        } // if
+    }
+    else
+    {
+        noiseCounter = 0;
+    } // if
+
     // Retrieve context
     TVanPacketRxDesc* rxDesc = VanBusRx._head;
     const PacketReadState_t state = rxDesc->state;
@@ -555,13 +574,14 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     if (state == VAN_RX_SEARCHING)
     {
         if (nCycles > CPU_CYCLES(2260) && nCycles < THREE_BIT_BOUNDARY) nCycles = THREE_BIT_BOUNDARY;
-        else if (nCycles > CPU_CYCLES(600) && nCycles < CPU_CYCLES(800)) nCycles -= CPU_CYCLES(20);
-        else if (nCycles > CPU_CYCLES(1100) && nCycles < CPU_CYCLES(1290)) nCycles -= CPU_CYCLES(20);
+        //else if (nCycles > CPU_CYCLES(600) && nCycles < CPU_CYCLES(800)) nCycles -= CPU_CYCLES(20);
+        else if (nCycles > CPU_CYCLES(1100) && nCycles < ONE_BIT_BOUNDARY) nCycles -= CPU_CYCLES(20);
     }
     else
     {
-        if (nCyclesMeasured > CPU_CYCLES(968) && nCyclesMeasured < CPU_CYCLES(1292)) nCycles += CPU_CYCLES(36);
-        else if (nCyclesMeasured > CPU_CYCLES(910) && nCyclesMeasured < CPU_CYCLES(969)) nCycles += CPU_CYCLES(10);
+      #define GO_TO_TWO_BITS CPU_CYCLES(1249)
+        if (nCyclesMeasured > CPU_CYCLES(1070) && nCyclesMeasured < ONE_BIT_BOUNDARY) nCycles += ONE_BIT_BOUNDARY - GO_TO_TWO_BITS;
+        else if (nCyclesMeasured > CPU_CYCLES(1000) && nCyclesMeasured < CPU_CYCLES(1071)) nCycles += CPU_CYCLES(20);
     } // if
 
     const uint32_t prevJitter = jitter;
@@ -569,8 +589,12 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     unsigned int nBits = nBitsTakingIntoAccountJitter(nCycles, jitter);
 
     // Experiment
-    if (jitter < CPU_CYCLES(22)) jitter = 0;
-    else if (jitter > prevJitter - CPU_CYCLES(30) && jitter < prevJitter + CPU_CYCLES(10)) jitter -= CPU_CYCLES(20);
+  #define SMALLEST_JITTER CPU_CYCLES(20)
+  #define LARGE_JITTER_RUNDOWN CPU_CYCLES(30)
+  #define SMALL_JITTER_RUNDOWN SMALLEST_JITTER
+    if (jitter < SMALLEST_JITTER) jitter = 0;
+    else if (jitter > 400 && jitter > prevJitter - CPU_CYCLES(30) && jitter < prevJitter + CPU_CYCLES(10)) jitter -= LARGE_JITTER_RUNDOWN;
+    else if (jitter > prevJitter - CPU_CYCLES(15) && jitter < prevJitter + CPU_CYCLES(10)) jitter -= SMALL_JITTER_RUNDOWN;
 
   #ifdef VAN_RX_ISR_DEBUGGING
 
@@ -636,9 +660,6 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     #define DEBUG_ISR_M(TO_, FROM_, MAX_)
 
   #endif // VAN_RX_ISR_DEBUGGING
-
-    const bool samePinLevel = (pinLevel == prevPinLevel);
-    prevPinLevel = pinLevel;
 
     uint16_t flipBits = 0;
 
@@ -740,7 +761,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         }
         else if (pinLevel == VAN_LOGICAL_HIGH)
         {
-            if (nBits >= 2)
+            if (nBits >= 2 && nBits <= 8)
             {
                 // Late detection
 
@@ -1009,7 +1030,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
             timerEnd(timer);
             timerAttachInterrupt(timer, WaitAckIsr, true);
-            timerAlarmWrite(timer, 24 * 5, false); // 3 time slots = 3 * 8 us = 24 us
+            timerAlarmWrite(timer, 40 * 5, false); // 5 time slots = 5 * 8 us = 40 us
             timerAlarmEnable(timer);
 
           #else // ! ARDUINO_ARCH_ESP32
@@ -1057,6 +1078,7 @@ bool TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
     for (TVanPacketRxDesc* rxDesc = pool; rxDesc < end; rxDesc++) rxDesc->slot = rxDesc - pool;
 
     attachInterrupt(digitalPinToInterrupt(rxPin), RxPinChangeIsr, CHANGE);
+    enabled = true;
 
   #ifdef ARDUINO_ARCH_ESP32
     // Clock to timer (prescaler) is always 80MHz, even F_CPU is 160 MHz. We want 0.2 microsecond resolution.
@@ -1099,7 +1121,9 @@ bool TVanPacketRxQueue::Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun)
 void TVanPacketRxQueue::Disable()
 {
     if (pin == VAN_NO_PIN_ASSIGNED) return; // Call Setup first!
+    timer1_disable();
     detachInterrupt(digitalPinToInterrupt(VanBusRx.pin));
+    enabled = false;
 } // TVanPacketRxQueue::Disable
 
 // Enable VAN packet receiver
@@ -1107,6 +1131,7 @@ void TVanPacketRxQueue::Enable()
 {
     if (pin == VAN_NO_PIN_ASSIGNED) return; // Call Setup first!
     attachInterrupt(digitalPinToInterrupt(VanBusRx.pin), RxPinChangeIsr, CHANGE);
+    enabled = true;
 } // TVanPacketRxQueue::Enable
 
 // Simple function to generate a string representation of a float value.
