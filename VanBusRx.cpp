@@ -18,6 +18,10 @@
   #include <Esp.h>  // wdt_reset
 #endif
 
+#ifdef ARDUINO_ARCH_ESP32
+  #define timer1_disable() timerEnd(timer)
+#endif // ARDUINO_ARCH_ESP32
+
 static const uint16_t VAN_CRC_POLYNOM = 0x0F9D;
 
 uint16_t _crc(const uint8_t bytes[], int size)
@@ -472,11 +476,7 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
 
 void ICACHE_RAM_ATTR SetTxBitTimer()
 {
-  #ifdef ARDUINO_ARCH_ESP32
-    timerEnd(timer);
-  #else // ! ARDUINO_ARCH_ESP32
     timer1_disable(); 
-  #endif // ARDUINO_ARCH_ESP32
 
     if (VanBusRx.txTimerIsr)
     {
@@ -551,7 +551,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     static int noiseCounter = 0;
     if (nCyclesMeasured < 484 || samePinLevel)
     {
-        if (++noiseCounter > 6)
+        if (++noiseCounter > 20)
         {
             VanBusRx.Disable();
             return;
@@ -722,11 +722,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             || nCycles > CPU_CYCLES(1000)
            )
         {
-          #ifdef ARDUINO_ARCH_ESP32
-            timerEnd(timer);
-          #else // ! ARDUINO_ARCH_ESP32
             timer1_disable();
-          #endif // ARDUINO_ARCH_ESP32
 
             // Go back to state VAN_RX_LOADING
             rxDesc->state = VAN_RX_LOADING;
@@ -925,11 +921,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         } // if
 
         // Be flexible in SOF detection. All cases were found by trial and error.
-        if (atBit == 7 && (readBits & 0x00F) == 0x00D)  // e.g. --- 11-1, -11 11-1
-        {
-            atBit = 10;
-        }
-        else if (atBit == 8 && (readBits & 0x00F) == 0x00D)  // e.g. ---1 11-1, --11 11-1, ---- 11-1
+        if ((atBit == 7 || atBit == 8) && (readBits & 0x00F) == 0x00D)  // e.g. --- 11-1, -11 11-1, ---1 11-1, --11 11-1, ---- 11-1
         {
             atBit = 10;
         }
@@ -1026,16 +1018,16 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
             // Set a timeout for the ACK bit
 
+            timer1_disable();
+
           #ifdef ARDUINO_ARCH_ESP32
 
-            timerEnd(timer);
             timerAttachInterrupt(timer, WaitAckIsr, true);
             timerAlarmWrite(timer, 40 * 5, false); // 5 time slots = 5 * 8 us = 40 us
             timerAlarmEnable(timer);
 
           #else // ! ARDUINO_ARCH_ESP32
 
-            timer1_disable();
             timer1_attachInterrupt(WaitAckIsr);
 
             // Clock to timer (prescaler) is always 80MHz, even F_CPU is 160 MHz
