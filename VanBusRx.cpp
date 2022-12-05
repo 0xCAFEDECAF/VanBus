@@ -442,16 +442,16 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
         return 2;
     } // if
 
-  #define THREE_BIT_BOUNDARY CPU_CYCLES(2523)
+  #define THREE_BIT_BOUNDARY CPU_CYCLES(2513)
     if (nCycles < THREE_BIT_BOUNDARY)
     {
-        if (nCycles > CPU_CYCLES(1998)) jitter = nCycles - CPU_CYCLES(1998);  // 1998 --> 2523 = 525
+        if (nCycles > CPU_CYCLES(1998)) jitter = nCycles - CPU_CYCLES(1998);  // 1998 --> 2513 = 515
         return 3;
     } // if
 
-    if (nCycles < CPU_CYCLES(3173))
+    if (nCycles < CPU_CYCLES(3167))
     {
-        if (nCycles > CPU_CYCLES(2636)) jitter = nCycles - CPU_CYCLES(2636);  // 2636 --> 3173 = 537
+        if (nCycles > CPU_CYCLES(2636)) jitter = nCycles - CPU_CYCLES(2636);  // 2636 --> 3167 = 537
         return 4;
     } // if
 
@@ -551,7 +551,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     static int noiseCounter = 0;
     if (nCyclesMeasured < 484 || samePinLevel)
     {
-        if (++noiseCounter > 20)
+        if (++noiseCounter > 30)
         {
             VanBusRx.Disable();
             return;
@@ -580,8 +580,8 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     else
     {
       #define GO_TO_TWO_BITS CPU_CYCLES(1249)
-        if (nCyclesMeasured > CPU_CYCLES(1070) && nCyclesMeasured < ONE_BIT_BOUNDARY) nCycles += ONE_BIT_BOUNDARY - GO_TO_TWO_BITS;
-        else if (nCyclesMeasured > CPU_CYCLES(1000) && nCyclesMeasured < CPU_CYCLES(1071)) nCycles += CPU_CYCLES(20);
+        if (nCyclesMeasured > CPU_CYCLES(1064) && nCyclesMeasured < ONE_BIT_BOUNDARY) nCycles += ONE_BIT_BOUNDARY - GO_TO_TWO_BITS;
+        else if (nCyclesMeasured > CPU_CYCLES(1000) && nCyclesMeasured < CPU_CYCLES(1065)) nCycles += CPU_CYCLES(20);
     } // if
 
     const uint32_t prevJitter = jitter;
@@ -921,11 +921,11 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         } // if
 
         // Be flexible in SOF detection. All cases were found by trial and error.
-        if ((atBit == 7 || atBit == 8) && (readBits & 0x00F) == 0x00D)  // e.g. --- 11-1, -11 11-1, ---1 11-1, --11 11-1, ---- 11-1
+        if ((atBit == 6 || atBit == 7 || atBit == 8) && (readBits & 0x00F) == 0x00D)  // e.g. 11 11-1, --- 11-1, -11 11-1, ---1 11-1, --11 11-1, ---- 11-1
         {
             atBit = 10;
         }
-        else if (atBit == 9 && (readBits & 0x00E) == 0x00A)  // e.g. - -111 1-11
+        else if ((atBit == 8 || atBit == 9) && (readBits & 0x00E) == 0x00A)  // e.g. -11 11-1 1, --11 11-1 1
         {
             atBit = 11;
         }
@@ -933,11 +933,11 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         {
             atBit = 10;
         }
-        else if (atBit == 10 && (readBits & 0x006) == 0x002) // e.g. -- -111 1-1-, -- -111 1-11, -- ---- 1-11
+        else if (atBit == 10 && (readBits & 0x006) == 0x002) // e.g. - --11 11-1 -, - --11 11-1 1, - ---- -1-1 1
         {
             atBit = 11;
         } // if
-        else if (atBit == 12 && (readBits & 0x018) == 0x008) // e.g. ---- -11- 1111
+        else if (atBit == 12 && (readBits & 0x018) == 0x008) // e.g. - ---- 11-1 111
         {
             atBit = 13;
         } // if
