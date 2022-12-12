@@ -425,7 +425,7 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
 
     if (nCycles < CPU_CYCLES(508))
     {
-        if (nCycles > CPU_CYCLES(106)) jitter = nCycles - CPU_CYCLES(106);
+        if (nCycles > CPU_CYCLES(126)) jitter = nCycles - CPU_CYCLES(126);
         return 0;
     } // if
 
@@ -577,7 +577,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         //else if (nCycles > CPU_CYCLES(600) && nCycles < CPU_CYCLES(800)) nCycles -= CPU_CYCLES(20);
         else if (nCycles > CPU_CYCLES(1100) && nCycles < ONE_BIT_BOUNDARY) nCycles -= CPU_CYCLES(20);
     }
-    else
+    else if (jitter < CPU_CYCLES(300))
     {
       #define GO_TO_TWO_BITS CPU_CYCLES(1249)
         if (nCyclesMeasured > CPU_CYCLES(1064) && nCyclesMeasured < ONE_BIT_BOUNDARY) nCycles += ONE_BIT_BOUNDARY - GO_TO_TWO_BITS;
@@ -593,7 +593,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
   #define LARGE_JITTER_RUNDOWN CPU_CYCLES(30)
   #define SMALL_JITTER_RUNDOWN SMALLEST_JITTER
     if (jitter < SMALLEST_JITTER) jitter = 0;
-    else if (jitter > 400 && jitter > prevJitter - CPU_CYCLES(30) && jitter < prevJitter + CPU_CYCLES(10)) jitter -= LARGE_JITTER_RUNDOWN;
+    else if (jitter > 400 && jitter > prevJitter - CPU_CYCLES(30) && jitter < prevJitter + CPU_CYCLES(5)) jitter -= LARGE_JITTER_RUNDOWN;
     else if (jitter > prevJitter - CPU_CYCLES(15) && jitter < prevJitter + CPU_CYCLES(10)) jitter -= SMALL_JITTER_RUNDOWN;
 
   #ifdef VAN_RX_ISR_DEBUGGING
@@ -809,7 +809,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     {
         if (state == VAN_RX_SEARCHING)
         {
-            nBits = 1; // Seems to work best in vehicle
+            nBits = 1;
             DEBUG_ISR(nBits, 1);
 
             jitter = 0;
