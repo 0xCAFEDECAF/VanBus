@@ -81,7 +81,7 @@ class Stream;
 
 struct TIsrDebugData
 {
-    uint32_t nCycles:16;
+    uint32_t nCyclesMeasured:16;
     uint32_t fromJitter:10;
     uint32_t toJitter:10;
     uint16_t nBits:8;
@@ -128,7 +128,7 @@ class TIsrDebugPacket
 // Data for Inter-frame space analysis
 struct TIfsDebugData
 {
-    uint32_t nCycles:16;
+    uint32_t nCyclesMeasured:16;
     uint16_t nBits:8;
     uint16_t pinLevel:1;
     uint16_t fromState:3;

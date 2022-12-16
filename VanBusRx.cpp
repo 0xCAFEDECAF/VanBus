@@ -449,9 +449,9 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
         return 3;
     } // if
 
-    if (nCycles < CPU_CYCLES(3167))
+    if (nCycles < CPU_CYCLES(3166))
     {
-        if (nCycles > CPU_CYCLES(2636)) jitter = nCycles - CPU_CYCLES(2636);  // 2636 --> 3167 = 537
+        if (nCycles > CPU_CYCLES(2636)) jitter = nCycles - CPU_CYCLES(2636);  // 2636 --> 3166 = 530
         return 4;
     } // if
 
@@ -579,9 +579,16 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     }
     else if (jitter < CPU_CYCLES(300))
     {
-      #define GO_TO_TWO_BITS CPU_CYCLES(1249)
-        if (nCyclesMeasured > CPU_CYCLES(1064) && nCyclesMeasured < ONE_BIT_BOUNDARY) nCycles += ONE_BIT_BOUNDARY - GO_TO_TWO_BITS;
-        else if (nCyclesMeasured > CPU_CYCLES(1000) && nCyclesMeasured < CPU_CYCLES(1065)) nCycles += CPU_CYCLES(20);
+      #define MOVE_TOWARDS_TWO_BITS_AT CPU_CYCLES(1249)
+      #define MOVE_TOWARDS_TWO_BITS ONE_BIT_BOUNDARY - MOVE_TOWARDS_TWO_BITS_AT
+        if (nCyclesMeasured > CPU_CYCLES(1064) && nCyclesMeasured < ONE_BIT_BOUNDARY && nCycles >= CPU_CYCLES(1220))
+        {
+            nCycles += MOVE_TOWARDS_TWO_BITS;
+        }
+        else if (nCyclesMeasured > CPU_CYCLES(1000) && nCyclesMeasured < CPU_CYCLES(1065))
+        {
+            nCycles += CPU_CYCLES(20);
+        } // if
     } // if
 
     const uint32_t prevJitter = jitter;
@@ -612,7 +619,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     // Only write into sample buffer if there is space
     if (debugIsr != NULL)
     {
-        debugIsr->nCycles = _min(nCyclesMeasured / CPU_F_FACTOR, USHRT_MAX);
+        debugIsr->nCyclesMeasured = _min(nCyclesMeasured / CPU_F_FACTOR, USHRT_MAX);
         debugIsr->fromJitter = _min(prevJitter / CPU_F_FACTOR, (1 << 10) - 1);
         debugIsr->nBits = _min(nBits, UCHAR_MAX);
         debugIsr->prevPinLevel = prevPinLevel;
@@ -691,7 +698,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         // Only write into sample buffer if there is space
         if (debugIfs != NULL)
         {
-            debugIfs->nCycles = _min(nCyclesMeasured / CPU_F_FACTOR, USHRT_MAX);
+            debugIfs->nCyclesMeasured = _min(nCyclesMeasured / CPU_F_FACTOR, USHRT_MAX);
             debugIfs->nBits = _min(nBits, UCHAR_MAX);
             debugIfs->pinLevel = pinLevel;
             debugIfs->fromState = state;
@@ -1240,8 +1247,8 @@ void TIfsDebugPacket::Dump(Stream& s) const
 
         s.printf("%3u", i);
 
-        const uint32_t nCycles = ifsData->nCycles;
-        if (nCycles >= USHRT_MAX) s.printf("  >%5lu", USHRT_MAX); else s.printf(" %7lu", nCycles);
+        const uint32_t nCyclesMeasured = ifsData->nCyclesMeasured;
+        if (nCyclesMeasured >= USHRT_MAX) s.printf("  >%5lu", USHRT_MAX); else s.printf(" %7lu", nCyclesMeasured);
 
         s.print(" -> ");
 
@@ -1317,14 +1324,14 @@ void TIsrDebugPacket::Dump(Stream& s) const
 
         s.printf("%3u", i);
 
-        const uint32_t nCycles = isrData->nCycles;
-        if (nCycles >= USHRT_MAX) s.printf("  >%5lu", USHRT_MAX); else s.printf(" %7lu", nCycles);
+        const uint32_t nCyclesMeasured = isrData->nCyclesMeasured;
+        if (nCyclesMeasured >= USHRT_MAX) s.printf("  >%5lu", USHRT_MAX); else s.printf(" %7lu", nCyclesMeasured);
 
         const uint32_t jitter = isrData->fromJitter;
         if (jitter != 0)
         {
             s.printf("%+5d", jitter);
-            s.printf(" =%7lu", nCycles + jitter);
+            s.printf(" =%7lu", nCyclesMeasured + jitter);
         }
         else
         {
