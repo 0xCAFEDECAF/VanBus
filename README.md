@@ -196,10 +196,11 @@ The following methods are available for ```TVanPacketRxDesc``` packet objects as
 7. [```bool CheckCrc()```](#CheckCrc)
 8. [```bool CheckCrcAndRepair()```](#CheckCrcAndRepair)
 9. [```void DumpRaw(Stream& s, char last = '\n')```](#DumpRaw)
-10. [```const TIsrDebugPacket& getIsrDebugPacket()```](#getIsrDebugPacket)
-11. [```const char* CommandFlagsStr()```](#CommandFlagsStr)
-12. [```const char* AckStr()```](#AckStr)
-13. [```const char* ResultStr()```](#ResultStr)
+10. [```const char* CommandFlagsStr()```](#CommandFlagsStr)
+11. [```const char* AckStr()```](#AckStr)
+12. [```const char* ResultStr()```](#ResultStr)
+13. [```const TIfsDebugPacket& getIfsDebugPacket()```](#getIfsDebugPacket)
+14. [```const TIsrDebugPacket& getIsrDebugPacket()```](#getIsrDebugPacket)
 
 ---
 
@@ -276,23 +277,33 @@ Example of dumping into a char array:
 Note: for this, you will need to install the [PrintEx](https://github.com/Chris--A/PrintEx) library. I tested with
 version 1.2.0 .
 
-#### 10. ```const TIsrDebugPacket& getIsrDebugPacket()``` <a name = "getIsrDebugPacket"></a>
-
-Retrieves a debug structure that can be used to analyse (observed) bit timings.
-
-#### 11. ```const char* CommandFlagsStr()``` <a name = "CommandFlagsStr"></a>
+#### 10. ```const char* CommandFlagsStr()``` <a name = "CommandFlagsStr"></a>
 
 Returns the "command" FLAGS field of the VAN packet as a string
 
 Note: uses a statically allocated buffer, so don't call this method twice within the same printf invocation.
 
-#### 12. ```const char* AckStr()``` <a name = "AckStr"></a>
+#### 11. ```const char* AckStr()``` <a name = "AckStr"></a>
 
 Returns the ACK field of the VAN packet as a string, either "ACK" or "NO_ACK".
 
-#### 13. ```const char* ResultStr()``` <a name = "ResultStr"></a>
+#### 12. ```const char* ResultStr()``` <a name = "ResultStr"></a>
 
 Returns the RESULT field of the VAN packet as a string, either "OK" or a string starting with "ERROR_".
+
+#### 13. ```const TIfsDebugPacket& getIfsDebugPacket()``` <a name = "getIfsDebugPacket"></a>
+
+Retrieves a debug structure that can be used to analyse inter-frame space events.
+
+Only available when ```#define VAN_RX_ISR_DEBUGGING``` is uncommented (see
+[```VanBusRx.h```](https://github.com/0xCAFEDECAF/VanBus/blob/756b05097e57c183f87b7879e431308daef5ce5f/VanBusRx.h#L33)).
+
+#### 14. ```const TIsrDebugPacket& getIsrDebugPacket()``` <a name = "getIsrDebugPacket"></a>
+
+Retrieves a debug structure that can be used to analyse (observed) bit timings.
+
+Only available when ```#define VAN_RX_IFS_DEBUGGING``` is uncommented (see
+[```VanBusRx.h```](https://github.com/0xCAFEDECAF/VanBus/blob/756b05097e57c183f87b7879e431308daef5ce5f/VanBusRx.h#L32)).
 
 ## ⚠️ Limitations, Caveats<a name = "limits"></a>
 
