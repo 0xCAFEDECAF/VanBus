@@ -186,11 +186,12 @@ class TVanPacketRxDesc
     unsigned long Millis() { return millis_; }  // Packet time stamp in milliseconds
     uint16_t Crc() const;
     bool CheckCrc() const;
-    bool CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)() const = 0);  // Yes, we can sometimes repair a corrupt packet by flipping one or two bits
+    bool CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)() const = 0);
     void DumpRaw(Stream& s, char last = '\n') const;
 
     // Example of the longest string that can be dumped (not realistic):
-    // Raw: #1234 (123/123) 28(33) 0E ABC RA0 01-02-03-04-05-06-07-08-09-10-11-12-13-14-15-16-17-18-19-20-21-22-23-24-25-26-27-28:CC-DD NO_ACK VAN_RX_ERROR_MAX_PACKET CCDD CRC_ERROR
+    // "Raw: #1234 (123/123) 28(33) 0E ABC RA0 01-02-03-04-05-06-07-08-09-10-11-12-13-14-15-16-17-18-19-20-21-22-
+    //     23-24-25-26-27-28:CC-DD NO_ACK VAN_RX_ERROR_MAX_PACKET CCDD CRC_ERROR"
     // + 1 for terminating '\0'
     #define VAN_MAX_DUMP_RAW_SIZE (38 + VAN_MAX_DATA_BYTES * 3 + 45 + 1)
 
@@ -226,17 +227,6 @@ class TVanPacketRxDesc
             result == VAN_RX_ERROR_NBITS ? "ERROR_NBITS" :
             result == VAN_RX_ERROR_MANCHESTER ? "ERROR_MANCHESTER" :
             result == VAN_RX_ERROR_MAX_PACKET ? "ERROR_MAX_PACKET" :
-            "ERROR_??";
-    } // ResultStr
-
-    static const char* StateStr(uint8_t state)
-    {
-        return
-            state == VAN_RX_VACANT ? "VACANT" :
-            state == VAN_RX_SEARCHING ? "SEARCHING" :
-            state == VAN_RX_LOADING ? "LOADING" :
-            state == VAN_RX_WAITING_ACK ? "WAITING_ACK" :
-            state == VAN_RX_DONE ? "DONE" :
             "ERROR_??";
     } // ResultStr
 
@@ -287,9 +277,22 @@ class TVanPacketRxDesc
       #endif // VAN_RX_IFS_DEBUGGING
     } // Init
 
+    static const char* StateStr(uint8_t state)
+    {
+        return
+            state == VAN_RX_VACANT ? "VACANT" :
+            state == VAN_RX_SEARCHING ? "SEARCHING" :
+            state == VAN_RX_LOADING ? "LOADING" :
+            state == VAN_RX_WAITING_ACK ? "WAITING_ACK" :
+            state == VAN_RX_DONE ? "DONE" :
+            "ERROR_??";
+    } // ResultStr
+
     friend void WaitAckIsr();
     friend void RxPinChangeIsr();
     friend class TVanPacketRxQueue;
+    friend class TIfsDebugPacket;
+    friend class TIsrDebugPacket;
 }; // class TVanPacketRxDesc
 
 #ifdef ARDUINO_ARCH_ESP32
