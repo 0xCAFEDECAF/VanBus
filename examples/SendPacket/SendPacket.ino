@@ -89,10 +89,10 @@ void loop()
 
         // Alternately send exterior temperature 8 and 16 deg C to the multifunction display (MFD).
         // Note: the MFD will average out the received values, ending up showing 12 deg C.
-        static uint8_t temperatureValue = 0x60;
-        if (temperatureValue == 0x60) temperatureValue = 0x70; else temperatureValue = 0x60;
+        static uint8_t temperatureValue = 8;
+        if (temperatureValue == 8) temperatureValue = 16; else temperatureValue = 8;
         
-        uint8_t rmtTemperatureBytes[] = {0x0F, 0x07, 0x00, 0x00, 0x00, 0x00, temperatureValue};
+        uint8_t rmtTemperatureBytes[] = {0x0F, 0x07, 0x00, 0x00, 0x00, 0x00, temperatureValue * 2 + 0x50};
         VanBus.SyncSendPacket(0x8A4, 0x08, rmtTemperatureBytes, sizeof(rmtTemperatureBytes));
     } // if
 
