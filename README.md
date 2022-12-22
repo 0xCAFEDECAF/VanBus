@@ -203,7 +203,7 @@ The following methods are available for ```TVanPacketRxDesc``` packet objects as
 ```VanBusRx.Receive(...)```:
 
 1. [```uint16_t Iden()```](#Iden)
-2. [```uint16_t CommandFlags()```](#CommandFlags)
+2. [```uint8_t CommandFlags()```](#CommandFlags)
 3. [```const uint8_t* Data()```](#Data)
 4. [```int DataLen()```](#DataLen)
 5. [```unsigned long Millis()```](#Millis)
@@ -228,13 +228,13 @@ An overview of known IDEN values can be found e.g. at:
 - http://pinterpeti.hu/psavanbus/PSA-VAN.html
 - http://graham.auld.me.uk/projects/vanbus/protocol.html
 
-#### 2. ```uint16_t CommandFlags()``` <a name = "CommandFlags"></a>
+#### 2. ```uint8_t CommandFlags()``` <a name = "CommandFlags"></a>
 
-Returns the "command" FLAGS field of the VAN packet. Each VAN packet has 4 "command" flags:
-- EXT : always 1
-- RAK : 1 = Requesting AcKnowledge
-- R/W : 1 = Read operation, 0 = Write operation
-- RTR : 1 = Remote Transmit Request
+Returns the 4-bit "command" FLAGS field of the VAN packet. Each VAN packet has 4 "command" flags:
+- EXT (bit 3, MSB) : always 1
+- RAK (bit 2): 1 = Requesting AcKnowledge
+- R/W (bit 1): 1 = Read operation, 0 = Write operation
+- RTR (bit 0, LSB): 1 = Remote Transmit Request
 
 A thorough explanation is found (in French) on page 6 and 7 of
 http://www.educauto.org/files/file_fields/2013/11/18/mux3.pdf#page=6 .
