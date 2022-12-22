@@ -59,7 +59,7 @@
 
 // F_CPU is set by the Arduino IDE option as chosen in menu Tools > CPU Frequency. It is always a multiple of 80000000.
 #define CPU_F_FACTOR (F_CPU / 80000000)
-#define CPU_CYCLES(_X) (_X) * CPU_F_FACTOR
+#define CPU_CYCLES(_X) ((_X) * CPU_F_FACTOR)
 
 #define VAN_NO_PIN_ASSIGNED (0xFF)
 
@@ -77,8 +77,7 @@ class Stream;
 
 #ifdef VAN_RX_ISR_DEBUGGING
 
-// ISR invocation data, for debugging purposes
-
+// ISR invocation data, for analysis and debugging purposes
 struct TIsrDebugData
 {
     uint32_t nCyclesMeasured:16;
@@ -95,7 +94,7 @@ struct TIsrDebugData
     uint16_t readBits:16;
 } __attribute__((packed)); // struct TIsrDebugData
 
-// Buffer of ISR invocation debug data
+// All ISR invocation data for one VAN-bus packet
 class TIsrDebugPacket
 {
   public:
@@ -106,8 +105,8 @@ class TIsrDebugPacket
 
   private:
 
-    // There can be at most 33 * 8 = 264 ISR invocations, but allocate a bit more so that we can see
-    // any prehistory, if present
+    // There can be at most 33 * 8 = 264 ISR invocations for a single packet, but allocate a bit more so that we
+    // can see any prehistory, if present
     #define VAN_ISR_DEBUG_BUFFER_SIZE 300
     TIsrDebugData samples[VAN_ISR_DEBUG_BUFFER_SIZE];
 
@@ -125,7 +124,7 @@ class TIsrDebugPacket
 
 #ifdef VAN_RX_IFS_DEBUGGING
 
-// Data for Inter-frame space analysis
+// Inter-frame space data, for analysis and debugging purposes
 struct TIfsDebugData
 {
     uint32_t nCyclesMeasured:16;
@@ -135,6 +134,7 @@ struct TIfsDebugData
     uint16_t toState:3;
 } __attribute__((packed)); // struct TIfsDebugData
 
+// All inter-frame space data, as seen preceding one VAN-bus packet
 class TIfsDebugPacket
 {
   public:
@@ -191,7 +191,7 @@ class TVanPacketRxDesc
 
     // Example of the longest string that can be dumped (not realistic):
     // "Raw: #1234 (123/123) 28(33) 0E ABC RA0 01-02-03-04-05-06-07-08-09-10-11-12-13-14-15-16-17-18-19-20-21-22-
-    //     23-24-25-26-27-28:CC-DD NO_ACK VAN_RX_ERROR_MAX_PACKET CCDD CRC_ERROR"
+    //     23-24-25-26-27-28:CC-DD NO_ACK ERROR_MAX_PACKET CCDD CRC_ERROR"
     // + 1 for terminating '\0'
     #define VAN_MAX_DUMP_RAW_SIZE (38 + VAN_MAX_DATA_BYTES * 3 + 45 + 1)
 
