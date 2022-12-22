@@ -78,8 +78,8 @@ For receiving and transmitting packets:
 
 1. Add the following lines to your initialisation block ```void setup()```:
 ```
-int TX_PIN = D3; // Set to GPIO pin connected to VAN bus transceiver input
-int RX_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
+int TX_PIN = D3; // GPIO pin connected to VAN bus transceiver input
+int RX_PIN = D2; // GPIO pin connected to VAN bus transceiver output
 TVanBus::Setup(RX_PIN, TX_PIN);
 ```
 
@@ -97,7 +97,7 @@ object:
 
 1. Add the following lines to your initialisation block ```void setup()```:
 ```
-int RX_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
+int RX_PIN = D2; // GPIO pin connected to VAN bus transceiver output
 VanBusRx.Setup(RX_PIN);
 ```
 
@@ -121,12 +121,15 @@ Interfaces for receiving packets:
 3. [```bool Available()```](#Available)
 4. [```bool Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun = NULL)```](#Receive)
 5. [```uint32_t GetRxCount()```](#GetRxCount)
+6. [```int QueueSize()```](#QueueSize)
+7. [```int GetNQueued()```](#GetNQueued)
+8. [```int GetMaxQueued()```](#GetMaxQueued)
 
 Interfaces for transmitting packets:
 
-6. [```bool SyncSendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)```](#SyncSendPacket)
-7. [```bool SendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)```](#SendPacket)
-8. [```uint32_t GetTxCount()```](#GetTxCount)
+9. [```bool SyncSendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)```](#SyncSendPacket)
+10. [```bool SendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)```](#SendPacket)
+11. [```uint32_t GetTxCount()```](#GetTxCount)
 
 ---
 
@@ -152,15 +155,27 @@ If a valid pointer is passed to 'isQueueOverrun', will report then clear any que
 
 Returns the number of received VAN packets since power-on. Counter may roll over.
 
-#### 6. ```bool SyncSendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)``` <a name = "SyncSendPacket"></a>
+#### 6. ```int QueueSize()``` <a name = "QueueSize"></a>
+
+Returns the number of VAN packets that can be queued before packets are lost.
+
+#### 7. ```int GetNQueued()``` <a name = "GetNQueued"></a>
+
+Returns the number of VAN packets currently queued.
+
+#### 8. ```int GetMaxQueued()``` <a name = "GetMaxQueued"></a>
+
+Returns the highest number of VAN packets that were queued.
+
+#### 9. ```bool SyncSendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)``` <a name = "SyncSendPacket"></a>
 
 Sends a packet for transmission. Returns ```true``` if the packet was successfully transmitted.
 
-#### 7. ```bool SendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)``` <a name = "SendPacket"></a>
+#### 10. ```bool SendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)``` <a name = "SendPacket"></a>
 
 Queues a packet for transmission. Returns ```true``` if the packet was successfully queued.
 
-#### 8. ```uint32_t GetTxCount()``` <a name = "GetTxCount"></a>
+#### 11. ```uint32_t GetTxCount()``` <a name = "GetTxCount"></a>
 
 Returns the number of VAN packets, offered for transmitting, since power-on. Counter may roll over.
 
