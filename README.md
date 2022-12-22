@@ -197,7 +197,7 @@ For background reading:
 - [Le bus VAN, vehicle area network: Fondements du protocole (French) Paperback – June 4, 1997](https://www.amazon.com/bus-VAN-vehicle-area-network/dp/2100031600)
 - [Vehicle Area Network (VAN bus) Analyzer for Saleae USB logic analyzer - Peter Pinter](https://github.com/morcibacsi/VanAnalyzer/)
 - [Atmel TSS463C VAN Data Link Controller with Serial Interface](http://ww1.microchip.com/downloads/en/DeviceDoc/doc7601.pdf)
-- [Multiplexed BSI Operating Principle for the Xsara Picasso And Xsara - The VAN protocol](http://milajda22.sweb.cz/Manual_k_ridici_jednotce.pdf#page=17)
+- [Multiplexed BSI Operating Principle for the Xsara Picasso And Xsara - The VAN protocol](https://web.archive.org/web/20221115101711/http://milajda22.sweb.cz/Manual_k_ridici_jednotce.pdf#page=17)
 
 The following methods are available for ```TVanPacketRxDesc``` packet objects as obtained from
 ```VanBusRx.Receive(...)```:
