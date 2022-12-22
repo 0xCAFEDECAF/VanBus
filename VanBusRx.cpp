@@ -3,7 +3,7 @@
  *
  * Written by Erik Tromp
  *
- * Version 0.3.1 - October, 2022
+ * Version 0.3.2 - December, 2022
  *
  * MIT license, all text above must be included in any redistribution.
  */
@@ -1030,6 +1030,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
                 && currentByte != 0x009 // 00 0000 1001
                 && currentByte != 0x01D // 00 0001 1101
                 && currentByte != 0x039 // 00 0011 1001
+                && currentByte != 0x03E // 00 0011 1110
                 && currentByte != 0x019 // 00 0001 1001
                 && currentByte != 0x03B // 00 0011 1011
                 && currentByte != 0x03C // 00 0011 1100

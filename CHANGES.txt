@@ -1,3 +1,18 @@
+0.3.2
+    General:
+    * Updated README.md
+
+    VanBusRx.cpp:
+    * Decrease CPU load by using table-based CRC calculation
+    * struct TIsrDebugData, struct TIfsDebugData: renamed nCycles to nCyclesMeasured
+    * Added new method TVanPacketRxQueue::IsEnabled()
+    * RxPinChangeIsr(): save a few precious bytes of RAM
+    * Prevent CPU monopolization by noise on bus
+    * TVanPacketRxQueue::Disable(): also run timer1_disable(), just in case
+    * Improved keeping the 'nQueued' counter up to date 
+    * Add extra patterns for SOF detection
+    * Small updates in the bit timing criteria
+
 0.3.1
     General:
     * Updated README.md
