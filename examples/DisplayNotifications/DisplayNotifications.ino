@@ -38,10 +38,10 @@
 const int TX_PIN = D3; // Set to GPIO pin connected to VAN bus transceiver input
 const int RX_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
 
-// Send exterior temperature 8 deg C to the multifunction display (MFD)
-void SendExteriorTemperatureMessage()
+// Send an exterior temperature value to the multifunction display (MFD)
+void SendExteriorTemperatureMessage(uint8_t temperatureValue)
 {
-    uint8_t rmtTemperatureBytes[] = {0x0F, 0x07, 0x00, 0x00, 0x00, 0x00, 0x60};
+    uint8_t rmtTemperatureBytes[] = {0x0F, 0x07, 0x00, 0x00, 0x00, 0x00, temperatureValue * 2 + 0x50};
     VanBus.SyncSendPacket(0x8A4, 0x08, rmtTemperatureBytes, sizeof(rmtTemperatureBytes));
 } // SendExteriorTemperatureMessage
 
@@ -203,7 +203,7 @@ void loop()
     {
         lastSentAt = millis();
 
-        SendExteriorTemperatureMessage();  // Send exterior temperature 8 deg C to the MFD
+        SendExteriorTemperatureMessage(8);  // Send exterior temperature 8 deg C to the MFD
     } // if
 
     // Print some boring statistics every minute or so
