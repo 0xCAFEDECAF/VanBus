@@ -1242,8 +1242,6 @@ void TVanPacketRxQueue::DumpStats(Stream& s, bool longForm) const
             pktCount == 0
                 ? "-.---" 
                 : FloatToStr(floatBuf, 100.0 * overallCorrupt / pktCount, 3));
-
-        s.printf_P(PSTR(", maxQueued: %d/%d\n"), GetMaxQueued(), QueueSize());
     }
     else
     {
@@ -1256,8 +1254,9 @@ void TVanPacketRxQueue::DumpStats(Stream& s, bool longForm) const
             pktCount == 0
                 ? "-.---"
                 : FloatToStr(floatBuf, 100.0 * overallCorrupt / pktCount, 3));
-        s.print(F("\n"));
     } // if
+
+    s.printf_P(PSTR(", maxQueued: %d/%d\n"), GetMaxQueued(), QueueSize());
 } // TVanPacketRxQueue::DumpStats
 
 #ifdef VAN_RX_IFS_DEBUGGING
