@@ -1498,7 +1498,7 @@ void TIsrDebugPacket::Dump(Stream& s) const
         i++;
     } // while
 
-    #undef reset()
+    #undef reset
 
     rLock = false;  // Assumed to be atomic
 
