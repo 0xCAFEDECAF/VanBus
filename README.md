@@ -10,7 +10,6 @@
 - [Usage](#usage)
   - [General](#general)
   - [Functions](#functions)
-- [Limitations, Caveats](#limits)
 - [Work to be Done](#todo)
 - [License](#license)
 
@@ -320,25 +319,9 @@ Retrieves a debug structure that can be used to analyse (observed) bit timings.
 Only available when ```#define VAN_RX_IFS_DEBUGGING``` is uncommented (see
 [```VanBusRx.h```](https://github.com/0xCAFEDECAF/VanBus/blob/756b05097e57c183f87b7879e431308daef5ce5f/VanBusRx.h#L32)).
 
-## ⚠️ Limitations, Caveats<a name = "limits"></a>
-
-The library times the incoming bits using an interrupt service routine (ISR) that triggers on pin "change"
-events (see the internal function ```RxPinChangeIsr``` in
-[VanBusRx.cpp](https://github.com/0xCAFEDECAF/VanBus/blob/master/VanBusRx.cpp#L326)).
-
-When Wi-Fi is enabled, the invocation of the ISR is often quite late (even if there is no Wi-Fi connection active).
-It turns out that disabling Wi-Fi altogether is the way to get a completely error-free packet reception, like this:
-
-    15:10:26.335 -> received pkts: 104883, corrupt: 0 (0.000%), repaired: 0 (---%), overall: 0 (0.000%)
-
-With Wi-Fi enabled, not all VAN bus packets are received error-free. Even after trying to "repair" a packet
-(see function [```bool CheckCrcAndRepair()```](#CheckCrcAndRepair)), the long-term average packet loss is around
-0.01% ... 0.015% (between 1 in 10,000 and 1 in 6,666), which is pretty workable for most applications. I am
-investigating how to improve on this.
-
 ## 👷 Work to be Done<a name = "todo"></a>
 
-### Near future
+### Future
 
 Currently the library supports only 125 kbit/s VAN bus. Need to add support for different rate, like 62.5 kbit/s,
 which can be passed as an optional parameter to ```VanBusRx.Setup(...)```.
