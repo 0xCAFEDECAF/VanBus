@@ -310,14 +310,14 @@ Returns the RESULT field of the VAN packet as a string, either "OK" or a string 
 Retrieves a debug structure that can be used to analyse inter-frame space events.
 
 Only available when ```#define VAN_RX_ISR_DEBUGGING``` is uncommented (see
-[```VanBusRx.h```](https://github.com/0xCAFEDECAF/VanBus/blob/756b05097e57c183f87b7879e431308daef5ce5f/VanBusRx.h#L33)).
+[```VanBusRx.h```](https://github.com/0xCAFEDECAF/VanBus/blob/756b05097e57c183f87b7879e431308daef5ce5f/VanBusRx.h#L32)).
 
 #### 14. ```const TIsrDebugPacket& getIsrDebugPacket()``` <a name = "getIsrDebugPacket"></a>
 
 Retrieves a debug structure that can be used to analyse (observed) bit timings.
 
 Only available when ```#define VAN_RX_IFS_DEBUGGING``` is uncommented (see
-[```VanBusRx.h```](https://github.com/0xCAFEDECAF/VanBus/blob/756b05097e57c183f87b7879e431308daef5ce5f/VanBusRx.h#L32)).
+[```VanBusRx.h```](https://github.com/0xCAFEDECAF/VanBus/blob/756b05097e57c183f87b7879e431308daef5ce5f/VanBusRx.h#L33)).
 
 ## 👷 Work to be Done<a name = "todo"></a>
 
