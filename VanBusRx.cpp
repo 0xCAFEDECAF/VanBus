@@ -633,13 +633,9 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     {
       #define MOVE_TOWARDS_TWO_BITS_AT CPU_CYCLES(1249)
       #define MOVE_TOWARDS_TWO_BITS ONE_BIT_BOUNDARY - MOVE_TOWARDS_TWO_BITS_AT
-        if (nCyclesMeasured > CPU_CYCLES(1064) && nCyclesMeasured < ONE_BIT_BOUNDARY && nCycles >= CPU_CYCLES(1220))
+        if (nCyclesMeasured > CPU_CYCLES(1008) && nCyclesMeasured < ONE_BIT_BOUNDARY && nCycles >= CPU_CYCLES(1220))
         {
             nCycles += MOVE_TOWARDS_TWO_BITS;
-        }
-        else if (nCyclesMeasured > CPU_CYCLES(1000) && nCyclesMeasured < CPU_CYCLES(1065))
-        {
-            nCycles += CPU_CYCLES(20);
         } // if
     } // if
 
@@ -1043,6 +1039,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
                 && currentByte != 0x001 // 00 0000 0001
                 && currentByte != 0x03F // 00 0011 1111
                 && currentByte != 0x3FD // 11 1111 1101
+                && currentByte != 0x079 // 00 0111 1001
                 && currentByte != 0x07D // 00 0111 1101
                )
             {
