@@ -477,7 +477,7 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
 
     if (nCycles < CPU_CYCLES(508))
     {
-        if (nCycles > CPU_CYCLES(126)) jitter = nCycles - CPU_CYCLES(126);
+        if (nCycles > CPU_CYCLES(112)) jitter = nCycles - CPU_CYCLES(112);
         return 0;
     } // if
 
@@ -622,20 +622,33 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     static uint32_t jitter = 0;
     uint32_t nCycles = nCyclesMeasured + jitter;
 
-    // During SOF, timing is slightly different. Timing values were found by trial and error.
-    if (state == VAN_RX_SEARCHING)
+    if (state == VAN_RX_VACANT || state == VAN_RX_SEARCHING)
     {
+        // During SOF, timing is slightly different. Timing values were found by trial and error.
+
         if (nCycles > CPU_CYCLES(2260) && nCycles < THREE_BIT_BOUNDARY) nCycles = THREE_BIT_BOUNDARY;
         //else if (nCycles > CPU_CYCLES(600) && nCycles < CPU_CYCLES(800)) nCycles -= CPU_CYCLES(20);
         else if (nCycles > CPU_CYCLES(1100) && nCycles < ONE_BIT_BOUNDARY) nCycles -= CPU_CYCLES(20);
     }
-    else if (jitter < CPU_CYCLES(300))
+    else
     {
-      #define MOVE_TOWARDS_TWO_BITS_AT CPU_CYCLES(1249)
-      #define MOVE_TOWARDS_TWO_BITS ONE_BIT_BOUNDARY - MOVE_TOWARDS_TWO_BITS_AT
-        if (nCyclesMeasured > CPU_CYCLES(1008) && nCyclesMeasured < ONE_BIT_BOUNDARY && nCycles >= CPU_CYCLES(1220))
+        // Sometimes, one long bit is in fact two bits
+
+        if (jitter < CPU_CYCLES(300))
         {
-            nCycles += MOVE_TOWARDS_TWO_BITS;
+          #define MOVE_TOWARDS_TWO_BITS_AT CPU_CYCLES(1239)
+          #define MOVE_TOWARDS_TWO_BITS ONE_BIT_BOUNDARY - MOVE_TOWARDS_TWO_BITS_AT
+            if (nCyclesMeasured > CPU_CYCLES(987) && nCyclesMeasured < ONE_BIT_BOUNDARY && nCycles >= CPU_CYCLES(1220))
+            {
+                nCycles += MOVE_TOWARDS_TWO_BITS;
+            } // if
+        }
+        else if (jitter < CPU_CYCLES(400))
+        {
+            if (nCyclesMeasured > CPU_CYCLES(900) && nCyclesMeasured < CPU_CYCLES(988))
+            {
+                nCycles += CPU_CYCLES(10);
+            } // if
         } // if
     } // if
 
@@ -649,7 +662,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
   #define SMALL_JITTER_RUNDOWN SMALLEST_JITTER
     if (jitter < SMALLEST_JITTER) jitter = 0;
     else if (jitter > 400 && jitter > prevJitter - CPU_CYCLES(30) && jitter < prevJitter + CPU_CYCLES(5)) jitter -= LARGE_JITTER_RUNDOWN;
-    else if (jitter > prevJitter - CPU_CYCLES(15) && jitter < prevJitter + CPU_CYCLES(10)) jitter -= SMALL_JITTER_RUNDOWN;
+    else if (jitter > prevJitter - CPU_CYCLES(15) && jitter < prevJitter + CPU_CYCLES(18)) jitter -= SMALL_JITTER_RUNDOWN;
 
   #ifdef VAN_RX_ISR_DEBUGGING
 
