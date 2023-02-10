@@ -98,7 +98,7 @@ enum VanPacketParseResult_t
 #define MFD_TO_HEAD_UNIT_IDEN 0x8D4
 #define AIR_CONDITIONER_DIAG_IDEN 0xADC
 #define AIR_CONDITIONER_DIAG_COMMAND_IDEN 0xA5C
-#define ECU_IDEN 0xB0E
+#define SATNAV_GPS_INFO 0xB0E
 
 // Often used string constants
 static const char PROGMEM emptyStr[] = "";
@@ -3824,9 +3824,9 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
         }
         break;
 
-        case ECU_IDEN:
+        case SATNAV_GPS_INFO:
         {
-            Serial.print(F("--> ECU status(?): "));
+            Serial.print(F("--> GPS info(?): "));
 
             if (dataLen != 15)
             {
@@ -3834,7 +3834,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
-            // No idea who is sending this packet (engine ECU?) and what this packet means.
+            // No idea who is sending this packet (sat nav unit?) and what this packet means.
 
             // Examples:
             //

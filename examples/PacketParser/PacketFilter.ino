@@ -43,7 +43,7 @@ bool IsPacketSelected(uint16_t iden, VanPacketFilter_t filter)
             // || iden == MFD_TO_HEAD_UNIT_IDEN
             // || iden == AIR_CONDITIONER_DIAG_IDEN
             // || iden == AIR_CONDITIONER_DIAG_COMMAND_IDEN
-            // || iden == ECU_IDEN
+            // || iden == SATNAV_GPS_INFO
            )
         {
             return false;
@@ -92,7 +92,7 @@ bool IsPacketSelected(uint16_t iden, VanPacketFilter_t filter)
             // && iden != MFD_TO_HEAD_UNIT_IDEN
             // && iden != AIR_CONDITIONER_DIAG_IDEN
             // && iden != AIR_CONDITIONER_DIAG_COMMAND_IDEN
-            // && iden != ECU_IDEN
+            // && iden != SATNAV_GPS_INFO
            )
         {
             return false;
@@ -141,7 +141,7 @@ bool IsPacketSelected(uint16_t iden, VanPacketFilter_t filter)
             // || iden == MFD_TO_HEAD_UNIT_IDEN
             || iden == AIR_CONDITIONER_DIAG_IDEN
             || iden == AIR_CONDITIONER_DIAG_COMMAND_IDEN
-            || iden == ECU_IDEN
+            || iden == SATNAV_GPS_INFO
            )
         {
             return false;
@@ -190,7 +190,7 @@ bool IsPacketSelected(uint16_t iden, VanPacketFilter_t filter)
             || iden == MFD_TO_HEAD_UNIT_IDEN
             // || iden == AIR_CONDITIONER_DIAG_IDEN
             // || iden == AIR_CONDITIONER_DIAG_COMMAND_IDEN
-            || iden == ECU_IDEN
+            || iden == SATNAV_GPS_INFO
            )
         {
             return false;
@@ -239,7 +239,7 @@ bool IsPacketSelected(uint16_t iden, VanPacketFilter_t filter)
             || iden == MFD_TO_HEAD_UNIT_IDEN
             || iden == AIR_CONDITIONER_DIAG_IDEN
             || iden == AIR_CONDITIONER_DIAG_COMMAND_IDEN
-            || iden == ECU_IDEN
+            || iden == SATNAV_GPS_INFO
            )
         {
             return false;
@@ -288,7 +288,7 @@ bool IsPacketSelected(uint16_t iden, VanPacketFilter_t filter)
             || iden == MFD_TO_HEAD_UNIT_IDEN
             || iden == AIR_CONDITIONER_DIAG_IDEN
             || iden == AIR_CONDITIONER_DIAG_COMMAND_IDEN
-            || iden == ECU_IDEN
+            || iden == SATNAV_GPS_INFO
            )
         {
             return false;
