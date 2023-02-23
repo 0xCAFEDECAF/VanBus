@@ -475,7 +475,7 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
     // All timing values were found by trial and error
     jitter = 0;
 
-    if (nCycles < CPU_CYCLES(508))
+    if (nCycles < CPU_CYCLES(560))
     {
         if (nCycles > CPU_CYCLES(112)) jitter = nCycles - CPU_CYCLES(112);
         return 0;
@@ -601,7 +601,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
     // Prevent CPU monopolization by noise on bus
     static int noiseCounter = 0;
-    if (nCyclesMeasured < 484 || samePinLevel)
+    if (nCyclesMeasured < 510 || samePinLevel)
     {
         if (++noiseCounter > 30)
         {

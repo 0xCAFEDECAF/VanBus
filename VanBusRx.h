@@ -212,7 +212,7 @@ class TVanPacketRxDesc
         static char result[4];
         sprintf(result, "%c%c%1u",
             bytes[2] & 0x02 ? 'R' : 'W',  // R/W
-            bytes[2] & 0x04 ? 'A' : '-',   // RAK
+            bytes[2] & 0x04 ? 'A' : '-',  // RAK
             bytes[2] & 0x01  // RTR
         );
         return result;
