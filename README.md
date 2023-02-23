@@ -54,7 +54,7 @@ There are various possibilities to hook up a ESP8266 based board to your vehicle
    the transceiver to a GPIO pin of your ESP8266 board. For transmitting packets, also connect the CTX / TXD / D pins
    of the transceiver to a GPIO pin of your ESP8266 board.
 
-   A board with the SN65HVD230 transceiver can be ordered
+   A board with the SN65HVD230 transceiver can be ordered e.g.
    [here](https://webshop.domoticx.nl/index.php?route=product/product&product_id=3935).
 
 ![schema](extras/schematics/Schematic%20using%20SN65HVD230_bb.png)
