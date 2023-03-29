@@ -457,6 +457,8 @@ inline __attribute__((always_inline)) unsigned int nBits(uint32_t nCycles)
     return (nCycles + CPU_CYCLES(200)) / VAN_NORMAL_BIT_TIME_CPU_CYCLES;
 } // nBits
 
+uint32_t averageOneBitTime = 0;
+
 // Calculate number of bits from a number of elapsed CPU cycles
 inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(uint32_t nCycles, uint32_t& jitter)
 {
@@ -488,16 +490,16 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
         return 1;
     } // if
 
-    if (nCycles < CPU_CYCLES(1865))
+    if (nCycles < CPU_CYCLES(1863))
     {
-        if (nCycles > CPU_CYCLES(1349)) jitter = nCycles - CPU_CYCLES(1349);  // 1349 --> 1865 = 516
+        if (nCycles > CPU_CYCLES(1349)) jitter = nCycles - CPU_CYCLES(1349);  // 1349 --> 1863 = 514
         return 2;
     } // if
 
-  #define THREE_BIT_BOUNDARY CPU_CYCLES(2513)
+  #define THREE_BIT_BOUNDARY CPU_CYCLES(2500)
     if (nCycles < THREE_BIT_BOUNDARY)
     {
-        if (nCycles > CPU_CYCLES(1998)) jitter = nCycles - CPU_CYCLES(1998);  // 1998 --> 2513 = 515
+        if (nCycles > CPU_CYCLES(1998)) jitter = nCycles - CPU_CYCLES(1998);  // 1998 --> 2500 = 502
         return 3;
     } // if
 
@@ -622,11 +624,32 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     static uint32_t jitter = 0;
     uint32_t nCycles = nCyclesMeasured + jitter;
 
+    // Experiment
+
+    if (nCyclesMeasured > CPU_CYCLES(600) && nCyclesMeasured < CPU_CYCLES(800))
+    {
+        averageOneBitTime = averageOneBitTime == 0 ? CPU_CYCLES(700) : (averageOneBitTime * 99 + nCyclesMeasured + 50) / 100;
+    } // if
+
+    if (averageOneBitTime > CPU_CYCLES(660))
+    {
+        if (averageOneBitTime < CPU_CYCLES(695))
+        {
+            //nCycles = (4 * nCycles + CPU_CYCLES(700) - averageOneBitTime + 2) / 4;
+            nCycles += CPU_CYCLES(10);
+        }
+        else if (averageOneBitTime > CPU_CYCLES(714))
+        {
+            nCycles -= CPU_CYCLES(10);
+        } // if
+    } // if
+
     if (state == VAN_RX_VACANT || state == VAN_RX_SEARCHING)
     {
         // During SOF, timing is slightly different. Timing values were found by trial and error.
 
-        if (nCycles > CPU_CYCLES(2260) && nCycles < THREE_BIT_BOUNDARY) nCycles = THREE_BIT_BOUNDARY;
+      #define MOVE_TOWARDS_THREE_BITS THREE_BIT_BOUNDARY + CPU_CYCLES(10)
+        if (nCycles > CPU_CYCLES(2260) && nCycles < MOVE_TOWARDS_THREE_BITS) nCycles = MOVE_TOWARDS_THREE_BITS;
         //else if (nCycles > CPU_CYCLES(600) && nCycles < CPU_CYCLES(800)) nCycles -= CPU_CYCLES(20);
         else if (nCycles > CPU_CYCLES(1100) && nCycles < ONE_BIT_BOUNDARY) nCycles -= CPU_CYCLES(20);
     }
@@ -882,11 +905,17 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
             jitter = 0;
         }
-        else
+        else if (atBit > 0)
         {
+            const uint16_t prev = readBits;
+
             // Set or clear the last read bit
             readBits = pinLevel == VAN_LOGICAL_LOW ? readBits | 0x0001 : readBits & 0xFFFE;
-        }
+
+            // If last bit was actually flipped, reset jitter
+            //if (atBit > 0 && prev != readBits) jitter = 0;
+            if (prev != readBits) jitter -= _min(jitter, CPU_CYCLES(176));
+        } // if
     }
     else if (samePinLevel)
     {
@@ -1266,6 +1295,8 @@ void TVanPacketRxQueue::DumpStats(Stream& s, bool longForm) const
                 : FloatToStr(floatBuf, 100.0 * overallCorrupt / pktCount, 3));
     } // if
 
+    s.printf_P(PSTR(", avg1bit: %lu"), averageOneBitTime / CPU_F_FACTOR);
+
     s.printf_P(PSTR(", maxQueued: %d/%d\n"), GetMaxQueued(), QueueSize());
 } // TVanPacketRxQueue::DumpStats
 
@@ -1373,7 +1404,7 @@ void TIsrDebugPacket::Dump(Stream& s) const
     while (at > 2 && i < at)
     {
         // Printing all this can take really long...
-        if (i % 100 == 0) wdt_reset();
+        if (i % 50 == 0) wdt_reset();
 
         const TIsrDebugData* isrData = samples + i;
         if (i == 0)
