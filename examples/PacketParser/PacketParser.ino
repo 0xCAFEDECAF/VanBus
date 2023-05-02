@@ -498,7 +498,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 17)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -524,7 +524,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 7)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -572,7 +572,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 2)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -609,7 +609,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 11 && dataLen != 14)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -722,7 +722,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen < 1 || dataLen > 3)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -742,7 +742,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
                 if (dataLen != 3)
                 {
-                    Serial.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
@@ -860,7 +860,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
                 if (dataLen != 1)
                 {
-                    Serial.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
@@ -870,7 +870,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             {
                 if (dataLen != 3)
                 {
-                    Serial.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
@@ -952,7 +952,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             {
                 if (dataLen != 2)
                 {
-                    Serial.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
@@ -996,7 +996,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 27)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -1060,7 +1060,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 14 && dataLen != 16)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -1261,8 +1261,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                         char alarmText[80];  // Make sure this is large enough for the largest string it must hold
                         strncpy_P(alarmText, (char *)pgm_read_dword(&(msgTable[byte * 8 + bit])), sizeof(alarmText) - 1);
                         alarmText[sizeof(alarmText) - 1] = 0;
-                        Serial.printf_P("%S- ", indentStr);
-                        Serial.println(alarmText);
+                        Serial.printf_P("%S- %s\n", indentStr, alarmText);
                     } // if
                 } // for
             } // for
@@ -1291,7 +1290,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 7)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -1326,7 +1325,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 11 && dataLen != 12)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -1397,7 +1396,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     // TODO - some web pages show 22 bytes data, some 23
                     if (dataLen != 22)
                     {
-                        Serial.println(FPSTR(unexpectedPacketLengthStr));
+                        Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                         return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                     } // if
 
@@ -1549,7 +1548,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
                     if (dataLen != 5)
                     {
-                        Serial.println(FPSTR(unexpectedPacketLengthStr));
+                        Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                         return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                     } // if
 
@@ -1577,7 +1576,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
                     if (dataLen != 12)
                     {
-                        Serial.println(FPSTR(unexpectedPacketLengthStr));
+                        Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                         return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                     } // if
 
@@ -1606,7 +1605,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     // TODO - do we know the fixed numbers? Seems like this can only be 10 or 12.
                     if (dataLen < 10)
                     {
-                        Serial.println(FPSTR(unexpectedPacketLengthStr));
+                        Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                         return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                     } // if
 
@@ -1675,7 +1674,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 case INFO_TYPE_CDCHANGER:
                 {
                     Serial.print(F("--> CD changer info: "));
-                    Serial.println(FPSTR(toBeDecodedStr));
+                    Serial.printf_P(PSTR("%S\n"), toBeDecodedStr);
                     return VAN_PACKET_PARSE_TO_BE_DECODED;
                 }
                 break;
@@ -1683,7 +1682,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 default:
                 {
                     Serial.printf_P(PSTR("--> Unknown head unit info type 0x%02X: "), infoType);
-                    Serial.println(FPSTR(toBeDecodedStr));
+                    Serial.printf_P(PSTR("%S\n"), toBeDecodedStr);
                     return VAN_PACKET_PARSE_TO_BE_DECODED;
                 }
                 break;
@@ -1720,7 +1719,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 5)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -1765,7 +1764,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 11)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -1839,7 +1838,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 2)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -1890,7 +1889,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 5)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -2007,7 +2006,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 7)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -2172,7 +2171,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 6)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -2256,7 +2255,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 0 && dataLen != 20)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -2395,7 +2394,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 );
             } // if
 
-            Serial.println();
+            Serial.print("\n");
         }
         break;
 
@@ -2420,7 +2419,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 2 && dataLen != 3 && dataLen != 17)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -2476,7 +2475,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     at += strlen(txt) + 1;
                 } // while
 
-                Serial.println();
+                Serial.print("\n");
             } // if
         }
         break;
@@ -2490,7 +2489,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 16)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -2566,7 +2565,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 3 && dataLen != 4 && dataLen != 6 && dataLen != 13 && dataLen != 16 && dataLen != 23)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -2796,7 +2795,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     if (dataLen != 13)
                     {
                         Serial.print(FPSTR(indentStr));
-                        Serial.println(FPSTR(unexpectedPacketLengthStr));
+                        Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                         return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                     } // if
 
@@ -2809,7 +2808,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     if (dataLen != 6)
                     {
                         Serial.print(FPSTR(indentStr));
-                        Serial.println(FPSTR(unexpectedPacketLengthStr));
+                        Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                         return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                     } // if
 
@@ -2834,7 +2833,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 if (dataLen != 23)
                 {
                     Serial.print(FPSTR(indentStr));
-                    Serial.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
@@ -2849,7 +2848,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 if (dataLen != 3)
                 {
                     Serial.print(FPSTR(indentStr));
-                    Serial.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
@@ -2860,7 +2859,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 if (dataLen != 4)
                 {
                     Serial.print(FPSTR(indentStr));
-                    Serial.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
@@ -2879,7 +2878,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 if (dataLen != 4)
                 {
                     Serial.print(FPSTR(indentStr));
-                    Serial.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
@@ -2897,7 +2896,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen < 3)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -3022,7 +3021,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             // Last packet in report sequence?
             if (lastPacket) Serial.print(F("--LAST--"));
-            Serial.println();
+            Serial.print("\n");
         }
         break;
 
@@ -3035,7 +3034,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 4 && dataLen != 9 && dataLen != 11)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -3323,7 +3322,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 } // if
             } // if
 
-            Serial.println();
+            Serial.print("\n");
         }
         break;
 
@@ -3336,7 +3335,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 27)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -3381,7 +3380,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // <Space>, printed here as '_'
             Serial.printf_P(PSTR("%c"), data[22] >> 1 & 0x01 ? '_' : '.');
 
-            Serial.println();
+            Serial.print("\n");
         }
         break;
 
@@ -3397,11 +3396,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 0)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
-            Serial.println();
+            Serial.print("\n");
         }
         break;
 
@@ -3418,11 +3417,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 1 && dataLen != 2)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
-            Serial.println();
+            Serial.print("\n");
         }
         break;
 
@@ -3441,11 +3440,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 0 && dataLen != 3 && dataLen != 26)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
-            Serial.println();
+            Serial.print("\n");
         }
         break;
 
@@ -3457,7 +3456,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 5)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -3486,7 +3485,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 5)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -3506,7 +3505,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 10)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -3566,7 +3565,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 2)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -3609,7 +3608,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             {
                 if (dataLen != 2)
                 {
-                    Serial.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
@@ -3633,7 +3632,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             {
                 if (dataLen != 2 && dataLen != 11)
                 {
-                    Serial.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
@@ -3691,7 +3690,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             {
                 if (dataLen != 2)
                 {
-                    Serial.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
@@ -3715,7 +3714,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
                 if (dataLen != 5)
                 {
-                    Serial.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
@@ -3732,7 +3731,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             {
                 if (dataLen != 2)
                 {
-                    Serial.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
@@ -3744,7 +3743,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             {
                 if (dataLen != 2)
                 {
-                    Serial.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
@@ -3757,7 +3756,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             {
                 if (dataLen != 4)
                 {
-                    Serial.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
@@ -3773,7 +3772,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             {
                 if (dataLen != 1)
                 {
-                    Serial.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
@@ -3783,7 +3782,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             {
                 if (dataLen != 1)
                 {
-                    Serial.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
@@ -3793,7 +3792,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             {
                 if (dataLen != 1)
                 {
-                    Serial.println(FPSTR(unexpectedPacketLengthStr));
+                    Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
@@ -3811,7 +3810,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
         case AIR_CONDITIONER_DIAG_IDEN:
         {
             Serial.print(F("--> Aircon diag: "));
-            Serial.println(FPSTR(toBeDecodedStr));
+            Serial.printf_P(PSTR("%S\n"), toBeDecodedStr);
             return VAN_PACKET_PARSE_TO_BE_DECODED;
         }
         break;
@@ -3819,7 +3818,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
         case AIR_CONDITIONER_DIAG_COMMAND_IDEN:
         {
             Serial.print(F("--> Aircon diag command: "));
-            Serial.println(FPSTR(toBeDecodedStr));
+            Serial.printf_P(PSTR("%S\n"), toBeDecodedStr);
             return VAN_PACKET_PARSE_TO_BE_DECODED;
         }
         break;
@@ -3830,7 +3829,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 15)
             {
-                Serial.println(FPSTR(unexpectedPacketLengthStr));
+                Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -3884,7 +3883,7 @@ void setup()
 {
     delay(1000);
     Serial.begin(115200);
-    Serial.println(F("Starting VAN bus packet parser"));
+    Serial.print(F("Starting VAN bus packet parser\n"));
 
     // Disable Wi-Fi altogether to get rid of long and variable interrupt latency, causing packet CRC errors
     // From: https://esp8266hints.wordpress.com/2017/06/29/save-power-by-reliably-switching-the-esp-wifi-on-and-off/

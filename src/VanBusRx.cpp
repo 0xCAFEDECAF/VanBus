@@ -1366,7 +1366,7 @@ void TIfsDebugPacket::Dump(Stream& s) const
             for (int i = nBits; i < 6; i++) s.print(" ");
         } // if
 
-        s.println();
+        s.print("\n");
 
         i++;
     } // while
@@ -1461,7 +1461,7 @@ void TIsrDebugPacket::Dump(Stream& s) const
         {
             // Show we just had a long series of 1's (shown as '1......') or 0's (shown as '-......')
             s.print(pinLevel == VAN_LOGICAL_LOW ? F("1......") : F("-......"));
-            s.println();
+            s.print("\n");
 
             reset();
             i++;
@@ -1534,7 +1534,7 @@ void TIsrDebugPacket::Dump(Stream& s) const
 
         prevAtBit = isrData->atBit;
 
-        s.println();
+        s.print("\n");
 
         i++;
     } // while

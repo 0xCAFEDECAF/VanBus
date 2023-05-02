@@ -119,20 +119,20 @@ char RecvOneChar()
 
 void printUsage()
 {
-    Serial.println("Type one of the following letters, then hit <Enter> (or click the 'Send' button):");
-    Serial.println("-> n = send Next message");
-    Serial.println("-> p = send Previous message");
-    Serial.println("-> c = Cycle through all messages");
-    Serial.println("-> s = Stop cycling through all messages");
-    Serial.println("-> h = show this Help text");
+    Serial.print("Type one of the following letters, then hit <Enter> (or click the 'Send' button):\n");
+    Serial.print("-> n = send Next message\n");
+    Serial.print("-> p = send Previous message\n");
+    Serial.print("-> c = Cycle through all messages\n");
+    Serial.print("-> s = Stop cycling through all messages\n");
+    Serial.print("-> h = show this Help text\n");
 } // printUsage
 
 void setup()
 {
     delay(1000);
     Serial.begin(115200);
-    Serial.println("Sketch to demonstrate the sending of MFD notification messages");
-    Serial.println();
+    Serial.print("Sketch to demonstrate the sending of MFD notification messages\n");
+    Serial.print("\n");
 
     // Disable Wi-Fi altogether to get rid of long and variable interrupt latency, causing packet CRC errors
     // From: https://esp8266hints.wordpress.com/2017/06/29/save-power-by-reliably-switching-the-esp-wifi-on-and-off/
@@ -175,7 +175,7 @@ void loop()
 
         case 'c':
         {
-            Serial.println("Starting to send all MFD notifications, one by one");
+            Serial.print("Starting to send all MFD notifications, one by one\n");
             cycling = true;
             CycleMessage(true);
         }
@@ -184,7 +184,7 @@ void loop()
         case 's':
         {
             cycling = false;
-            Serial.println("Stopped sending all MFD notifications");
+            Serial.print("Stopped sending all MFD notifications\n");
         }
         break;
 

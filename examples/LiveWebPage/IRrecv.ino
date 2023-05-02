@@ -246,7 +246,7 @@ IRrecv* irrecv;
 
 void IrSetup()
 {
-    Serial.println(F("Setting up IR receiver"));
+    Serial.print(F("Setting up IR receiver\n"));
 
     // Using GPIO pins to feed the IR receiver. Should be possible with e.g. the TSOP4838 IR receiver as
     // it typically uses only 0.7 mA.
@@ -315,7 +315,7 @@ bool IrReceive(TIrPacket& irPacket)
     if (irPacket.held && (irPacket.value == IB_MENU || irPacket.value == IB_MODE))
     {
       #ifdef DEBUG_IR_RECV
-        Serial.println();
+        Serial.print("\n");
       #endif // DEBUG_IR_RECV
         return false;
     } // if
@@ -377,7 +377,7 @@ bool IrReceive(TIrPacket& irPacket)
         if (countDown > 0)
         {
           #ifdef DEBUG_IR_RECV
-            Serial.println();
+            Serial.print("\n");
           #endif // DEBUG_IR_RECV
             return false;
         } // if
@@ -391,7 +391,7 @@ bool IrReceive(TIrPacket& irPacket)
         if (countDown > 0)
         {
           #ifdef DEBUG_IR_RECV
-            Serial.println();
+            Serial.print("\n");
           #endif // DEBUG_IR_RECV
             return false;
         } // if

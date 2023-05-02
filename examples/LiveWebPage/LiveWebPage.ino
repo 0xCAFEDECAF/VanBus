@@ -910,7 +910,7 @@ void HandleDumpFilter()
             if (i < webServer.args() - 1) Serial.print('&');
         } // for
     } // if
-    Serial.println(F("'"));
+    Serial.print(F("'\n"));
 
     webServer.send(200, F("text/plain"),
         ! found ? F("NOT OK!") :
@@ -1013,7 +1013,7 @@ void setup()
 {
     delay(1000);
     Serial.begin(115200);
-    Serial.println(F("Starting VAN bus live web page server"));
+    Serial.print(F("Starting VAN bus live web page server\n"));
 
     PrintSystemSpecs();
 
@@ -1031,7 +1031,8 @@ void setup()
     webSocket.onEvent(webSocketEvent);
 
     Serial.print(F("Please surf to: http://"));
-    Serial.println(WiFi.localIP());
+    Serial.print(WiFi.localIP());
+    Serial.print("\n");
 
 #if ! defined VAN_RX_ISR_DEBUGGING && ! defined VAN_RX_IFS_DEBUGGING
 

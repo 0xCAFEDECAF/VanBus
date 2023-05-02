@@ -29,7 +29,8 @@ void PrintSystemSpecs()
     Serial.printf_P(PSTR("Flash chip configuration %S\n"), ideSize != realSize ? PSTR("wrong!") : PSTR("ok."));
 
     Serial.print(F("Wi-Fi MAC address: "));
-    Serial.println(WiFi.macAddress());
+    Serial.print(WiFi.macAddress());
+    Serial.print("\n");
 } // PrintSystemSpecs
 
 const char* EspSystemDataToJson(char* buf, const int n)

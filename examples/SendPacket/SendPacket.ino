@@ -48,7 +48,7 @@ void setup()
 {
     delay(1000);
     Serial.begin(115200);
-    Serial.println("Starting VAN bus transmitter");
+    Serial.print("Starting VAN bus transmitter\n");
 
   #ifdef  ARDUINO_ARCH_ESP8266 
     // Disable WIFI altogether to get rid of long and variable interrupt latency, causing packet CRC errors

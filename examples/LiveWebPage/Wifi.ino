@@ -1,8 +1,8 @@
 
 #include "Config.h"
 
-char* ssid = WIFI_SSID;
-char* password = WIFI_PASSWORD;
+const char* ssid = WIFI_SSID;
+const char* password = WIFI_PASSWORD;
 
 const char* GetHostname()
 {
@@ -35,7 +35,7 @@ void SetupWifi()
         Serial.print(".");
         delay(500);
     } // while
-    Serial.println(F(" OK"));
+    Serial.print(F(" OK\n"));
 
     WiFi.hostname(GetHostname());
 

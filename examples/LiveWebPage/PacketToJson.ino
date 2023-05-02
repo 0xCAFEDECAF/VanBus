@@ -24,7 +24,7 @@ typedef VanPacketParseResult_t (*TPacketParser)(TVanPacketRxDesc&, char*, const 
 struct IdenHandler_t
 {
     uint16_t iden;
-    char* idenStr;
+    const char* idenStr;
     int dataLen;
     bool ignoreDups;
     TPacketParser parser;
@@ -4423,12 +4423,12 @@ bool IsPacketDataDuplicate(TVanPacketRxDesc& pkt, IdenHandler_t* handler)
                     } // if
                     Serial.printf_P(PSTR("%s%S"), diffByte, i < n - 1 ? dashStr : emptyStr);
                 } // for
-                Serial.println();
             }
             else
             {
-                Serial.println("<no_data>");
+                Serial.print("<no_data>");
             } // if
+            Serial.print("\n");
         } // if
     } // if
   #endif // PRINT_RAW_PACKET_DATA
@@ -4454,12 +4454,12 @@ bool IsPacketDataDuplicate(TVanPacketRxDesc& pkt, IdenHandler_t* handler)
             {
                 Serial.printf_P(PSTR("%02X%S"), data[i], i < dataLen - 1 ? dashStr : emptyStr);
             } // for
-            Serial.println();
         }
         else
         {
-            Serial.println("<no_data>");
+            Serial.print("<no_data>");
         } // if
+        Serial.print("\n");
     } // if
   #endif // PRINT_RAW_PACKET_DATA
 
