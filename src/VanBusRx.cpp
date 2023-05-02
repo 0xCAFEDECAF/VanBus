@@ -670,7 +670,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         {
             if (nCyclesMeasured > CPU_CYCLES(900) && nCyclesMeasured < CPU_CYCLES(988))
             {
-                nCycles += CPU_CYCLES(10);
+                nCycles += CPU_CYCLES(22);
             } // if
         } // if
     } // if
