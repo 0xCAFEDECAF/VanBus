@@ -659,9 +659,9 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
         if (jitter < CPU_CYCLES(300))
         {
-          #define MOVE_TOWARDS_TWO_BITS_AT CPU_CYCLES(1235)
+          #define MOVE_TOWARDS_TWO_BITS_AT CPU_CYCLES(1198)
           #define MOVE_TOWARDS_TWO_BITS ONE_BIT_BOUNDARY - MOVE_TOWARDS_TWO_BITS_AT
-            if (nCyclesMeasured > CPU_CYCLES(987) && nCyclesMeasured < ONE_BIT_BOUNDARY && nCycles >= CPU_CYCLES(1220))
+            if (nCyclesMeasured > CPU_CYCLES(987) && nCyclesMeasured < ONE_BIT_BOUNDARY && nCycles >= MOVE_TOWARDS_TWO_BITS_AT)
             {
                 nCycles += MOVE_TOWARDS_TWO_BITS;
             } // if

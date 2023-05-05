@@ -189,20 +189,6 @@ class TVanPacketRxDesc
     bool CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)() const = 0);
     void DumpRaw(Stream& s, char last = '\n') const;
 
-    // Example of the longest string that can be dumped (not realistic):
-    // "Raw: #1234 (123/123) 28(33) 0E ABC RA0 01-02-03-04-05-06-07-08-09-10-11-12-13-14-15-16-17-18-19-20-21-22-
-    //     23-24-25-26-27-28:CC-DD NO_ACK ERROR_MAX_PACKET CCDD CRC_ERROR"
-    // + 1 for terminating '\0'
-    #define VAN_MAX_DUMP_RAW_SIZE (38 + VAN_MAX_DATA_BYTES * 3 + 45 + 1)
-
-  #ifdef VAN_RX_IFS_DEBUGGING
-    const TIfsDebugPacket& getIfsDebugPacket() const { return ifsDebugPacket; }
-  #endif // VAN_RX_IFS_DEBUGGING
-
-  #ifdef VAN_RX_ISR_DEBUGGING
-    const TIsrDebugPacket& getIsrDebugPacket() const { return *isrDebugPacket; }
-  #endif // VAN_RX_ISR_DEBUGGING
-
     // String representation of various fields.
     // Notes:
     // - Uses statically allocated buffer, so don't call twice within the same printf invocation
@@ -229,6 +215,20 @@ class TVanPacketRxDesc
             result == VAN_RX_ERROR_MAX_PACKET ? "ERROR_MAX_PACKET" :
             "ERROR_??";
     } // ResultStr
+
+    // Example of the longest string that can be dumped (not realistic):
+    // "Raw: #1234 (123/123) 28(33) 0E ABC RA0 01-02-03-04-05-06-07-08-09-10-11-12-13-14-15-16-17-18-19-20-21-22-
+    //     23-24-25-26-27-28:CC-DD NO_ACK ERROR_MAX_PACKET CCDD CRC_ERROR"
+    // + 1 for terminating '\0'
+    #define VAN_MAX_DUMP_RAW_SIZE (38 + VAN_MAX_DATA_BYTES * 3 + 45 + 1)
+
+  #ifdef VAN_RX_IFS_DEBUGGING
+    const TIfsDebugPacket& getIfsDebugPacket() const { return ifsDebugPacket; }
+  #endif // VAN_RX_IFS_DEBUGGING
+
+  #ifdef VAN_RX_ISR_DEBUGGING
+    const TIsrDebugPacket& getIsrDebugPacket() const { return *isrDebugPacket; }
+  #endif // VAN_RX_ISR_DEBUGGING
 
     __attribute__((always_inline)) bool IsSatnavPacket() const
     {
