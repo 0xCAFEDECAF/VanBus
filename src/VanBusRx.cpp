@@ -633,10 +633,10 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
     if (averageOneBitTime > CPU_CYCLES(660))
     {
-        if (averageOneBitTime < CPU_CYCLES(695))
+        if (averageOneBitTime < CPU_CYCLES(693))
         {
             //nCycles = (4 * nCycles + CPU_CYCLES(700) - averageOneBitTime + 2) / 4;
-            nCycles += CPU_CYCLES(10);
+            nCycles += CPU_CYCLES(5);
         }
         else if (averageOneBitTime > CPU_CYCLES(714))
         {
@@ -661,7 +661,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         {
           #define MOVE_TOWARDS_TWO_BITS_AT CPU_CYCLES(1198)
           #define MOVE_TOWARDS_TWO_BITS ONE_BIT_BOUNDARY - MOVE_TOWARDS_TWO_BITS_AT
-            if (nCyclesMeasured > CPU_CYCLES(987) && nCyclesMeasured < ONE_BIT_BOUNDARY && nCycles >= MOVE_TOWARDS_TWO_BITS_AT)
+            if (nCyclesMeasured > CPU_CYCLES(986) && nCyclesMeasured < ONE_BIT_BOUNDARY && nCycles >= MOVE_TOWARDS_TWO_BITS_AT)
             {
                 nCycles += MOVE_TOWARDS_TWO_BITS;
             } // if
