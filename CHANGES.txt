@@ -1,4 +1,27 @@
 0.3.3
+    General:
+    * Moved code to src/ subdir to adhere to '1.5 library format (rev. 2.2)'
+    * Updated README.md
+    * All lines end consistently with "\n" (no more lines ending with "\r\n")
+    * Fix compiler warnings
+
+    src/VanBusRx.cpp:
+    * Implement simple packet drop policy for queue filling up
+    * Experiment: use time average of measured one-bit CPU cycles to adjust timing of bits
+    * If (nBits == 0): reset jitter if last bit was actually flipped
+    * Small updates in the bit timing criteria
+
+    src/VanBusRx.h:
+    * Move methods 'getIfsDebugPacket' and 'getIsrDebugPacket' down, to match as listed in README.MD
+
+    extras/schematics:
+    * Added labels
+
+    examples/LiveWebPage:
+    * Rename IDEN 0xB0E from ECU_IDEN to SATNAV_GPS_INFO
+
+    examples/PacketParser:
+    * Rename IDEN 0xB0E from ECU_IDEN to SATNAV_GPS_INFO
 
 0.3.2
     General:
