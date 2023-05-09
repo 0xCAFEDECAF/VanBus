@@ -362,6 +362,7 @@ class TVanPacketRxQueue
         , nUncertainBitErrors(0)
         , nQueued(0)
         , maxQueued(0)
+        , isEssentialPacket(0)
     { }
 
     bool Setup(uint8_t rxPin, int queueSize = VAN_DEFAULT_RX_QUEUE_SIZE);
@@ -374,6 +375,8 @@ class TVanPacketRxQueue
     void Disable();
     void Enable();
     bool IsEnabled() { return enabled; }
+
+    void SetDropPolicy(int startAt, bool (*isEssential)(const TVanPacketRxDesc&));
 
     bool IsSetup() const { return pin != VAN_NO_PIN_ASSIGNED; }
     uint32_t GetCount() const { return count; }  // TODO - use ISR_SAFE_GET ?
@@ -415,6 +418,10 @@ class TVanPacketRxQueue
     volatile int nQueued;
     volatile int maxQueued;
 
+    // Drop policy
+    int startDroppingPacketsAt;
+    bool (*isEssentialPacket)(const TVanPacketRxDesc&);
+
     void RegisterTxTimerTicks(uint32_t ticks) { txTimerTicks = ticks; };
     void RegisterTxIsr(timercallback isr) { ISR_SAFE_SET(txTimerIsr, isr); };
 
@@ -424,7 +431,7 @@ class TVanPacketRxQueue
     bool IsQueueOverrun() { NO_INTERRUPTS; bool result = _overrun; _overrun = false; INTERRUPTS; return result; }
 
     // Only to be called from ISR, unsafe otherwise
-    __attribute__((always_inline)) void _AdvanceHead()
+    void _AdvanceHead()
     {
         _head->millis_ = millis();
         _head->state = VAN_RX_DONE;
@@ -444,12 +451,23 @@ class TVanPacketRxQueue
                 if (isrDebugPacket == isrDebugPacketPool + N_ISR_DEBUG_PACKETS) isrDebugPacket = isrDebugPacketPool;
             } while (isrDebugPacket->rLock && isrDebugPacket != _head->isrDebugPacket);
         } // if
+
       #endif // VAN_RX_ISR_DEBUGGING
 
-        if (++_head == end) _head = pool;  // Roll over if needed
+        // Implement simple drop policy
+        if (nQueued <= startDroppingPacketsAt || (isEssentialPacket != 0 && (*isEssentialPacket)(*_head)))
+        {
+            // Move to next slot in queue
+            if (++_head == end) _head = pool;  // Roll over if needed
 
-        // Keep track of queue fill level
-        if (++nQueued > maxQueued) maxQueued = nQueued;
+            // Keep track of queue fill level
+            if (++nQueued > maxQueued) maxQueued = nQueued;
+        }
+        else
+        {
+            // Drop just read packet; free current slot in queue
+            _head->Init();
+        } // if
 
       #ifdef VAN_RX_ISR_DEBUGGING
         isrDebugPacket->Init();

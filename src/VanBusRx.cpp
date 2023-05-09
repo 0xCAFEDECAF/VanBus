@@ -1157,6 +1157,7 @@ bool TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
     pinMode(rxPin, INPUT_PULLUP);
 
     size = queueSize;
+    startDroppingPacketsAt = queueSize;
     pool = new TVanPacketRxDesc[queueSize];
     _head = pool;
     tail = pool;
@@ -1224,6 +1225,12 @@ void TVanPacketRxQueue::Enable()
     attachInterrupt(digitalPinToInterrupt(VanBusRx.pin), RxPinChangeIsr, CHANGE);
     enabled = true;
 } // TVanPacketRxQueue::Enable
+
+void TVanPacketRxQueue::SetDropPolicy(int startAt, bool (*isEssential)(const TVanPacketRxDesc& pkt) = 0)
+{
+    startDroppingPacketsAt = startAt;
+    isEssentialPacket = isEssential;
+} // TVanPacketRxQueue::SetDropPolicy
 
 // Simple function to generate a string representation of a float value.
 // Note: passed buffer size must be (at least) MAX_FLOAT_SIZE bytes, e.g. declare like this:
