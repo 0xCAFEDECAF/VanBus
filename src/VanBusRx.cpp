@@ -631,6 +631,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
         averageOneBitTime = averageOneBitTime == 0 ? CPU_CYCLES(700) : (averageOneBitTime * 99 + nCyclesMeasured + 50) / 100;
     } // if
 
+  #if 0
     if (averageOneBitTime > CPU_CYCLES(660))
     {
         if (averageOneBitTime < CPU_CYCLES(693))
@@ -643,6 +644,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             nCycles -= CPU_CYCLES(10);
         } // if
     } // if
+  #endif
 
     if (state == VAN_RX_VACANT || state == VAN_RX_SEARCHING)
     {
@@ -888,7 +890,17 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             RETURN;
         } // if
 
-        rxDesc->result = VAN_RX_ERROR_NBITS;
+        if (atBit == 9)
+        {
+            uint16_t currentByte = readBits << 1;
+            uint8_t readByte = (currentByte >> 2 & 0xF0) | (currentByte >> 1 & 0x0F);
+            rxDesc->bytes[rxDesc->size++] = readByte;
+        }
+        else
+        {
+            rxDesc->result = VAN_RX_ERROR_NBITS;
+        } // if
+
         VanBusRx._AdvanceHead();
 
         RETURN;
