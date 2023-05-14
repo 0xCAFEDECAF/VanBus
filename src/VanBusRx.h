@@ -431,7 +431,7 @@ class TVanPacketRxQueue
     bool IsQueueOverrun() { NO_INTERRUPTS; bool result = _overrun; _overrun = false; INTERRUPTS; return result; }
 
     // Only to be called from ISR, unsafe otherwise
-    void _AdvanceHead()
+    void ICACHE_RAM_ATTR _AdvanceHead()
     {
         _head->millis_ = millis();
         _head->state = VAN_RX_DONE;
