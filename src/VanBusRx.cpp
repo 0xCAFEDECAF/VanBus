@@ -1244,6 +1244,54 @@ void TVanPacketRxQueue::SetDropPolicy(int startAt, bool (*isEssential)(const TVa
     isEssentialPacket = isEssential;
 } // TVanPacketRxQueue::SetDropPolicy
 
+void ICACHE_RAM_ATTR TVanPacketRxQueue::_AdvanceHead()
+{
+    _head->millis_ = millis();
+    _head->state = VAN_RX_DONE;
+    _head->seqNo = count++;
+    if (_head->IsSatnavPacket()) countSatnav++;  // TODO - remove
+
+  #ifdef VAN_RX_ISR_DEBUGGING
+
+    // Keep the ISR debug packet if CRC is wrong, otherwise just overwrite
+    if (! _head->CheckCrc())
+    {
+        isrDebugPacket->wLock = false;  // Indicate this debug packet is free for reading
+
+        // Move to the next debug packet, but skip it if it is currently being read
+        do
+        {
+            isrDebugPacket++;
+            if (isrDebugPacket == isrDebugPacketPool + N_ISR_DEBUG_PACKETS) isrDebugPacket = isrDebugPacketPool;
+        } while (isrDebugPacket->rLock && isrDebugPacket != _head->isrDebugPacket);
+    } // if
+  #endif // VAN_RX_ISR_DEBUGGING
+
+    // Implement simple drop policy
+    if (nQueued <= startDroppingPacketsAt || (isEssentialPacket != 0 && (*isEssentialPacket)(*_head)))
+    {
+        // Move to next slot in queue
+        if (++_head == end) _head = pool;  // Roll over if needed
+
+        // Keep track of queue fill level
+        if (++nQueued > maxQueued) maxQueued = nQueued;
+    }
+    else
+    {
+        // Drop just read packet; free current slot in queue
+        _head->Init();
+    } // if
+
+  #ifdef VAN_RX_ISR_DEBUGGING
+    isrDebugPacket->Init();
+    _head->isrDebugPacket = isrDebugPacket;
+  #endif // VAN_RX_ISR_DEBUGGING
+
+  #ifdef VAN_RX_IFS_DEBUGGING
+    _head->ifsDebugPacket.Init();
+  #endif // VAN_RX_IFS_DEBUGGING
+} // _AdvanceHead
+
 // Simple function to generate a string representation of a float value.
 // Note: passed buffer size must be (at least) MAX_FLOAT_SIZE bytes, e.g. declare like this:
 //   char buffer[MAX_FLOAT_SIZE];
