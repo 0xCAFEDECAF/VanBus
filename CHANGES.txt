@@ -9,10 +9,13 @@
     * Implement simple packet drop policy for queue filling up
     * Experiment: use time average of measured one-bit CPU cycles to adjust timing of bits
     * If (nBits == 0): reset jitter if last bit was actually flipped
+    * If there are still 9 last read bits at end of packet, store those bits and keep the read
+      result VAN_RX_PACKET_OK
     * Small updates in the bit timing criteria
 
     src/VanBusRx.h:
     * Move methods 'getIfsDebugPacket' and 'getIsrDebugPacket' down, to match as listed in README.MD
+    * Moved method '_AdvanceHead' from .h file to .cpp file
 
     extras/schematics:
     * Added labels
