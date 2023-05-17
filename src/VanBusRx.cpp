@@ -599,7 +599,6 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     prev = curr;
 
     const bool samePinLevel = (pinLevel == prevPinLevel);
-    prevPinLevel = pinLevel;
 
     // Prevent CPU monopolization by noise on bus
     static int noiseCounter = 0;
@@ -683,11 +682,20 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
     // Experiment
   #define SMALLEST_JITTER CPU_CYCLES(20)
-  #define LARGE_JITTER_RUNDOWN CPU_CYCLES(30)
-  #define SMALL_JITTER_RUNDOWN SMALLEST_JITTER
-    if (jitter < SMALLEST_JITTER) jitter = 0;
-    else if (jitter > 400 && jitter > prevJitter - CPU_CYCLES(30) && jitter < prevJitter + CPU_CYCLES(5)) jitter -= LARGE_JITTER_RUNDOWN;
-    else if (jitter > prevJitter - CPU_CYCLES(15) && jitter < prevJitter + CPU_CYCLES(18)) jitter -= SMALL_JITTER_RUNDOWN;
+    if (jitter < SMALLEST_JITTER)
+    {
+        jitter = 0;
+    }
+    else if (jitter <= CPU_CYCLES(200))
+    {
+      #define SMALL_JITTER_RUNDOWN SMALLEST_JITTER
+        if (jitter > prevJitter - CPU_CYCLES(15) && jitter < prevJitter + CPU_CYCLES(18)) jitter -= SMALL_JITTER_RUNDOWN;
+    }
+    else
+    {
+      #define LARGE_JITTER_RUNDOWN CPU_CYCLES(30)
+        if (jitter > prevJitter - CPU_CYCLES(30) && jitter < prevJitter + CPU_CYCLES(5)) jitter -= LARGE_JITTER_RUNDOWN;
+    } // if
 
   #ifdef VAN_RX_ISR_DEBUGGING
 
@@ -753,6 +761,8 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     #define DEBUG_ISR_M(TO_, FROM_, MAX_)
 
   #endif // VAN_RX_ISR_DEBUGGING
+
+    prevPinLevel = pinLevel;
 
     uint16_t flipBits = 0;
 
