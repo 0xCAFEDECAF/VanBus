@@ -649,8 +649,8 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     {
         // During SOF, timing is slightly different. Timing values were found by trial and error.
 
-      #define MOVE_TOWARDS_THREE_BITS THREE_BIT_BOUNDARY + CPU_CYCLES(10)
-        if (nCycles > CPU_CYCLES(2260) && nCycles < MOVE_TOWARDS_THREE_BITS) nCycles = MOVE_TOWARDS_THREE_BITS;
+      #define FOUR_BITS THREE_BIT_BOUNDARY + CPU_CYCLES(10)
+        if (nCycles > CPU_CYCLES(2284) && nCycles < FOUR_BITS) nCycles = FOUR_BITS;
         //else if (nCycles > CPU_CYCLES(600) && nCycles < CPU_CYCLES(800)) nCycles -= CPU_CYCLES(20);
         else if (nCycles > CPU_CYCLES(1100) && nCycles < ONE_BIT_BOUNDARY) nCycles -= CPU_CYCLES(20);
     }
@@ -936,7 +936,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
             // If last bit was actually flipped, reset jitter
             //if (atBit > 0 && prev != readBits) jitter = 0;
-            if (prev != readBits) jitter -= _min(jitter, CPU_CYCLES(176));
+            if (prev != readBits) jitter -= _min(jitter, CPU_CYCLES(157));
         } // if
     }
     else if (samePinLevel)
