@@ -2442,7 +2442,12 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     status == 0x0110 ? ToHexStr(status) :
                     status == 0x0120 ? PSTR("ACCEPTED_TERMS_AND_CONDITIONS") :
                     status == 0x0140 ? PSTR("GPS_POS_FOUND") :
-                    status == 0x0306 ? PSTR("SATNAV_DISC_ID_READ") :
+                    status == 0x0300 ? PSTR("SATNAV_LANGUAGE_SET_TO_FRENCH") :
+                    status == 0x0301 ? PSTR("SATNAV_LANGUAGE_SET_TO_ENGLISH") :
+                    status == 0x0302 ? PSTR("SATNAV_LANGUAGE_SET_TO_GERMAN") :
+                    status == 0x0303 ? PSTR("SATNAV_LANGUAGE_SET_TO_SPANISH") :
+                    status == 0x0304 ? PSTR("SATNAV_LANGUAGE_SET_TO_ITALIAN") :
+                    status == 0x0306 ? PSTR("SATNAV_LANGUAGE_SET_TO_DUTCH") :
                     status == 0x0C01 ? PSTR("CD_ROM_FOUND") :
                     status == 0x0C02 ? PSTR("POWERING_OFF") :
                     ToHexStr(status)
