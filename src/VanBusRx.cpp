@@ -483,7 +483,7 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
         return 0;
     } // if
 
-  #define ONE_BIT_BOUNDARY CPU_CYCLES(1292)
+  #define ONE_BIT_BOUNDARY CPU_CYCLES(1281)
     if (nCycles < ONE_BIT_BOUNDARY)
     {
         if (nCycles > CPU_CYCLES(712)) jitter = nCycles - CPU_CYCLES(712);  // 712 --> 1292 = 580
