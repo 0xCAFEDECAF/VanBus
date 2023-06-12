@@ -44,11 +44,12 @@ There are various possibilities to hook up a ESP8266 based board to your vehicle
    [here](https://webshop.domoticx.nl/can-bus-transceiver-module-5v-mcp2551) or
    [here](https://nl.aliexpress.com/item/1005004475976642.html).
 
-![schema](extras/schematics/Schematic%20using%20MCP2551_bb.png)
+![schema](extras/Schematics/Schematic%20using%20MCP2551_bb.png)
 
 > 👉 Note 1: CANH of the transceiver is connected to VAN BAR (DATA B), CANL to VAN (DATA). This may seem illogical
      but in practice it turns out this works best.
-> 👉 Note 2: The clamping circuit (D1, D2, R1) seems to help in reducing the amount of bit errors (CRC errors).
+> 👉 Note 2: The clamping circuit (D1, D2, R1) seems to (somehow) help in reducing the amount of bit errors
+     (packet CRC errors).
 
 2. Use a [SN65HVD230] transceiver, connected with its CANH and CANL pins to the vehicle's VAN bus.
    The SN65HVD230 transceiver already has 3.3V logic, so it is possible to directly connect the CRX / RXD / R pin of
@@ -58,17 +59,18 @@ There are various possibilities to hook up a ESP8266 based board to your vehicle
    A board with the SN65HVD230 transceiver can be ordered e.g.
    [here](https://webshop.domoticx.nl/index.php?route=product/product&product_id=3935).
 
-![schema](extras/schematics/Schematic%20using%20SN65HVD230_bb.png)
+![schema](extras/Schematics/Schematic%20using%20SN65HVD230_bb.png)
    
 > 👉 Note 1: CANH of the transceiver is connected to VAN BAR (DATA B), CANL to VAN (DATA). This may seem illogical
      but in practice it turns out this works best.
-> 👉 Note 2: The clamping circuit (D1, D2, R1) seems to help in reducing the amount of bit errors (CRC errors).
+> 👉 Note 2: The clamping circuit (D1, D2, R1) seems to (somehow) help in reducing the amount of bit errors
+     (packet CRC errors).
 
 3. The simplest schematic is not to use a transceiver at all, but connect the VAN DATA line to GrouND using
    two 4.7 kOhm resistors. Connect the GPIO pin of your ESP8266 board to the 1:2 [voltage divider] that is thus
    formed by the two resistors. This is only for receiving packets, not for transmitting. Results may vary.
 
-![schema](extras/schematics/Schematic%20using%20voltage%20divider_bb.png)
+![schema](extras/Schematics/Schematic%20using%20voltage%20divider_bb.png)
    
 > 👉 Note: I used this schematic during many long debugging hours, but I cannot guarantee that it won't ultimately
      cause your car to explode! (or anything less catastrofic)
