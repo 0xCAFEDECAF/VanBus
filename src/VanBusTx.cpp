@@ -148,7 +148,7 @@ void TVanPacketTxQueue::Setup(uint8_t theRxPin, uint8_t theTxPin)
     txPin = theTxPin;
 
     pinMode(theTxPin, OUTPUT);
-    digitalWrite(theTxPin, VAN_BIT_RECESSIVE);  // Set bus state to 'recessive'; CANH and CANL: not driven)
+    digitalWrite(theTxPin, VAN_BIT_RECESSIVE);  // Set bus state to 'recessive' (CANH and CANL: not driven)
 
     VanBusRx.Setup(theRxPin);
     VanBusRx.RegisterTxTimerTicks(VAN_BIT_TIMER_TICKS);

@@ -48,6 +48,7 @@ There are various possibilities to hook up a ESP8266 based board to your vehicle
 
 > 👉 Note 1: CANH of the transceiver is connected to VAN BAR (DATA B), CANL to VAN (DATA). This may seem illogical
      but in practice it turns out this works best.
+
 > 👉 Note 2: The clamping circuit (D1, D2, R1) seems to (somehow) help in reducing the amount of bit errors
      (packet CRC errors).
 
@@ -63,6 +64,7 @@ There are various possibilities to hook up a ESP8266 based board to your vehicle
    
 > 👉 Note 1: CANH of the transceiver is connected to VAN BAR (DATA B), CANL to VAN (DATA). This may seem illogical
      but in practice it turns out this works best.
+
 > 👉 Note 2: The clamping circuit (D1, D2, R1) seems to (somehow) help in reducing the amount of bit errors
      (packet CRC errors).
 
