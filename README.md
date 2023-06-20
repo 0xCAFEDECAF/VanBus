@@ -46,10 +46,10 @@ There are various possibilities to hook up a ESP8266 based board to your vehicle
 
 ![schema](extras/Schematics/Schematic%20using%20MCP2551_bb.png)
 
-> 👉 Note 1: CANH of the transceiver is connected to VAN BAR (DATA B), CANL to VAN (DATA). This may seem illogical
+> 👉 Notes:
+>  * CANH of the transceiver is connected to VAN BAR (DATA B), CANL to VAN (DATA). This may seem illogical
      but in practice it turns out this works best.
-
-> 👉 Note 2: The clamping circuit (D1, D2, R1) seems to (somehow) help in reducing the amount of bit errors
+>  * The clamping circuit (D1, D2, R1) seems to (somehow) help in reducing the amount of bit errors
      (packet CRC errors).
 
 2. Use a [SN65HVD230] transceiver, connected with its CANH and CANL pins to the vehicle's VAN bus.
@@ -62,10 +62,10 @@ There are various possibilities to hook up a ESP8266 based board to your vehicle
 
 ![schema](extras/Schematics/Schematic%20using%20SN65HVD230_bb.png)
    
-> 👉 Note 1: CANH of the transceiver is connected to VAN BAR (DATA B), CANL to VAN (DATA). This may seem illogical
+> 👉 Notes:
+>  * CANH of the transceiver is connected to VAN BAR (DATA B), CANL to VAN (DATA). This may seem illogical
      but in practice it turns out this works best.
-
-> 👉 Note 2: The clamping circuit (D1, D2, R1) seems to (somehow) help in reducing the amount of bit errors
+>  * The clamping circuit (D1, D2, R1) seems to (somehow) help in reducing the amount of bit errors
      (packet CRC errors).
 
 3. The simplest schematic is not to use a transceiver at all, but connect the VAN DATA line to GrouND using
