@@ -30,7 +30,7 @@ excellent library: [ESP32 RMT peripheral Vehicle Area Network (VAN bus) reader].
 
 ## 🔌 Schematics<a name = "schematics"></a>
 
-You can usually find the VAN bus on pins 2 and 3 of ISO block "A" of your head unit (car radio). See 
+You can usually find the VAN bus on pins 2 and 3 of ISO block "A" of your head unit (car radio). See
 https://en.wikipedia.org/wiki/Connectors_for_car_audio and https://github.com/morcibacsi/esp32_rmt_van_rx#schematics .
 
 There are various possibilities to hook up a ESP8266 based board to your vehicle's VAN bus:
@@ -61,7 +61,7 @@ There are various possibilities to hook up a ESP8266 based board to your vehicle
    [here](https://webshop.domoticx.nl/index.php?route=product/product&product_id=3935).
 
 ![schema](extras/Schematics/Schematic%20using%20SN65HVD230_bb.png)
-   
+
 > 👉 Notes:
 >  * CANH of the transceiver is connected to VAN BAR (DATA B), CANL to VAN (DATA). This may seem illogical
      but in practice it turns out this works best.
@@ -73,7 +73,7 @@ There are various possibilities to hook up a ESP8266 based board to your vehicle
    formed by the two resistors. This is only for receiving packets, not for transmitting. Results may vary.
 
 ![schema](extras/Schematics/Schematic%20using%20voltage%20divider_bb.png)
-   
+
 > 👉 Note: I used this schematic during many long debugging hours, but I cannot guarantee that it won't ultimately
      cause your car to explode! (or anything less catastrofic)
 
@@ -82,21 +82,21 @@ There are various possibilities to hook up a ESP8266 based board to your vehicle
 ### General<a name = "general"></a>
 
 Add the following line to your ```.ino``` sketch:
-```
+```cpp
 #include <VanBus.h>
 ```
 
 For receiving and transmitting packets:
 
 1. Add the following lines to your initialisation block ```void setup()```:
-```
+```cpp
 int TX_PIN = D3; // GPIO pin connected to VAN bus transceiver input
 int RX_PIN = D2; // GPIO pin connected to VAN bus transceiver output
 TVanBus::Setup(RX_PIN, TX_PIN);
 ```
 
 2. Add e.g. the following lines to your main loop ```void loop()```:
-```
+```cpp
 TVanPacketRxDesc pkt;
 if (VanBus.Receive(pkt)) pkt.DumpRaw(Serial);
 
@@ -108,13 +108,13 @@ If you only want to receive packets, you may save a few hundred precious bytes b
 object:
 
 1. Add the following lines to your initialisation block ```void setup()```:
-```
+```cpp
 int RX_PIN = D2; // GPIO pin connected to VAN bus transceiver output
 VanBusRx.Setup(RX_PIN);
 ```
 
 2. Add the following lines to your main loop ```void loop()```:
-```
+```cpp
 TVanPacketRxDesc pkt;
 if (VanBusRx.Receive(pkt)) pkt.DumpRaw(Serial);
 ```
@@ -136,12 +136,13 @@ Interfaces for receiving packets:
 6. [```int QueueSize()```](#QueueSize)
 7. [```int GetNQueued()```](#GetNQueued)
 8. [```int GetMaxQueued()```](#GetMaxQueued)
+9. [```void SetDropPolicy(int startAt, bool (*isEssential)(const TVanPacketRxDesc&) = 0)```](#SetDropPolicy)
 
 Interfaces for transmitting packets:
 
-9. [```bool SyncSendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)```](#SyncSendPacket)
-10. [```bool SendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)```](#SendPacket)
-11. [```uint32_t GetTxCount()```](#GetTxCount)
+10. [```bool SyncSendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)```](#SyncSendPacket)
+11. [```bool SendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)```](#SendPacket)
+12. [```uint32_t GetTxCount()```](#GetTxCount)
 
 ---
 
@@ -179,15 +180,45 @@ Returns the number of VAN packets currently queued.
 
 Returns the highest number of VAN packets that were queued.
 
-#### 9. ```bool SyncSendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)``` <a name = "SyncSendPacket"></a>
+#### 9. ```void SetDropPolicy(int startAt, bool (*isEssential)(const TVanPacketRxDesc&) = 0)``` <a name = "SetDropPolicy"></a>
+
+Implements a simple packet drop policy for if the receive queue is starting to fill up.
+
+Packets are dropped if the receive queue has ```startAt``` packets or more queued, unless a packet is identified
+as "important". To identify such packets, pass a function pointer via the ```isEssential``` parameter. The passed
+function is called within interrupt context, so it *must* have the ```ICACHE_RAM_ATTR``` attribute.
+
+Example:
+
+```cpp
+bool ICACHE_RAM_ATTR IsImportantPacket(const TVanPacketRxDesc& pkt)
+{
+    return
+        pkt.DataLen() >= 3 &&
+        (
+            pkt.Iden() == CAR_STATUS1_IDEN  // Right-hand stalk button press
+            || (pkt.Iden() == DEVICE_REPORT && pkt.Data()[0] == 0x8A)  // head_unit_report, head_unit_button_pressed
+        );
+} // IsImportantPacket
+
+#define RX_PIN D2
+#define VAN_PACKET_QUEUE_SIZE 60
+VanBusRx.Setup(RX_PIN, VAN_PACKET_QUEUE_SIZE);
+VanBusRx.SetDropPolicy(VAN_PACKET_QUEUE_SIZE * 8 / 10, &IsImportantPacket);
+```
+
+The above example will drop incoming packets if the recieve queue contains 48 or more packets, unless they
+are recognized by ```IsImportantPacket```.
+
+#### 10. ```bool SyncSendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)``` <a name = "SyncSendPacket"></a>
 
 Sends a packet for transmission. Returns ```true``` if the packet was successfully transmitted.
 
-#### 10. ```bool SendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)``` <a name = "SendPacket"></a>
+#### 11. ```bool SendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)``` <a name = "SendPacket"></a>
 
 Queues a packet for transmission. Returns ```true``` if the packet was successfully queued.
 
-#### 11. ```uint32_t GetTxCount()``` <a name = "GetTxCount"></a>
+#### 12. ```uint32_t GetTxCount()``` <a name = "GetTxCount"></a>
 
 Returns the number of VAN packets, offered for transmitting, since power-on. Counter may roll over.
 
@@ -290,16 +321,18 @@ Example of output:
 
 Example of dumping into a char array:
 
-    const char* PacketRawToStr(TVanPacketRxDesc& pkt)
-    {
-        static char dumpBuffer[MAX_DUMP_RAW_SIZE];
-        
-        GString str(dumpBuffer);
-        PrintAdapter streamer(str);
-        pkt.DumpRaw(streamer, '\0');
-        
-        return dumpBuffer;
-    }
+```cpp
+const char* PacketRawToStr(TVanPacketRxDesc& pkt)
+{
+    static char dumpBuffer[MAX_DUMP_RAW_SIZE];
+
+    GString str(dumpBuffer);
+    PrintAdapter streamer(str);
+    pkt.DumpRaw(streamer, '\0');
+
+    return dumpBuffer;
+}
+```
 
 Note: for this, you will need to install the [PrintEx](https://github.com/Chris--A/PrintEx) library. I tested with
 version 1.2.0 .
