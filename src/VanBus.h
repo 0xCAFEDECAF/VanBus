@@ -61,6 +61,10 @@ class TVanBus
     static int QueueSize() { return VanBusRx.QueueSize(); }
     static int GetNQueued() { return VanBusRx.GetNQueued(); }
     static int GetMaxQueued() { return VanBusRx.GetMaxQueued(); }
+    static void SetDropPolicy(int startAt, bool (*isEssential)(const TVanPacketRxDesc&) = 0)
+    {
+        return VanBusRx.SetDropPolicy(startAt, isEssential);
+    } // SetDropPolicy
 
     // -----
     // Tx interfaces
