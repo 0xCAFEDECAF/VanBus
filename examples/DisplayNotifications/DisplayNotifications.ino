@@ -32,6 +32,7 @@
  *   sense media access from other devices on the bus, so that bus arbitration can be performed.
  */
 
+#include <assert.h>
 #include <ESP8266WiFi.h>
 #include <VanBus.h>
 
@@ -39,9 +40,11 @@ const int TX_PIN = D3; // Set to GPIO pin connected to VAN bus transceiver input
 const int RX_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
 
 // Send an exterior temperature value to the multifunction display (MFD)
-void SendExteriorTemperatureMessage(uint8_t temperatureValue)
+void SendExteriorTemperatureMessage(int temperatureValue)
 {
-    uint8_t rmtTemperatureBytes[] = {0x0F, 0x07, 0x00, 0x00, 0x00, 0x00, temperatureValue * 2 + 0x50};
+    const int byteToSend = temperatureValue * 2 + 0x50;
+    assert(byteToSend >= 0 && byteToSend <= 255);
+    const uint8_t rmtTemperatureBytes[] = {0x0F, 0x07, 0x00, 0x00, 0x00, 0x00, (uint8_t)byteToSend};
     VanBus.SyncSendPacket(0x8A4, 0x08, rmtTemperatureBytes, sizeof(rmtTemperatureBytes));
 } // SendExteriorTemperatureMessage
 

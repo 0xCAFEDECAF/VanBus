@@ -30,6 +30,8 @@
  *   sense media access from other devices on the bus, so that bus arbitration can be performed.
  */
 
+#include <assert.h>
+
 #ifdef  ARDUINO_ARCH_ESP8266 
 #include <ESP8266WiFi.h>
 #endif // ARDUINO_ARCH_ESP8266
@@ -89,10 +91,13 @@ void loop()
 
         // Alternately send exterior temperature 8 and 16 deg C to the multifunction display (MFD).
         // Note: the MFD will average out the received values, ending up showing 12 deg C.
-        static uint8_t temperatureValue = 8;
+        int temperatureValue = 8;
         if (temperatureValue == 8) temperatureValue = 16; else temperatureValue = 8;
-        
-        uint8_t rmtTemperatureBytes[] = {0x0F, 0x07, 0x00, 0x00, 0x00, 0x00, temperatureValue * 2 + 0x50};
+
+        const int byteToSend = temperatureValue * 2 + 0x50;
+        assert(byteToSend >= 0 && byteToSend <= 255);
+
+        const uint8_t rmtTemperatureBytes[] = {0x0F, 0x07, 0x00, 0x00, 0x00, 0x00, (uint8_t)byteToSend};
         VanBus.SyncSendPacket(0x8A4, 0x08, rmtTemperatureBytes, sizeof(rmtTemperatureBytes));
     } // if
 
