@@ -1259,7 +1259,6 @@ void ICACHE_RAM_ATTR TVanPacketRxQueue::_AdvanceHead()
     _head->millis_ = millis();
     _head->state = VAN_RX_DONE;
     _head->seqNo = count++;
-    if (_head->IsSatnavPacket()) countSatnav++;  // TODO - remove
 
   #ifdef VAN_RX_ISR_DEBUGGING
 
