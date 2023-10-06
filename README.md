@@ -41,7 +41,7 @@ There are various possibilities to hook up a ESP8266 based board to your vehicle
    the CTX / TXD / D pins of the transceiver, via the level converter, to a GPIO pin of your ESP8266 board.
 
    A board with the MCP2551 transceiver can be ordered e.g.
-   [here](https://webshop.domoticx.nl/can-bus-transceiver-module-5v-mcp2551) or
+   [here](https://domoticx.net/webshop/can-bus-transceiver-module-5v-mcp2551/) or
    [here](https://nl.aliexpress.com/item/1005004475976642.html).
 
 ![schema](extras/Schematics/Schematic%20using%20MCP2551_bb.png)
@@ -58,7 +58,7 @@ There are various possibilities to hook up a ESP8266 based board to your vehicle
    of the transceiver to a GPIO pin of your ESP8266 board.
 
    A board with the SN65HVD230 transceiver can be ordered e.g.
-   [here](https://webshop.domoticx.nl/index.php?route=product/product&product_id=3935).
+   [here](https://domoticx.net/webshop/can-bus-transceiver-module-3-3v-sn65hvd230-vp230/).
 
 ![schema](extras/Schematics/Schematic%20using%20SN65HVD230_bb.png)
 
@@ -207,7 +207,7 @@ VanBusRx.Setup(RX_PIN, VAN_PACKET_QUEUE_SIZE);
 VanBusRx.SetDropPolicy(VAN_PACKET_QUEUE_SIZE * 8 / 10, &IsImportantPacket);
 ```
 
-The above example will drop incoming packets if the recieve queue contains 48 or more packets, unless they
+The above example will drop incoming packets if the receive queue contains 48 or more packets, unless they
 are recognized by ```IsImportantPacket```.
 
 #### 10. ```bool SyncSendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)``` <a name = "SyncSendPacket"></a>
