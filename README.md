@@ -71,7 +71,7 @@ There are various possibilities to hook up a ESP8266 based board to your vehicle
 > 👉 Notes:
 >  * <img src="extras/Schematics/SN65HVD230%20terminator%20resistor.jpg" align="right" width="200px"/>The terminator
      resistor R2 (120 Ohm, near the CANH and CANL pins) on this transceiver board is meant
-     for operating inside a CAN bus networ, but is not necessary on a VAN bus. In fact, it may even cause the
+     for operating inside a CAN bus network, but is not necessary on a VAN bus. In fact, it may even cause the
      other equipment on the bus to malfunction. If you experience problems in the vehicle equipment, you may
      want to remove (unsolder) the R2 terminator resistor.
      See also [this issue](https://github.com/0xCAFEDECAF/VanBus/issues/9).
