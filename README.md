@@ -47,6 +47,12 @@ There are various possibilities to hook up a ESP8266 based board to your vehicle
 ![schema](extras/Schematics/Schematic%20using%20MCP2551_bb.png)
 
 > 👉 Notes:
+>  * <img src="extras/Schematics/MCP2551%20terminator%20resistors.jpg" align="right" width="200px"/>The two terminator
+     resistors R3 and R4 (2 x 100 Ohm, near the CANH and CANL pins) on this transceiver board
+     are meant for operating inside a CAN bus network, but are not necessary on a VAN bus. In fact, they may even
+     cause the other equipment on the bus to malfunction. If you experience problems in the vehicle equipment,
+     you may want to remove (unsolder) these terminator resistors.
+     See also [this issue](https://github.com/0xCAFEDECAF/VanBus/issues/9).
 >  * CANH of the transceiver is connected to VAN BAR (DATA B), CANL to VAN (DATA). This may seem illogical
      but in practice it turns out this works best.
 >  * The clamping circuit (D1, D2, R1) seems to (somehow) help in reducing the amount of bit errors
@@ -63,6 +69,12 @@ There are various possibilities to hook up a ESP8266 based board to your vehicle
 ![schema](extras/Schematics/Schematic%20using%20SN65HVD230_bb.png)
 
 > 👉 Notes:
+>  * <img src="extras/Schematics/SN65HVD230%20terminator%20resistor.jpg" align="right" width="200px"/>The terminator
+     resistor R2 (120 Ohm, near the CANH and CANL pins) on this transceiver board is meant
+     for operating inside a CAN bus networ, but is not necessary on a VAN bus. In fact, it may even cause the
+     other equipment on the bus to malfunction. If you experience problems in the vehicle equipment, you may
+     want to remove (unsolder) the R2 terminator resistor.
+     See also [this issue](https://github.com/0xCAFEDECAF/VanBus/issues/9).
 >  * CANH of the transceiver is connected to VAN BAR (DATA B), CANL to VAN (DATA). This may seem illogical
      but in practice it turns out this works best.
 >  * The clamping circuit (D1, D2, R1) seems to (somehow) help in reducing the amount of bit errors
@@ -75,7 +87,7 @@ There are various possibilities to hook up a ESP8266 based board to your vehicle
 ![schema](extras/Schematics/Schematic%20using%20voltage%20divider_bb.png)
 
 > 👉 Note: I used this schematic during many long debugging hours, but I cannot guarantee that it won't ultimately
-     cause your car to explode! (or anything less catastrofic)
+     cause your car to explode! (or anything less catastrophic)
 
 ## 🚀 Usage<a name = "usage"></a>
 
