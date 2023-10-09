@@ -64,7 +64,8 @@ There are various possibilities to hook up a ESP8266 based board to your vehicle
    of the transceiver to a GPIO pin of your ESP8266 board.
 
    A board with the SN65HVD230 transceiver can be ordered e.g.
-   [here](https://domoticx.net/webshop/can-bus-transceiver-module-3-3v-sn65hvd230-vp230/).
+   [here](https://domoticx.net/webshop/can-bus-transceiver-module-3-3v-sn65hvd230-vp230/) or
+   [here](https://eu.robotshop.com/products/waveshare-can-board-sn65hvd230).
 
 ![schema](extras/Schematics/Schematic%20using%20SN65HVD230_bb.png)
 
