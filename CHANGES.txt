@@ -1,3 +1,29 @@
+0.3.4
+    README.md:
+    * Add note on clamping circuit
+    * Add note about the removal of the terminator resistors on the transceivers
+    * Document new method 'TVanBus::SetDropPolicy'
+    * Fix links
+
+    src/VanBus.h:
+    * Add method 'TVanBus::SetDropPolicy'
+
+    src/VanBusRx.cpp:
+    * Fix compilation error
+    * Small updates in the bit timing criteria
+
+    extras/Schematics:
+    * Add clamping circuit: seems to reduce amount of bit errors
+
+    examples/SendPacket:
+    * Add possibility to send also negative temperature values
+
+    examples/PacketParser:
+    * IDEN 0x8CE (SATNAV_STATUS_3_IDEN): add sat nav language codes
+
+    examples/DisplayNotifications:
+    * Add possibility to send also negative temperature values
+
 0.3.3
     General:
     * Moved code to src/ subdir to adhere to '1.5 library format (rev. 2.2)'
