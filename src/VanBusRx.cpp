@@ -936,7 +936,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
             // If last bit was actually flipped, reset jitter
             //if (atBit > 0 && prev != readBits) jitter = 0;
-            if (prev != readBits) jitter -= _min(jitter, CPU_CYCLES(157));
+            if (prev != readBits) jitter -= _min(jitter, CPU_CYCLES(157U));
         } // if
     }
     else if (samePinLevel)

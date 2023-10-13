@@ -1036,7 +1036,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 FloatToStr(floatBuf[0], ((uint16_t)data[16] << 8 | data[17]) / 10.0, 1),
                 (uint16_t)data[18] << 8 | data[19],
                 FloatToStr(floatBuf[1], ((uint16_t)data[20] << 8 | data[21]) / 10.0, 1),
-                (uint16_t)data[22] << 8 | data[23] == 0xFFFF
+                ((uint16_t)data[22] << 8 | data[23]) == 0xFFFF
                     ? notApplicable3Str
                     : FloatToStr(floatBuf[2], ((uint16_t)data[22] << 8 | data[23]) / 10.0, 1),
                 (uint16_t)data[24] << 8 | data[25]
@@ -1261,7 +1261,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                         char alarmText[80];  // Make sure this is large enough for the largest string it must hold
                         strncpy_P(alarmText, (char *)pgm_read_dword(&(msgTable[byte * 8 + bit])), sizeof(alarmText) - 1);
                         alarmText[sizeof(alarmText) - 1] = 0;
-                        Serial.printf_P("%S- %s\n", indentStr, alarmText);
+                        Serial.printf_P(PSTR("%S- %s\n"), indentStr, alarmText);
                     } // if
                 } // for
             } // for
@@ -1848,8 +1848,8 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // must also be a specific packet that triggers this bit to be set to '0', because this happens e.g. when
             // the contact key is removed.
 
-            Serial.printf(
-                "%S\n",
+            Serial.printf_P(
+                PSTR("%S\n"),
 
                 // hmmm... MFD can also be ON if this is reported; this happens e.g. in the "minimal VAN network" test
                 // setup with only the head unit (radio) and MFD. Maybe this is a status report: the MFD indicates that

@@ -168,17 +168,17 @@ void TVanPacketTxDesc::PreparePacket(uint16_t iden, uint8_t cmdFlags, const uint
     uint8_t bytes[VAN_MAX_PACKET_SIZE];
     bytes[0] = 0x0E;  // SOF
     bytes[1] = iden >> 4 & 0xFF;  // IDEN (MSB 8 bits)
-    bytes[2] = iden << 4 | 0x08 | cmdFlags & 0x07;  // IDEN (LSB 4 bits), fixed-1 (1 bit), COM (3 bits)
+    bytes[2] = iden << 4 | 0x08 | (cmdFlags & 0x07);  // IDEN (LSB 4 bits), fixed-1 (1 bit), COM (3 bits)
     memcpy(bytes + 3, data, dataLen);
     uint16_t crc = _crc(bytes, dataLen + 5);
     bytes[dataLen + 3] = crc >> 8;
     bytes[dataLen + 4] = crc & 0xFF;
 
     // Stuff with Manchester bits
-    for (int i = 0; i < dataLen + 5; i++)
+    for (size_t i = 0; i < dataLen + 5; i++)
     {
         uint8_t byte = bytes[i];
-        stuffedBytes[i] = (byte & 0xF0) << 2 | (~ byte & 0x10) << 1 | (byte & 0x0F) << 1 | ~ byte & 0x01;
+        stuffedBytes[i] = (byte & 0xF0) << 2 | (~ byte & 0x10) << 1 | (byte & 0x0F) << 1 | (~ byte & 0x01);
     } // for
 
     // The last bit is always 0 (CRC has been shifted left 1 bit), and the last Manchester bit is also always 0,
@@ -205,11 +205,14 @@ void TVanPacketTxDesc::Dump() const
     if (! busOccupied && bitOk && nCollisions == 0 && ! bitError) return;
 
     uint32_t ifsBits = interFrameCpuCycles / CPU_F_FACTOR / VAN_BIT_TIMER_TICKS / 16;
-    Serial.printf("#%lu, ifsBits=%lu%s", n, ifsBits, busOccupied ? ", busOccupied" : "");
+    Serial.printf_P(PSTR("#%lu, ifsBits=%lu%s"), n, ifsBits, busOccupied ? ", busOccupied" : "");
 
-    if (nCollisions > 0) Serial.printf(", nCollisions=%lu, firstCollisionAtBit=%lu", nCollisions, firstCollisionAtBit);
+    if (nCollisions > 0)
+    {
+        Serial.printf_P(PSTR(", nCollisions=%lu, firstCollisionAtBit=%lu"), nCollisions, firstCollisionAtBit);
+    } // if
 
-    Serial.printf("%s%s\n", bitOk ? "" : ", NO bitOk", bitError ? ", bitError" : "");
+    Serial.printf_P(PSTR("%s%s\n"), bitOk ? "" : ", NO bitOk", bitError ? ", bitError" : "");
 } // TVanPacketTxDesc::Dump
 
 void TVanPacketTxQueue::StartBitSendTimer()

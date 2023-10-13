@@ -1,4 +1,7 @@
 0.3.4
+    General:
+    * Fix compiler warnings
+
     README.md:
     * Add note on clamping circuit
     * Add note about the removal of the terminator resistors on the transceivers

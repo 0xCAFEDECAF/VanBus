@@ -1006,6 +1006,9 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
             SendJsonText(EspSystemDataToJson(jsonBuffer, JSON_BUFFER_SIZE));
         }
         break;
+
+        default:
+        break;
     } // switch
 } // webSocketEvent
 
