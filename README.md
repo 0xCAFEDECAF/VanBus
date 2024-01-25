@@ -159,16 +159,16 @@ Interfaces for transmitting packets:
 
 ---
 
-#### 1. ```void Setup(uint8_t rxPin, uint8_t txPin)``` <a id="Setup"></a>
+#### 1. ```void Setup(uint8_t rxPin, uint8_t txPin)``` <a id="setup"></a>
 
 Start the receiver listening on GPIO pin ```rxPin```. The transmitter will transmit on GPIO pin ```txPin```.
 
-#### 2. ```void DumpStats(Stream& s, bool longForm = true)``` <a id="DumpStats"></a>
+#### 2. ```void DumpStats(Stream& s, bool longForm = true)``` <a id="dumpstats"></a>
 
 Dumps a few packet statistics on the passed stream. Passing **false** to the `longForm` parameter generates
 the short form.
 
-#### 3. ```bool Available()``` <a name = "Available"></a>
+#### 3. ```bool Available()``` <a name="Available"></a>
 
 Returns ```true``` if a VAN packet is available in the receive queue.
 
