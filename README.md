@@ -138,7 +138,7 @@ The following methods are available for the ```VanBus``` object:<a name = "funct
 
 Interfaces for both receiving and transmitting of packets:
 
-1. [```void Setup(uint8_t rxPin, uint8_t txPin)```](#Setup)
+1. [```void Setup(uint8_t rxPin, uint8_t txPin)```](#setup)
 2. [```void DumpStats(Stream& s, bool longForm = true)```](#DumpStats)
 
 Interfaces for receiving packets:
@@ -159,7 +159,7 @@ Interfaces for transmitting packets:
 
 ---
 
-#### 1. ```void Setup(uint8_t rxPin, uint8_t txPin)``` <a name="Setup"></a>
+#### 1. ```void Setup(uint8_t rxPin, uint8_t txPin)``` <a id="setup"></a>
 
 Start the receiver listening on GPIO pin ```rxPin```. The transmitter will transmit on GPIO pin ```txPin```.
 
