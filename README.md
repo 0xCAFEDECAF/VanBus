@@ -138,8 +138,8 @@ The following methods are available for the ```VanBus``` object:<a name = "funct
 
 Interfaces for both receiving and transmitting of packets:
 
-1. [```void Setup(uint8_t rxPin, uint8_t txPin)```](#Setup)
-2. [```void DumpStats(Stream& s, bool longForm = true)```](#DumpStats)
+1. [```void Setup(uint8_t rxPin, uint8_t txPin)```](#setup)
+2. [```void DumpStats(Stream& s, bool longForm = true)```](#dumpstats)
 
 Interfaces for receiving packets:
 
