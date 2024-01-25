@@ -69,7 +69,7 @@ void ICACHE_RAM_ATTR SendBitIsr()
             return;
         } // if
 
-        // Don't waste precious CPU time handling the RX pin interrupts of my own transmssion.
+        // Don't waste precious CPU time handling the RX pin interrupts of my own transmission.
         // TODO - this will cause any colliding incoming packet to be not received by the receiver.
         detachInterrupt(digitalPinToInterrupt(VanBusRx.pin));
 
