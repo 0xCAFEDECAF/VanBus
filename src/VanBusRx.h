@@ -386,6 +386,8 @@ class TVanPacketRxQueue
     int GetNQueued() const { return nQueued; }  // TODO - use ISR_SAFE_GET ?
     int GetMaxQueued() const { return maxQueued; }  // TODO - use ISR_SAFE_GET ?
 
+    uint32_t GetLastMediaAccessAt() { ISR_SAFE_GET(uint32_t, lastMediaAccessAt); };
+
   private:
 
     uint8_t pin;
@@ -425,7 +427,6 @@ class TVanPacketRxQueue
     void RegisterTxTimerTicks(uint32_t ticks) { txTimerTicks = ticks; };
     void RegisterTxIsr(timercallback isr) { ISR_SAFE_SET(txTimerIsr, isr); };
 
-    uint32_t GetLastMediaAccessAt() { ISR_SAFE_GET(uint32_t, lastMediaAccessAt); };
     void SetLastMediaAccessAt(uint32_t at) { ISR_SAFE_SET(lastMediaAccessAt, at); };
 
     bool IsQueueOverrun() { NO_INTERRUPTS; bool result = _overrun; _overrun = false; INTERRUPTS; return result; }
