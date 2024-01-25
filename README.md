@@ -258,24 +258,24 @@ For background reading:
 The following methods are available for ```TVanPacketRxDesc``` packet objects as obtained from
 ```VanBusRx.Receive(...)```:
 
-1. [```uint16_t Iden()```](#Iden)
-2. [```uint8_t CommandFlags()```](#CommandFlags)
-3. [```const uint8_t* Data()```](#Data)
-4. [```int DataLen()```](#DataLen)
-5. [```unsigned long Millis()```](#Millis)
-6. [```uint16_t Crc()```](#Crc)
-7. [```bool CheckCrc()```](#CheckCrc)
-8. [```bool CheckCrcAndRepair()```](#CheckCrcAndRepair)
-9. [```void DumpRaw(Stream& s, char last = '\n')```](#DumpRaw)
-10. [```const char* CommandFlagsStr()```](#CommandFlagsStr)
-11. [```const char* AckStr()```](#AckStr)
-12. [```const char* ResultStr()```](#ResultStr)
-13. [```const TIfsDebugPacket& getIfsDebugPacket()```](#getIfsDebugPacket)
-14. [```const TIsrDebugPacket& getIsrDebugPacket()```](#getIsrDebugPacket)
+1. [```uint16_t Iden()```](#iden)
+2. [```uint8_t CommandFlags()```](#commandflags)
+3. [```const uint8_t* Data()```](#data)
+4. [```int DataLen()```](#datalen)
+5. [```unsigned long Millis()```](#millis)
+6. [```uint16_t Crc()```](#crc)
+7. [```bool CheckCrc()```](#checkcrc)
+8. [```bool CheckCrcAndRepair()```](#checkcrcandrepair)
+9. [```void DumpRaw(Stream& s, char last = '\n')```](#dumpraw)
+10. [```const char* CommandFlagsStr()```](#commandflagsstr)
+11. [```const char* AckStr()```](#ackstr)
+12. [```const char* ResultStr()```](#resultstr)
+13. [```const TIfsDebugPacket& getIfsDebugPacket()```](#getifsdebugpacket)
+14. [```const TIsrDebugPacket& getIsrDebugPacket()```](#getisrdebugpacket)
 
 ---
 
-#### 1. ```uint16_t Iden()``` <a name = "Iden"></a>
+#### 1. ```uint16_t Iden()``` <a id="iden"></a>
 
 Returns the IDEN field of the VAN packet.
 
@@ -284,7 +284,7 @@ An overview of known IDEN values can be found e.g. at:
 - http://pinterpeti.hu/psavanbus/PSA-VAN.html
 - http://graham.auld.me.uk/projects/vanbus/protocol.html
 
-#### 2. ```uint8_t CommandFlags()``` <a name = "CommandFlags"></a>
+#### 2. ```uint8_t CommandFlags()``` <a id="commandflags"></a>
 
 Returns the 4-bit "command" FLAGS field of the VAN packet. Each VAN packet has 4 "command" flags:
 - EXT (bit 3, MSB) : always 1
@@ -295,32 +295,32 @@ Returns the 4-bit "command" FLAGS field of the VAN packet. Each VAN packet has 4
 A thorough explanation is found (in French) on page 6 and 7 of
 http://www.educauto.org/files/file_fields/2013/11/18/mux3.pdf#page=6 .
 
-#### 3. ```const uint8_t* Data()``` <a name = "Data"></a>
+#### 3. ```const uint8_t* Data()``` <a id="data"></a>
 
 Returns the data field (bytes) of the VAN packet.
 
-#### 4. ```int DataLen()``` <a name = "DataLen"></a>
+#### 4. ```int DataLen()``` <a id="datalen"></a>
 
 Returns the number of data bytes in the VAN packet. There can be at most 28 data bytes in a VAN packet.
 
-#### 5. ```unsigned long Millis()``` <a name = "Millis"></a>
+#### 5. ```unsigned long Millis()``` <a id="millis"></a>
 
 Packet time stamp in milliseconds.
 
-#### 6. ```uint16_t Crc()``` <a name = "Crc"></a>
+#### 6. ```uint16_t Crc()``` <a id="crc"></a>
 
 Returns the 15-bit CRC value of the VAN packet.
 
-#### 7. ```bool CheckCrc()``` <a name = "CheckCrc"></a>
+#### 7. ```bool CheckCrc()``` <a id="checkcrc"></a>
 
 Checks the CRC value of the VAN packet.
 
-#### 8. ```bool CheckCrcAndRepair()``` <a name = "CheckCrcAndRepair"></a>
+#### 8. ```bool CheckCrcAndRepair()``` <a id="checkcrcandrepair"></a>
 
 Checks the CRC value of the VAN packet. If not, tries to repair it by flipping each bit. Returns ```true``` if the
 packet is OK (either before or after the repair).
 
-#### 9. ```void DumpRaw(Stream& s, char last = '\n')``` <a name = "DumpRaw"></a>
+#### 9. ```void DumpRaw(Stream& s, char last = '\n')``` <a id="dumpraw"></a>
 
 Dumps the raw packet bytes to a stream. Optionally specify the last character; default is '\n' (newline).
 
@@ -350,28 +350,28 @@ const char* PacketRawToStr(TVanPacketRxDesc& pkt)
 Note: for this, you will need to install the [PrintEx](https://github.com/Chris--A/PrintEx) library. I tested with
 version 1.2.0 .
 
-#### 10. ```const char* CommandFlagsStr()``` <a name = "CommandFlagsStr"></a>
+#### 10. ```const char* CommandFlagsStr()``` <a id="commandflagsstr"></a>
 
 Returns the "command" FLAGS field of the VAN packet as a string
 
 Note: uses a statically allocated buffer, so don't call this method twice within the same printf invocation.
 
-#### 11. ```const char* AckStr()``` <a name = "AckStr"></a>
+#### 11. ```const char* AckStr()``` <a id="ackstr"></a>
 
 Returns the ACK field of the VAN packet as a string, either "ACK" or "NO_ACK".
 
-#### 12. ```const char* ResultStr()``` <a name = "ResultStr"></a>
+#### 12. ```const char* ResultStr()``` <a id="resultstr"></a>
 
 Returns the RESULT field of the VAN packet as a string, either "OK" or a string starting with "ERROR_".
 
-#### 13. ```const TIfsDebugPacket& getIfsDebugPacket()``` <a name = "getIfsDebugPacket"></a>
+#### 13. ```const TIfsDebugPacket& getIfsDebugPacket()``` <a id="getifsdebugpacket"></a>
 
 Retrieves a debug structure that can be used to analyse inter-frame space events.
 
 Only available when ```#define VAN_RX_ISR_DEBUGGING``` is uncommented (see
 [```VanBusRx.h```](https://github.com/0xCAFEDECAF/VanBus/blob/756b05097e57c183f87b7879e431308daef5ce5f/VanBusRx.h#L32)).
 
-#### 14. ```const TIsrDebugPacket& getIsrDebugPacket()``` <a name = "getIsrDebugPacket"></a>
+#### 14. ```const TIsrDebugPacket& getIsrDebugPacket()``` <a id="getisrdebugpacket"></a>
 
 Retrieves a debug structure that can be used to analyse (observed) bit timings.
 
