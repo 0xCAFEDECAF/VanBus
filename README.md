@@ -138,7 +138,7 @@ The following methods are available for the ```VanBus``` object:<a name = "funct
 
 Interfaces for both receiving and transmitting of packets:
 
-1. [```void Setup(uint8_t rxPin, uint8_t txPin)```](#setup)
+1. [```void Setup(uint8_t rxPin, uint8_t txPin)```](#Setup)
 2. [```void DumpStats(Stream& s, bool longForm = true)```](#DumpStats)
 
 Interfaces for receiving packets:
@@ -159,11 +159,11 @@ Interfaces for transmitting packets:
 
 ---
 
-#### 1. ```void Setup(uint8_t rxPin, uint8_t txPin)``` <a id="setup"></a>
+#### 1. ```void Setup(uint8_t rxPin, uint8_t txPin)``` <a name="Setup"></a>
 
 Start the receiver listening on GPIO pin ```rxPin```. The transmitter will transmit on GPIO pin ```txPin```.
 
-#### 2. ```void DumpStats(Stream& s, bool longForm = true)``` <a name = "DumpStats"></a>
+#### 2. ```void DumpStats(Stream& s, bool longForm = true)``` <a id="DumpStats"></a>
 
 Dumps a few packet statistics on the passed stream. Passing **false** to the `longForm` parameter generates
 the short form.
@@ -172,7 +172,7 @@ the short form.
 
 Returns ```true``` if a VAN packet is available in the receive queue.
 
-#### 4. ```bool Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun = NULL)``` <a name = "Receive"></a>
+#### 4. ```bool Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun = NULL)``` <a name="Receive"></a>
 
 Copy a VAN packet out of the receive queue, if available. Otherwise, returns ```false```.
 If a valid pointer is passed to 'isQueueOverrun', will report then clear any queue overrun condition.
