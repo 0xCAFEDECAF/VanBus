@@ -168,32 +168,32 @@ Start the receiver listening on GPIO pin ```rxPin```. The transmitter will trans
 Dumps a few packet statistics on the passed stream. Passing **false** to the `longForm` parameter generates
 the short form.
 
-#### 3. ```bool Available()``` <a name="Available"></a>
+#### 3. ```bool Available()``` <a id="available"></a>
 
 Returns ```true``` if a VAN packet is available in the receive queue.
 
-#### 4. ```bool Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun = NULL)``` <a name="Receive"></a>
+#### 4. ```bool Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun = NULL)``` <a id="receive"></a>
 
 Copy a VAN packet out of the receive queue, if available. Otherwise, returns ```false```.
 If a valid pointer is passed to 'isQueueOverrun', will report then clear any queue overrun condition.
 
-#### 5. ```uint32_t GetRxCount()``` <a name = "GetRxCount"></a>
+#### 5. ```uint32_t GetRxCount()``` <a id="getrxcount"></a>
 
 Returns the number of received VAN packets since power-on. Counter may roll over.
 
-#### 6. ```int QueueSize()``` <a name = "QueueSize"></a>
+#### 6. ```int QueueSize()``` <a id="queuesize"></a>
 
 Returns the number of VAN packets that can be queued before packets are lost.
 
-#### 7. ```int GetNQueued()``` <a name = "GetNQueued"></a>
+#### 7. ```int GetNQueued()``` <a id="getnqueued"></a>
 
 Returns the number of VAN packets currently queued.
 
-#### 8. ```int GetMaxQueued()``` <a name = "GetMaxQueued"></a>
+#### 8. ```int GetMaxQueued()``` <a id="getmaxqueued"></a>
 
 Returns the highest number of VAN packets that were queued.
 
-#### 9. ```void SetDropPolicy(int startAt, bool (*isEssential)(const TVanPacketRxDesc&) = 0)``` <a name = "SetDropPolicy"></a>
+#### 9. ```void SetDropPolicy(int startAt, bool (*isEssential)(const TVanPacketRxDesc&) = 0)``` <a id="setdroppolicy"></a>
 
 Implements a simple packet drop policy for if the receive queue is starting to fill up.
 
@@ -223,15 +223,15 @@ VanBusRx.SetDropPolicy(VAN_PACKET_QUEUE_SIZE * 8 / 10, &IsImportantPacket);
 The above example will drop incoming packets if the receive queue contains 48 or more packets, unless they
 are recognized by ```IsImportantPacket```.
 
-#### 10. ```bool SyncSendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)``` <a name = "SyncSendPacket"></a>
+#### 10. ```bool SyncSendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)``` <a id="syncsendpacket"></a>
 
 Sends a packet for transmission. Returns ```true``` if the packet was successfully transmitted.
 
-#### 11. ```bool SendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)``` <a name = "SendPacket"></a>
+#### 11. ```bool SendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)``` <a id="sendpacket"></a>
 
 Queues a packet for transmission. Returns ```true``` if the packet was successfully queued.
 
-#### 12. ```uint32_t GetTxCount()``` <a name = "GetTxCount"></a>
+#### 12. ```uint32_t GetTxCount()``` <a id="gettxcount"></a>
 
 Returns the number of VAN packets, offered for transmitting, since power-on. Counter may roll over.
 
