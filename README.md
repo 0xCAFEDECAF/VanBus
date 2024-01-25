@@ -159,7 +159,7 @@ Interfaces for transmitting packets:
 
 ---
 
-#### 1. ```void Setup(uint8_t rxPin, uint8_t txPin)``` <a name="Setup"></a>
+#### 1. ```void Setup(uint8_t rxPin, uint8_t txPin)``` <a id="Setup"></a>
 
 Start the receiver listening on GPIO pin ```rxPin```. The transmitter will transmit on GPIO pin ```txPin```.
 
