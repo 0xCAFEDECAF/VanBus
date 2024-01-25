@@ -143,19 +143,19 @@ Interfaces for both receiving and transmitting of packets:
 
 Interfaces for receiving packets:
 
-3. [```bool Available()```](#Available)
-4. [```bool Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun = NULL)```](#Receive)
-5. [```uint32_t GetRxCount()```](#GetRxCount)
-6. [```int QueueSize()```](#QueueSize)
-7. [```int GetNQueued()```](#GetNQueued)
-8. [```int GetMaxQueued()```](#GetMaxQueued)
-9. [```void SetDropPolicy(int startAt, bool (*isEssential)(const TVanPacketRxDesc&) = 0)```](#SetDropPolicy)
+3. [```bool Available()```](#available)
+4. [```bool Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun = NULL)```](#receive)
+5. [```uint32_t GetRxCount()```](#getrxcount)
+6. [```int QueueSize()```](#queuesize)
+7. [```int GetNQueued()```](#getnqueued)
+8. [```int GetMaxQueued()```](#getmaxqueued)
+9. [```void SetDropPolicy(int startAt, bool (*isEssential)(const TVanPacketRxDesc&) = 0)```](#setdroppolicy)
 
 Interfaces for transmitting packets:
 
-10. [```bool SyncSendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)```](#SyncSendPacket)
-11. [```bool SendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)```](#SendPacket)
-12. [```uint32_t GetTxCount()```](#GetTxCount)
+10. [```bool SyncSendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)```](#syncsendpacket)
+11. [```bool SendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)```](#sendpacket)
+12. [```uint32_t GetTxCount()```](#gettxcount)
 
 ---
 
