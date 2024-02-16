@@ -60,23 +60,22 @@
  *         +--- Packet sequence number (modulo 10000)
  */
 
-#ifdef  ARDUINO_ARCH_ESP8266 
-#include <ESP8266WiFi.h>
-#endif // ARDUINO_ARCH_ESP8266
+#ifdef ARDUINO_ARCH_ESP32
+  #include <WiFi.h>
+#else
+  #include <ESP8266WiFi.h>
+#endif // ARDUINO_ARCH_ESP32
 
-#include <VanBusRx.h>
+#include <VanBusRx.h>  // https://github.com/0xCAFEDECAF/VanBus
 
 #ifdef ARDUINO_ARCH_ESP32
-const int RX_PIN = GPIO_NUM_22; // Set to GPIO pin connected to VAN bus transceiver output
-
+  const int RX_PIN = GPIO_NUM_22;  // Set to GPIO pin connected to VAN bus transceiver output
 #else // ! ARDUINO_ARCH_ESP32
-#if defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
-// For ESP-01 board we use GPIO 2 (internal pull-up, keep disconnected or high at boot time)
-#define D2 (2)
-#endif // defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
-
-const int RX_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
-
+  #if defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
+    // For ESP-01 board we use GPIO 2 (internal pull-up, keep disconnected or high at boot time)
+    #define D2 (2)
+  #endif // defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
+  const int RX_PIN = D2;  // Set to GPIO pin connected to VAN bus transceiver output
 #endif // ARDUINO_ARCH_ESP32
 
 void setup()
@@ -85,13 +84,13 @@ void setup()
     Serial.begin(115200);
     Serial.print("Starting VAN bus receiver\n");
 
-  #ifdef  ARDUINO_ARCH_ESP8266 
     // Disable Wi-Fi altogether to get rid of long and variable interrupt latency, causing packet CRC errors
     // From: https://esp8266hints.wordpress.com/2017/06/29/save-power-by-reliably-switching-the-esp-wifi-on-and-off/
     WiFi.disconnect(true);
-    delay(1); 
+    delay(1);
     WiFi.mode(WIFI_OFF);
     delay(1);
+  #ifdef ARDUINO_ARCH_ESP8266
     WiFi.forceSleepBegin();
     delay(1);
   #endif // ARDUINO_ARCH_ESP8266
@@ -116,9 +115,9 @@ void loop()
       #endif // VAN_RX_ISR_DEBUGGING
     } // if
 
-    // Print some boring statistics every minute or so
+    // Print some boring statistics
     static unsigned long lastUpdate = 0;
-    if (millis() - lastUpdate >= 60000UL) // Arithmetic has safe roll-over
+    if (millis() - lastUpdate >= 10000UL) // Arithmetic has safe roll-over
     {
         lastUpdate = millis();
         VanBusRx.DumpStats(Serial);

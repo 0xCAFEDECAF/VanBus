@@ -18,10 +18,6 @@
   #include <Esp.h>  // wdt_reset
 #endif
 
-#ifdef ARDUINO_ARCH_ESP32
-  #define timer1_disable() timerEnd(timer)
-#endif // ARDUINO_ARCH_ESP32
-
 static const uint16_t VAN_CRC_POLYNOM = 0x0F9D;
 
 #define VAN_CRC_TABLE_SIZE 256
@@ -530,7 +526,11 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
 
 void ICACHE_RAM_ATTR SetTxBitTimer()
 {
-    timer1_disable(); 
+  #ifdef ARDUINO_ARCH_ESP32
+    timerAlarmDisable(timer);
+  #else // ! ARDUINO_ARCH_ESP32
+    timer1_disable();
+  #endif // ARDUINO_ARCH_ESP32
 
     if (VanBusRx.txTimerIsr)
     {
@@ -825,7 +825,11 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
             || nCycles > CPU_CYCLES(1000)
            )
         {
+          #ifdef ARDUINO_ARCH_ESP32
+            timerAlarmDisable(timer);
+          #else // ! ARDUINO_ARCH_ESP32
             timer1_disable();
+          #endif // ARDUINO_ARCH_ESP32
 
             // Go back to state VAN_RX_LOADING
             rxDesc->state = VAN_RX_LOADING;
@@ -1139,16 +1143,16 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
             // Set a timeout for the ACK bit
 
-            timer1_disable();
-
           #ifdef ARDUINO_ARCH_ESP32
 
-            timerAttachInterrupt(timer, WaitAckIsr, true);
+            timerAlarmDisable(timer);
+            timerAttachInterrupt(timer, &WaitAckIsr, true);
             timerAlarmWrite(timer, 40 * 5, false); // 5 time slots = 5 * 8 us = 40 us
             timerAlarmEnable(timer);
 
           #else // ! ARDUINO_ARCH_ESP32
 
+            timer1_disable();
             timer1_attachInterrupt(WaitAckIsr);
 
             // Clock to timer (prescaler) is always 80MHz, even F_CPU is 160 MHz
@@ -1197,6 +1201,7 @@ bool TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
   #ifdef ARDUINO_ARCH_ESP32
     // Clock to timer (prescaler) is always 80MHz, even F_CPU is 160 MHz. We want 0.2 microsecond resolution.
     timer = timerBegin(0, 80 / 5, true);
+    timerAlarmDisable(timer);
   #else // ! ARDUINO_ARCH_ESP32
     timer1_isr_init();
     timer1_disable();
@@ -1235,7 +1240,13 @@ bool TVanPacketRxQueue::Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun)
 void TVanPacketRxQueue::Disable()
 {
     if (pin == VAN_NO_PIN_ASSIGNED) return; // Call Setup first!
+
+  #ifdef ARDUINO_ARCH_ESP32
+    timerAlarmDisable(timer);
+  #else // ! ARDUINO_ARCH_ESP32
     timer1_disable();
+  #endif // ARDUINO_ARCH_ESP32
+
     detachInterrupt(digitalPinToInterrupt(VanBusRx.pin));
     enabled = false;
 } // TVanPacketRxQueue::Disable

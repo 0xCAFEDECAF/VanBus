@@ -33,11 +33,22 @@
  */
 
 #include <assert.h>
-#include <ESP8266WiFi.h>
-#include <VanBus.h>
 
-const int TX_PIN = D3; // Set to GPIO pin connected to VAN bus transceiver input
-const int RX_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
+#ifdef ARDUINO_ARCH_ESP32
+  #include <WiFi.h>
+#else
+  #include <ESP8266WiFi.h>
+#endif // ARDUINO_ARCH_ESP32
+
+#include <VanBus.h>  // https://github.com/0xCAFEDECAF/VanBus
+
+#ifdef ARDUINO_ARCH_ESP32
+  const int TX_PIN = GPIO_NUM_21; // Set to GPIO pin connected to VAN bus transceiver input
+  const int RX_PIN = GPIO_NUM_22; // Set to GPIO pin connected to VAN bus transceiver output
+#else // ! ARDUINO_ARCH_ESP32
+  const int TX_PIN = D3; // Set to GPIO pin connected to VAN bus transceiver input
+  const int RX_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
+#endif // ARDUINO_ARCH_ESP32
 
 // Send an exterior temperature value to the multifunction display (MFD)
 void SendExteriorTemperatureMessage(int temperatureValue)
@@ -143,8 +154,10 @@ void setup()
     delay(1); 
     WiFi.mode(WIFI_OFF);
     delay(1);
+  #ifdef  ARDUINO_ARCH_ESP8266 
     WiFi.forceSleepBegin();
     delay(1);
+  #endif // ARDUINO_ARCH_ESP8266
 
     VanBus.Setup(RX_PIN, TX_PIN);
 
@@ -209,9 +222,13 @@ void loop()
         SendExteriorTemperatureMessage(8);  // Send exterior temperature 8 deg C to the MFD
     } // if
 
-    // Print some boring statistics every minute or so
+    // Just to count the number of received packets (shown below in 'VanBus.DumpStats')
+    TVanPacketRxDesc pkt;
+    VanBus.Receive(pkt);
+
+    // Print some boring statistics
     static unsigned long lastDumped = 0;
-    if (millis() - lastDumped >= 60000UL)  // Arithmetic has safe roll-over
+    if (millis() - lastDumped >= 10000UL)  // Arithmetic has safe roll-over
     {
         lastDumped = millis();
         VanBus.DumpStats(Serial);

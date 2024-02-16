@@ -1,4 +1,4 @@
-<h3 align="center">PSA (Peugeot, Citroën) VAN bus reader/writer for Arduino-ESP8266</h3>
+<h3 align="center">PSA (Peugeot, Citroën) VAN bus reader/writer for Arduino-ESP8266 and ESP32</h3>
 
 ---
 
@@ -25,20 +25,20 @@ in their newer cars with the CAN bus protocol, however some models had VAN bus i
 [This overview](https://github.com/morcibacsi/PSAVanCanBridge#compatibility) lists vehicles that are
 supposedly fitted with a VAN (comfort) bus.
 
-Only ESP8266 / ESP8285 is supported. ESP32 is NOT supported by this library; for boards with those MCUs there is this
-excellent library: [ESP32 RMT peripheral Vehicle Area Network (VAN bus) reader].
+Both the ESP8266 / ESP8285 and ESP32 platforms are supported by this library.
 
 ## 🔌 Schematics<a name = "schematics"></a>
 
 You can usually find the VAN bus on pins 2 and 3 of ISO block "A" of your head unit (car radio). See
 https://en.wikipedia.org/wiki/Connectors_for_car_audio and https://github.com/morcibacsi/esp32_rmt_van_rx#schematics .
 
-There are various possibilities to hook up a ESP8266 based board to your vehicle's VAN bus:
+There are various possibilities to hook up a ESP8266/ESP32 based board to your vehicle's VAN bus:
 
 1. Use a [MCP2551] transceiver, connected with its CANH and CANL pins to the vehicle's VAN bus.
    As the MCP2551 has 5V logic, a 5V ↔ 3.3V [level converter] is needed to connect the CRX / RXD / R pin of the
-   transceiver, via the level converter, to a GPIO pin of your ESP8266 board. For transmitting packets, also connect
-   the CTX / TXD / D pins of the transceiver, via the level converter, to a GPIO pin of your ESP8266 board.
+   transceiver, via the level converter, to a GPIO pin of your ESP8266/ESP32 board. For transmitting packets,
+   also connect the CTX / TXD / D pins of the transceiver, via the level converter, to a GPIO pin of your
+   ESP8266/ESP32 board.
 
    A board with the MCP2551 transceiver can be ordered e.g.
    [here](https://domoticx.net/webshop/can-bus-transceiver-module-5v-mcp2551/) or
@@ -60,8 +60,8 @@ There are various possibilities to hook up a ESP8266 based board to your vehicle
 
 2. Use a [SN65HVD230] transceiver, connected with its CANH and CANL pins to the vehicle's VAN bus.
    The SN65HVD230 transceiver already has 3.3V logic, so it is possible to directly connect the CRX / RXD / R pin of
-   the transceiver to a GPIO pin of your ESP8266 board. For transmitting packets, also connect the CTX / TXD / D pins
-   of the transceiver to a GPIO pin of your ESP8266 board.
+   the transceiver to a GPIO pin of your ESP8266/ESP32 board. For transmitting packets, also connect the
+   CTX / TXD / D pins of the transceiver to a GPIO pin of your ESP8266/ESP32 board.
 
    A board with the SN65HVD230 transceiver can be ordered e.g.
    [here](https://domoticx.net/webshop/can-bus-transceiver-module-3-3v-sn65hvd230-vp230/) or
@@ -82,7 +82,7 @@ There are various possibilities to hook up a ESP8266 based board to your vehicle
      (packet CRC errors).
 
 3. The simplest schematic is not to use a transceiver at all, but connect the VAN DATA line to GrouND using
-   two 4.7 kOhm resistors. Connect the GPIO pin of your ESP8266 board to the 1:2 [voltage divider] that is thus
+   two 4.7 kOhm resistors. Connect the GPIO pin of your ESP8266/ESP32 board to the 1:2 [voltage divider] that is thus
    formed by the two resistors. This is only for receiving packets, not for transmitting. Results may vary.
 
 ![schema](extras/Schematics/Schematic%20using%20voltage%20divider_bb.png)
@@ -395,6 +395,7 @@ Do whatever you like with it, but contributions are appreciated!
 
 - [VAN Live Connect](https://github.com/0xCAFEDECAF/VanLiveConnect) - Live data from your PSA vehicle (Peugeot,
   Citroën) on your smartphone or tablet, directly from the VAN bus.
+- [ESP32 RMT peripheral Vehicle Area Network (VAN bus) reader]
 
 ["VAN" bus]: https://en.wikipedia.org/wiki/Vehicle_Area_Network
 [MCP2551]: http://ww1.microchip.com/downloads/en/devicedoc/21667d.pdf

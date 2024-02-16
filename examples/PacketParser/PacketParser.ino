@@ -22,7 +22,7 @@
  * - Driving assistance messages, sounds and warning lamps
  * - Comfort and convenience messages, sounds and warning lamps
  * - Accessory messages, sounds and indicator lamps
- * - Display systems  
+ * - Display systems
  * - Audio / telematics / telephone
  * - Audio / multimedia
  * - Navigation
@@ -43,14 +43,23 @@
  *
  */
 
-#include <ESP8266WiFi.h>
-#include <VanBusRx.h>
+#ifdef ARDUINO_ARCH_ESP32
+  #include <WiFi.h>
+#else
+  #include <ESP8266WiFi.h>
+#endif // ARDUINO_ARCH_ESP32
 
-#if defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
-// For ESP-01 board we use GPIO 2 (internal pull-up, keep disconnected or high at boot time)
-#define D2 (2)
-#endif
-int RX_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
+#include <VanBusRx.h>  // https://github.com/0xCAFEDECAF/VanBus
+
+#ifdef ARDUINO_ARCH_ESP32
+  const int RX_PIN = GPIO_NUM_22;  // Set to GPIO pin connected to VAN bus transceiver output
+#else // ! ARDUINO_ARCH_ESP32
+  #if defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
+    // For ESP-01 board we use GPIO 2 (internal pull-up, keep disconnected or high at boot time)
+    #define D2 (2)
+  #endif // defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
+  const int RX_PIN = D2;  // Set to GPIO pin connected to VAN bus transceiver output
+#endif // ARDUINO_ARCH_ESP32
 
 // Packet parsing
 enum VanPacketParseResult_t
@@ -116,7 +125,7 @@ static const char PROGMEM notApplicable3Str[] = "---";
 static const char PROGMEM toBeDecodedStr[] = "[to be decoded]";
 static const char PROGMEM unexpectedPacketLengthStr[] = "[unexpected packet length]";
 
-// Uses statically allocated buffer, so don't call twice within the same printf invocation 
+// Uses statically allocated buffer, so don't call twice within the same printf invocation
 char* ToStr(uint8_t data)
 {
     #define MAX_UINT8_STR_SIZE 4
@@ -126,7 +135,7 @@ char* ToStr(uint8_t data)
     return buffer;
 } // ToStr
 
-// Uses statically allocated buffer, so don't call twice within the same printf invocation 
+// Uses statically allocated buffer, so don't call twice within the same printf invocation
 char* ToHexStr(uint8_t data)
 {
     #define MAX_UINT8_HEX_STR_SIZE 5
@@ -136,7 +145,7 @@ char* ToHexStr(uint8_t data)
     return buffer;
 } // ToHexStr
 
-// Uses statically allocated buffer, so don't call twice within the same printf invocation 
+// Uses statically allocated buffer, so don't call twice within the same printf invocation
 char* ToHexStr(uint16_t data)
 {
     #define MAX_UINT16_HEX_STR_SIZE 7
@@ -146,7 +155,7 @@ char* ToHexStr(uint16_t data)
     return buffer;
 } // ToHexStr
 
-// Uses statically allocated buffer, so don't call twice within the same printf invocation 
+// Uses statically allocated buffer, so don't call twice within the same printf invocation
 char* ToHexStr(uint8_t data1, uint8_t data2)
 {
     #define MAX_2_UINT8_HEX_STR_SIZE 10
@@ -189,10 +198,10 @@ const char* TunerBandStr(uint8_t data)
 //  0  0  0 : Not searching
 //  0  0  1 : Manual tuning
 //  0  1  0 : Searching by frequency
-//  0  1  1 : 
+//  0  1  1 :
 //  1  0  0 : Searching for station with matching PTY
-//  1  0  1 : 
-//  1  1  0 : 
+//  1  0  1 :
+//  1  1  0 :
 //  1  1  1 : Auto-station search in the FMAST band (long-press "Radio Band" button)
 enum TunerSearchMode_t
 {
@@ -792,7 +801,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 // 0x01 - Audio settings announcement
                 // 0x02 - Button press announcement
                 // 0x04 - Status update (CD track or tuner info)
-                // 0x08 - 
+                // 0x08 -
                 // 0xF0 - 0x20 = Tuner (radio)
                 //      - 0x30 = CD track found
                 //      - 0x40 = Tuner preset
@@ -1462,7 +1471,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                         // ! anySearchBusy ? emptyStr : dxSensitivity ? PSTR(", sensitivity=Dx") : PSTR(", sensitivity=Lo"),
                         dxSensitivity ? PSTR(", sensitivity=Dx") : PSTR(", sensitivity=Lo"),
 
-                        ! anySearchBusy ? emptyStr : 
+                        ! anySearchBusy ? emptyStr :
                             searchDirectionUp ? PSTR(", search_direction=UP") : PSTR(", search_direction=DOWN")
                     );
 
@@ -1501,7 +1510,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                         // & 0x40: 1 = "Select PTY" dialog visible (long-press "TA" button; press "<<" or ">>" to change)
                         uint8_t selectedPty = data[10] & 0x1F;
                         bool ptyMatch = (data[10] & 0x20) == 0;  // PTY of station matches selected PTY
-                        bool ptySelectionMenu = data[10] & 0x40; 
+                        bool ptySelectionMenu = data[10] & 0x40;
                         char selectedPtyBuffer[40];
                         sprintf_P(selectedPtyBuffer, PSTR("%u(%S)"), selectedPty, PtyStr(selectedPty));
 
@@ -1539,7 +1548,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     } // if
                 }
                 break;
-                
+
                 case INFO_TYPE_TAPE:
                 {
                     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#554_2
@@ -1784,8 +1793,8 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 (data[4] & 0x0F) == 0x00 ? noneStr :  // source
                 (data[4] & 0x0F) == 0x01 ? PSTR("TUNER") :
                 (data[4] & 0x0F) == 0x02 ?
-                    data[4] & 0x20 ? PSTR("TAPE") : 
-                    data[4] & 0x40 ? PSTR("INTERNAL_CD") : 
+                    data[4] & 0x20 ? PSTR("TAPE") :
+                    data[4] & 0x40 ? PSTR("INTERNAL_CD") :
                     PSTR("INTERNAL_CD_OR_TAPE") :
                 (data[4] & 0x0F) == 0x03 ? PSTR("CD_CHANGER") :
 
@@ -1808,14 +1817,14 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 // audio_menu. Bug: if CD changer is playing, this one is always "OPEN" (even if it isn't).
                 data[1] & 0x20 ? PSTR("OPEN") : PSTR("CLOSED"),
 
-                (sint8_t)(data[8] & 0x7F) - 0x3F,  // bass
+                (int8_t)(data[8] & 0x7F) - 0x3F,  // bass
                 data[8] & 0x80 ? updatedStr : emptyStr,
-                (sint8_t)(data[9] & 0x7F) - 0x3F,  // treble
+                (int8_t)(data[9] & 0x7F) - 0x3F,  // treble
                 data[9] & 0x80 ? updatedStr : emptyStr,
                 data[1] & 0x10 ? onStr : offStr,  // loudness
-                (sint8_t)(0x3F) - (data[7] & 0x7F),  // fader
+                (int8_t)(0x3F) - (data[7] & 0x7F),  // fader
                 data[7] & 0x80 ? updatedStr : emptyStr,
-                (sint8_t)(0x3F) - (data[6] & 0x7F),  // balance
+                (int8_t)(0x3F) - (data[6] & 0x7F),  // balance
                 data[6] & 0x80 ? updatedStr : emptyStr,
                 data[1] & 0x04 ? onStr : offStr  // auto_volume
             );
@@ -1908,14 +1917,14 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             //
             // 1.) Recirculation = OFF, rear window heater = OFF, A/C = OFF:
             //     Fan icon not visible at all = 0
-            //     Fan icon with all empty blades = 4 
+            //     Fan icon with all empty blades = 4
             //     One blade visible = 4 (same as previous!)
             //     Two blades - low = 6
             //     Two blades - high = 7
             //     Three blades - low = 9
             //     Three blades - high = 10
             //     Four blades = 19
-            //     
+            //
             // 2.) Recirculation = ON, rear window heater = OFF, A/C = OFF:
             //     Fan icon not visible at all = 0
             //     Fan icon with all empty blades = 4
@@ -2104,7 +2113,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 data[2] == 0x49 ? PSTR("INITIALIZE") :  // Not sure
                 data[2] == 0x4B ? PSTR("LOADING") :
                 data[2] == 0xC0 ? PSTR("POWER_ON_READY") :  // Not sure
-                data[2] == 0xC1 ? 
+                data[2] == 0xC1 ?
                     data[10] == 0 ? PSTR("EJECT") :
                     PSTR("PAUSE") :
                 data[2] == 0xC3 ? PSTR("PLAY") :
@@ -3099,7 +3108,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 //   param == 0x1D:
                 //   - type = 0 (SRT_REQ_N_ITEMS) (dataLen = 4): request (remaining) list length
                 //     -- data[3]: (next) character to narrow down selection with. 0x00 if none.
-                //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): request list 
+                //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): request list
                 //     -- data[5] << 8 | data[6]: offset in list (0-based)
                 //     -- data[7] << 8 | data[8]: number of items to retrieve
                 //   - type = 2 (SRT_SELECT) (dataLen = 11): select entry
@@ -3113,7 +3122,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 //   param == 0x1D:
                 //   - type = 0 (SRT_REQ_N_ITEMS) (dataLen = 4): request (remaining) list length
                 //     -- data[3]: (next) character to narrow down selection with. 0x00 if none.
-                //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): request list 
+                //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): request list
                 //     -- data[5] << 8 | data[6]: offset in list (0-based)
                 //     -- data[7] << 8 | data[8]: number of items to retrieve
                 //   - type = 2 (SRT_SELECT) (dataLen = 11): select entry
@@ -3151,7 +3160,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 //   param == 0xFF:
                 //   - type = 0 (SRT_REQ_N_ITEMS) (dataLen = 4): present nag screen. Satnav response is PLACE_OF_INTEREST_CATEGORY_LIST
                 //              with list_size=38, but the MFD ignores that.
-                //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): request list 
+                //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): request list
                 //     -- data[5] << 8 | data[6]: offset in list (always 0)
                 //     -- data[7] << 8 | data[8]: number of items to retrieve (always 38)
 
@@ -3161,7 +3170,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 // * request == 0x09 (SR_SERVICE_ADDRESS),
                 //   param == 0x0D:
                 //   - type = 0 (SRT_REQ_N_ITEMS) (dataLen = 4): request list length
-                //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): request list 
+                //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): request list
                 //     -- data[5] << 8 | data[6]: offset in list (always 0)
                 //     -- data[7] << 8 | data[8]: number of items to retrieve (always 1: MFD browses address by address)
 
@@ -3258,7 +3267,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 // * request == 0x1B (SR_PERSONAL_ADDRESS_LIST),
                 //   param == 0xFF:
                 //   - type = 0 (SRT_REQ_N_ITEMS) (dataLen = 4): request list length
-                //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): request list 
+                //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): request list
                 //     -- data[5] << 8 | data[6]: offset in list
                 //     -- data[7] << 8 | data[8]: number of items to retrieve
 
@@ -3268,7 +3277,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 // * request == 0x1C (SR_PROFESSIONAL_ADDRESS_LIST),
                 //   param == 0xFF:
                 //   - type = 0 (SRT_REQ_N_ITEMS) (dataLen = 4): request list length
-                //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): request list 
+                //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): request list
                 //     -- data[5] << 8 | data[6]: offset in list
                 //     -- data[7] << 8 | data[8]: number of items to retrieve
 
@@ -3351,7 +3360,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // data[4] << 8 | data[5]: number of items
             // data[17...22]: bits indicating available letters, numbers, single quote (') or space
 
-            sint16_t listSize = (sint16_t)(data[4] << 8 | data[5]);
+            int16_t listSize = (int16_t)(data[4] << 8 | data[5]);
 
             Serial.printf_P(
                 PSTR("response=%S, list_size=%d, available_characters="),
@@ -3550,7 +3559,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             );
 
             Serial.printf_P(PSTR("Head unit stalk wheel position: %d\n"),
-                (sint8_t)data[6]);
+                (int8_t)data[6]);
         }
         break;
 
@@ -3667,8 +3676,8 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                         (data[4] & 0x0F) == 0x01 ? PSTR("TUNER") :
                         (data[4] & 0x0F) == 0x02 ? PSTR("INTERNAL_CD_OR_TAPE") :
                             // TODO - is this applicable:
-                            // data[4] & 0x20 ? "TAPE" : 
-                            // data[4] & 0x40 ? "INTERNAL_CD" : 
+                            // data[4] & 0x20 ? "TAPE" :
+                            // data[4] & 0x40 ? "INTERNAL_CD" :
                         (data[4] & 0x0F) == 0x03 ? PSTR("CD_CHANGER") :
 
                         // This is the "default" mode for the head unit, to sit there and listen to the navigation
@@ -3680,13 +3689,13 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
                         data[5] & 0x7F,
                         data[5] & 0x80 ? updatedStr : emptyStr,
-                        (sint8_t)(0x3F) - (data[6] & 0x7F),
+                        (int8_t)(0x3F) - (data[6] & 0x7F),
                         data[6] & 0x80 ? updatedStr : emptyStr,
-                        (sint8_t)(0x3F) - (data[7] & 0x7F),
+                        (int8_t)(0x3F) - (data[7] & 0x7F),
                         data[7] & 0x80 ? updatedStr : emptyStr,
-                        (sint8_t)(data[8] & 0x7F) - 0x3F,
+                        (int8_t)(data[8] & 0x7F) - 0x3F,
                         data[8] & 0x80 ? updatedStr : emptyStr,
-                        (sint8_t)(data[9] & 0x7F) - 0x3F,
+                        (int8_t)(data[9] & 0x7F) - 0x3F,
                         data[9] & 0x80 ? updatedStr : emptyStr
                     );
                 } // if
@@ -3726,10 +3735,10 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 // TODO - bit 7 of data[1] is always 1 ?
 
                 Serial.printf_P(PSTR("command=HEAD_UNIT_UPDATE_AUDIO_LEVELS, balance=%d, fader=%d, bass=%d, treble=%d\n"),
-                    (sint8_t)(0x3F) - (data[1] & 0x7F),
-                    (sint8_t)(0x3F) - data[2],
-                    (sint8_t)data[3] - 0x3F,
-                    (sint8_t)data[4] - 0x3F
+                    (int8_t)(0x3F) - (data[1] & 0x7F),
+                    (int8_t)(0x3F) - data[2],
+                    (int8_t)data[3] - 0x3F,
+                    (int8_t)data[4] - 0x3F
                 );
             }
             else if (data[0] == 0x24)
@@ -3893,11 +3902,13 @@ void setup()
     // Disable Wi-Fi altogether to get rid of long and variable interrupt latency, causing packet CRC errors
     // From: https://esp8266hints.wordpress.com/2017/06/29/save-power-by-reliably-switching-the-esp-wifi-on-and-off/
     WiFi.disconnect(true);
-    delay(1); 
+    delay(1);
     WiFi.mode(WIFI_OFF);
     delay(1);
+  #ifdef ARDUINO_ARCH_ESP8266
     WiFi.forceSleepBegin();
     delay(1);
+  #endif // ARDUINO_ARCH_ESP8266
 
     VanBusRx.Setup(RX_PIN);
     Serial.printf_P(PSTR("VanBusRx queue of size %d is set up\n"), VanBusRx.QueueSize());

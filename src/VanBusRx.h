@@ -58,7 +58,10 @@
 #define VAN_LOGICAL_HIGH VAN_BIT_RECESSIVE
 
 // F_CPU is set by the Arduino IDE option as chosen in menu Tools > CPU Frequency. It is always a multiple of 80000000.
-#define CPU_F_FACTOR (F_CPU / 80000000)
+#ifndef TIMER_BASE_CLK
+  #define TIMER_BASE_CLK (80000000)
+#endif
+#define CPU_F_FACTOR (F_CPU / TIMER_BASE_CLK)
 #define CPU_CYCLES(_X) ((_X) * CPU_F_FACTOR)
 
 #define VAN_NO_PIN_ASSIGNED (0xFF)

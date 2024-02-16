@@ -10,11 +10,13 @@
 
 #include "VanBus.h"
 
-// 1 bit time slot = 8 us
-//#define VAN_BIT_TIMER_TICKS (8 * 5)
-
-// 1 bit time slot = 8.2 us --> Seems to work much better than 8 us time slots ?!
-#define VAN_BIT_TIMER_TICKS (8 * 5 + 1)
+// Normally this value should be 8 * 5 to have a  1-bit time of 8 microseconds.
+// However, it appears that results are better when adding one or a few tenths of a microsecond.
+#ifdef ARDUINO_ARCH_ESP32
+  #define VAN_BIT_TIMER_TICKS (8 * 5 + 3)
+#else // ! ARDUINO_ARCH_ESP32
+  #define VAN_BIT_TIMER_TICKS (8 * 5 + 1)
+#endif // ARDUINO_ARCH_ESP32
 
 // Finish packet transmission
 void ICACHE_RAM_ATTR FinishPacketTransmission(TVanPacketTxDesc* txDesc)
@@ -32,11 +34,11 @@ void ICACHE_RAM_ATTR FinishPacketTransmission(TVanPacketTxDesc* txDesc)
     {
         VanBusRx.RegisterTxIsr(NULL);
 
-    #ifdef ARDUINO_ARCH_ESP32
-        timerEnd(timer);
-    #else // ! ARDUINO_ARCH_ESP32
-        timer1_disable();
-    #endif // ARDUINO_ARCH_ESP32
+  #ifdef ARDUINO_ARCH_ESP32
+    timerAlarmDisable(timer);
+  #else // ! ARDUINO_ARCH_ESP32
+    timer1_disable();
+  #endif // ARDUINO_ARCH_ESP32
 
     } // if 
 
@@ -217,7 +219,7 @@ void TVanPacketTxDesc::Dump() const
 
 void TVanPacketTxQueue::StartBitSendTimer()
 {
-    VanBusRx.RegisterTxIsr(SendBitIsr);
+    VanBusRx.RegisterTxIsr(&SendBitIsr);
 
     // TODO - wait here until:
     // nCycles >= (8 /* EOF */ + 5 /* IFS */) * (VAN_BIT_TIMER_TICKS * 16) * CPU_F_FACTOR
@@ -234,11 +236,11 @@ void TVanPacketTxQueue::StartBitSendTimer()
 
 #ifdef ARDUINO_ARCH_ESP32
 
-    if (timerAlarmEnabled(timer))
+    if (! timerAlarmEnabled(timer))
     {
         // Set a repetitive timer
-        timerEnd(timer);
-        timerAttachInterrupt(timer, SendBitIsr, true);
+        timerAlarmDisable(timer);
+        timerAttachInterrupt(timer, &SendBitIsr, true);
         timerAlarmWrite(timer, VAN_BIT_TIMER_TICKS, true);
         timerAlarmEnable(timer);
     } // if

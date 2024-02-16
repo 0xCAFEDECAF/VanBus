@@ -6,17 +6,19 @@
         "type": "git",
         "url": "https://github.com/0xCAFEDECAF/VanBus"
     },
-    "authors":
-    [
-    {
-            "name": "Erik Tromp"
-    }
+    "authors": [
+        {
+            "name": "Erik Tromp",
+            "maintainer": true
+        }
     ],
     "version": "0.3.4",
     "exclude": "tests",
     "examples": "examples/*/*.ino",
     "frameworks": "arduino",
     "platforms": [
-        "espressif8266"
-    ]
+        "espressif8266",
+        "espressif32"
+    ],
+    "license": "MIT"
 }
