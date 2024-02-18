@@ -9,14 +9,18 @@ const char PROGMEM unknownStr[] = "UNKNOWN";
 
 void PrintSystemSpecs()
 {
-    Serial.printf_P(PSTR("CPU Speed: %u MHz (CPU_F_FACTOR = %d)\n"), system_get_cpu_freq(), CPU_F_FACTOR);
-    Serial.printf_P(PSTR("SDK: %s\n"), system_get_sdk_version());
+    Serial.printf_P(PSTR("CPU Speed: %u MHz (CPU_F_FACTOR = %d)\n"), ESP.getCpuFreqMHz(), CPU_F_FACTOR);
+    Serial.printf_P(PSTR("SDK: %s\n"), ESP.getSdkVersion());
 
+  #ifndef ARDUINO_ARCH_ESP32
     uint32_t realSize = ESP.getFlashChipRealSize();
+  #endif // ARDUINO_ARCH_ESP32
     uint32_t ideSize = ESP.getFlashChipSize();
 
     char floatBuf[MAX_FLOAT_SIZE];
+  #ifndef ARDUINO_ARCH_ESP32
     Serial.printf_P(PSTR("Flash real size: %s MBytes\n"), FloatToStr(floatBuf, realSize/1024.0/1024.0, 2));
+  #endif // ARDUINO_ARCH_ESP32
     Serial.printf_P(PSTR("Flash ide size: %s MBytes\n"), FloatToStr(floatBuf, ideSize/1024.0/1024.0, 2));
     Serial.printf_P(PSTR("Flash ide speed: %s MHz\n"), FloatToStr(floatBuf, ESP.getFlashChipSpeed()/1000000.0, 2));
     FlashMode_t ideMode = ESP.getFlashChipMode();
@@ -26,7 +30,9 @@ void PrintSystemSpecs()
         ideMode == FM_DIO ? dioStr :
         ideMode == FM_DOUT ? doutStr :
         unknownStr);
+  #ifndef ARDUINO_ARCH_ESP32
     Serial.printf_P(PSTR("Flash chip configuration %S\n"), ideSize != realSize ? PSTR("wrong!") : PSTR("ok."));
+  #endif // ARDUINO_ARCH_ESP32
 
     Serial.print(F("Wi-Fi MAC address: "));
     Serial.print(WiFi.macAddress());
@@ -35,7 +41,9 @@ void PrintSystemSpecs()
 
 const char* EspSystemDataToJson(char* buf, const int n)
 {
+  #ifndef ARDUINO_ARCH_ESP32
     uint32_t flashSizeReal = ESP.getFlashChipRealSize();
+  #endif // ARDUINO_ARCH_ESP32
     uint32_t flashSizeIde = ESP.getFlashChipSize();
     FlashMode_t flashModeIde = ESP.getFlashChipMode();
 
@@ -44,15 +52,18 @@ const char* EspSystemDataToJson(char* buf, const int n)
         "\"event\": \"display\",\n"
         "\"data\":\n"
         "{\n"
+          #ifndef ARDUINO_ARCH_ESP32
             "\"esp_last_reset_reason\": \"%s\",\n"
             "\"esp_last_reset_info\": \"%s\",\n"
             "\"esp_boot_version\": \"%u\",\n"
+          #endif // ARDUINO_ARCH_ESP32
             "\"esp_cpu_speed\": \"%u MHz\",\n"
             "\"esp_sdk_version\": \"%s\",\n"
+          #ifndef ARDUINO_ARCH_ESP32
             "\"esp_chip_id\": \"0x%08X\",\n"
-
             "\"esp_flash_id\": \"0x%08X\",\n"
             "\"esp_flash_size_real\": \"%s MBytes\",\n"
+          #endif // ARDUINO_ARCH_ESP32
             "\"esp_flash_size_ide\": \"%s MBytes\",\n"
             "\"esp_flash_speed_ide\": \"%s MHz\",\n"
 
@@ -69,16 +80,20 @@ const char* EspSystemDataToJson(char* buf, const int n)
     char floatBuf[3][MAX_FLOAT_SIZE];
     int at = snprintf_P(buf, n, jsonFormatter,
 
+      #ifndef ARDUINO_ARCH_ESP32
         ESP.getResetReason().c_str(),
         ESP.getResetInfo().c_str(),
 
         ESP.getBootVersion(),
-        ESP.getCpuFreqMHz(), // system_get_cpu_freq(),
+      #endif // ARDUINO_ARCH_ESP32
+        ESP.getCpuFreqMHz(),
         ESP.getSdkVersion(),
+      #ifndef ARDUINO_ARCH_ESP32
         ESP.getChipId(),
 
         ESP.getFlashChipId(),
         FloatToStr(floatBuf[0], flashSizeReal/1024.0/1024.0, 2),
+      #endif // ARDUINO_ARCH_ESP32
         FloatToStr(floatBuf[1], flashSizeIde/1024.0/1024.0, 2),
         FloatToStr(floatBuf[2], ESP.getFlashChipSpeed()/1000000.0, 2),
 
@@ -92,7 +107,11 @@ const char* EspSystemDataToJson(char* buf, const int n)
         WiFi.localIP().toString().c_str(),
         WiFi.RSSI(),
 
+      #ifdef ARDUINO_ARCH_ESP32
+        esp_get_free_heap_size()
+      #else
         system_get_free_heap_size()
+      #endif // ARDUINO_ARCH_ESP32
     );
 
     // JSON buffer overflow?
@@ -105,4 +124,3 @@ const char* EspSystemDataToJson(char* buf, const int n)
 
     return buf;
 } // EspSystemDataToJson
-

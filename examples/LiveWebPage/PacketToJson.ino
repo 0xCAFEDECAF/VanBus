@@ -59,7 +59,7 @@ bool IsPacketSelected(uint16_t iden, VanPacketFilter_t filter);
 
 // Round downwards (even if negative) to nearest multiple of d. Safe for negative values of n and d, and for
 // values of n around 0.
-sint32_t _floor(sint32_t n, sint32_t d)
+int32_t _floor(int32_t n, int32_t d)
 {
     return (n / d - (((n > 0) ^ (d > 0)) && (n % d))) * d;
 } // _floor
@@ -85,7 +85,7 @@ char* ToStr(uint16_t data)
 } // ToStr
 
 // Uses statically allocated buffer, so don't call twice within the same printf invocation
-char* ToStr(sint16_t data)
+char* ToStr(int16_t data)
 {
     #define MAX_SINT16_STR_SIZE 7
     static char buffer[MAX_SINT16_STR_SIZE];
@@ -554,7 +554,7 @@ VanPacketParseResult_t ParseEnginePkt(TVanPacketRxDesc& pkt, char* buf, const in
     uint8_t coolantTempRaw = data[2];
     if (coolantTempRaw != 0xFF) lastValidCoolantTempRaw = coolantTempRaw;  // Copy only if packet value is valid
     bool isCoolantTempValid = lastValidCoolantTempRaw != 0xFF;
-    sint16_t coolantTemp = (uint16_t)lastValidCoolantTempRaw - 39;
+    int16_t coolantTemp = (uint16_t)lastValidCoolantTempRaw - 39;
     float odometer = ((uint32_t)data[3] << 16 | (uint32_t)data[4] << 8 | data[5]) / 10.0;
 
     uint8_t extTempRaw = data[6];
@@ -674,7 +674,7 @@ VanPacketParseResult_t ParseLightsStatusPkt(TVanPacketRxDesc& pkt, char* buf, co
     uint16_t remainingKmToService20 = (uint16_t)(data[2] & 0x7F) << 8 | data[3];
     bool remainingKmToServiceOverdue = data[2] & 0x80;
 
-    sint32_t remainingKmToService = remainingKmToService20 * 20;
+    int32_t remainingKmToService = remainingKmToService20 * 20;
     if (remainingKmToServiceOverdue) remainingKmToService = - remainingKmToService;
 
     const static char jsonFormatter[] PROGMEM =
@@ -1964,8 +1964,8 @@ VanPacketParseResult_t ParseAudioSettingsPkt(TVanPacketRxDesc& pkt, char* buf, c
     bool isCdPresent = data[4] & 0x40;
 
     uint8_t volume = data[5] & 0x7F;
-    sint8_t balance = (sint8_t)(0x3F) - (data[6] & 0x7F);
-    sint8_t fader = (sint8_t)(0x3F) - (data[7] & 0x7F);
+    int8_t balance = (int8_t)(0x3F) - (data[6] & 0x7F);
+    int8_t fader = (int8_t)(0x3F) - (data[7] & 0x7F);
 
     const static char jsonFormatter[] PROGMEM =
     "{\n"
@@ -2039,9 +2039,9 @@ VanPacketParseResult_t ParseAudioSettingsPkt(TVanPacketRxDesc& pkt, char* buf, c
         // Audio menu. Bug: if CD changer is playing, this one is always "OPEN" (even if it isn't).
         data[1] & 0x20 ? openStr : closedStr,
 
-        (sint8_t)(data[8] & 0x7F) - 0x3F,  // Bass
+        (int8_t)(data[8] & 0x7F) - 0x3F,  // Bass
         data[8] & 0x80 ? yesStr : noStr,
-        (sint8_t)(data[9] & 0x7F) - 0x3F,  // Treble
+        (int8_t)(data[9] & 0x7F) - 0x3F,  // Treble
         data[9] & 0x80 ? yesStr : noStr,
         data[1] & 0x10 ? onStr : offStr,  // Loudness
         fader == 0 ? "   " : fader > 0 ? "F +" : "R ", fader,
@@ -2229,21 +2229,21 @@ VanPacketParseResult_t ParseAirCon2Pkt(TVanPacketRxDesc& pkt, char* buf, const i
 
     // Avoid continuous updates if a temperature value is constantly toggling between 2 values, while the rest of the
     // data is the same.
-    
+
     static uint16_t prevStatusBits = 0xFFFF;  // Value that can never come from a packet itself
     uint8_t statusBits = data[0];
-    
+
     static uint16_t prevContactKeyData = 0xFFFF;  // Value that can never come from a packet itself
     uint8_t contactKeyData = data[1];
-    
+
     static uint32_t lastReportedCondenserTemp = 0xFFFFFFFF;  // Value that can never come from a packet itself
     uint8_t condenserTemp = data[2];
     static uint8_t prevCondenserTemp = condenserTemp;
-    
+
     static uint32_t lastReportedEvaporatorTemp = 0xFFFFFFFF;  // Value that can never come from a packet itself
     uint16_t evaporatorTemp = (uint16_t)data[3] << 8 | data[4];
     static uint16_t prevEvaporatorTemp = evaporatorTemp;
-    
+
     bool hasNewData =
         statusBits != prevStatusBits
         || contactKeyData != prevContactKeyData
@@ -2254,9 +2254,9 @@ VanPacketParseResult_t ParseAirCon2Pkt(TVanPacketRxDesc& pkt, char* buf, const i
     prevContactKeyData = contactKeyData;
     prevCondenserTemp = condenserTemp;
     prevEvaporatorTemp = evaporatorTemp;
-    
+
     if (! hasNewData) return VAN_PACKET_DUPLICATE;
-    
+
     lastReportedCondenserTemp = condenserTemp;
     lastReportedEvaporatorTemp = evaporatorTemp;
 
@@ -3851,12 +3851,12 @@ VanPacketParseResult_t ParseSatNavToMfdPkt(TVanPacketRxDesc& pkt, char* buf, con
 
     const uint8_t* data = pkt.Data();
     uint8_t request = data[1];
-    sint16_t listSize = (sint16_t)(data[4] << 8 | data[5]);
+    int16_t listSize = (int16_t)(data[4] << 8 | data[5]);
 
     // Sometimes there is a second list size. The first list size (bytes 4 and 5) is the number of items *containing*
     // the selected characters, the second list size (bytes 11 and 12) is the number of items *starting* with the
     // selected characters.
-    sint16_t list2Size = (sint16_t)(data[11] << 8 | data[12]);
+    int16_t list2Size = (int16_t)(data[11] << 8 | data[12]);
 
     const static char jsonFormatter[] PROGMEM =
     "{\n"
@@ -4065,7 +4065,7 @@ VanPacketParseResult_t ParseCom2000Pkt(TVanPacketRxDesc& pkt, char* buf, const i
         data[5] & 0x40 ? onStr : offStr,
         data[5] & 0x80 ? onStr : offStr,
 
-        (sint8_t)data[6]
+        (int8_t)data[6]
     );
 
     // JSON buffer overflow?
@@ -4209,13 +4209,13 @@ VanPacketParseResult_t ParseMfdToHeadUnitPkt(TVanPacketRxDesc& pkt, char* buf, c
 
                 data[5] & 0x7F,
                 data[5] & 0x80 ? updatedStr : emptyStr,
-                (sint8_t)(0x3F) - (data[6] & 0x7F),
+                (int8_t)(0x3F) - (data[6] & 0x7F),
                 data[6] & 0x80 ? updatedStr : emptyStr,
-                (sint8_t)(0x3F) - (data[7] & 0x7F),
+                (int8_t)(0x3F) - (data[7] & 0x7F),
                 data[7] & 0x80 ? updatedStr : emptyStr,
-                (sint8_t)(data[8] & 0x7F) - 0x3F,
+                (int8_t)(data[8] & 0x7F) - 0x3F,
                 data[8] & 0x80 ? updatedStr : emptyStr,
-                (sint8_t)(data[9] & 0x7F) - 0x3F,
+                (int8_t)(data[9] & 0x7F) - 0x3F,
                 data[9] & 0x80 ? updatedStr : emptyStr
             );
         } // if
@@ -4270,10 +4270,10 @@ VanPacketParseResult_t ParseMfdToHeadUnitPkt(TVanPacketRxDesc& pkt, char* buf, c
         "}\n";
 
         at = snprintf_P(buf, n, jsonFormatter,
-            (sint8_t)(0x3F) - (data[1] & 0x7F),
-            (sint8_t)(0x3F) - data[2],
-            (sint8_t)data[3] - 0x3F,
-            (sint8_t)data[4] - 0x3F
+            (int8_t)(0x3F) - (data[1] & 0x7F),
+            (int8_t)(0x3F) - data[2],
+            (int8_t)data[3] - 0x3F,
+            (int8_t)data[4] - 0x3F
         );
     }
     else if (data[0] == 0x27)

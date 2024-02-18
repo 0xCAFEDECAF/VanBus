@@ -33,7 +33,7 @@
  * (Arduino IDE --> Menu 'Sketch' --> 'Include Library' --> 'Manage Libraries...')
  *
  * - A WebSockets library; choose either:
- *   * "WebSockets" by Markus Sattler (https://github.com/Links2004/arduinoWebSockets) 
+ *   * "WebSockets" by Markus Sattler (https://github.com/Links2004/arduinoWebSockets)
  *     --> Tested with version 2.2.0, 2.3.3 and 2.3.4 .
  *   * "WebSockets_Generic" by Markus Sattler and Khoi Hoang (https://github.com/khoih-prog/WebSockets_Generic)
  *     --> Tested with version 2.4.0 .
@@ -63,33 +63,45 @@
  *   to have hiccups in the TCP traffic, ultimately causing the VAN Rx bus to overrun.
  */
 
-#include <ESP8266WiFi.h>
+#include "Config.h"
 
-// Either this for "WebSockets" (https://github.com/Links2004/arduinoWebSockets):
-#include <WebSocketsServer.h>
+// Either this for "WebSockets"
+#include <WebSocketsServer.h>  // https://github.com/Links2004/arduinoWebSockets
 
-// Or this for "WebSockets_Generic" (https://github.com/khoih-prog/WebSockets_Generic):
-//#include <WebSocketsServer_Generic.h>
+// Or this for "WebSockets_Generic"
+//#include <WebSocketsServer_Generic.h>  // https://github.com/khoih-prog/WebSockets_Generic
 
-#include <ESP8266WebServer.h>
-#include <VanBusRx.h>
+#ifdef ARDUINO_ARCH_ESP32
+  #include <WebServer.h>
+#else // ! ARDUINO_ARCH_ESP32
+  #include <ESP8266WebServer.h>
+#endif // ARDUINO_ARCH_ESP32
 
-#if defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
-// For ESP-01 board we use GPIO 2 (internal pull-up, keep disconnected or high at boot time)
-#define D2 (2)
-#endif
+#include <VanBusRx.h>  // https://github.com/0xCAFEDECAF/VanBus
 
-// Set to GPIO pin connected to VAN bus transceiver output
-int RX_PIN = D2;  // GPIO4 - often used as SDA (I2C)
-//int RX_PIN = D3;  // GPIO0 - pulled up - Boot fails
-//int RX_PIN = D4;  // GPIO2 - pulled up
-//int RX_PIN = D8;  // GPIO15 - pulled to GND - Boot fails
+#ifdef ARDUINO_ARCH_ESP32
+  const int RX_PIN = GPIO_NUM_22;  // Set to GPIO pin connected to VAN bus transceiver output
+#else // ! ARDUINO_ARCH_ESP32
+  #if defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
+    // For ESP-01 board we use GPIO 2 (internal pull-up, keep disconnected or high at boot time)
+    #define D2 (2)
+  #endif // defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
+  // Set to GPIO pin connected to VAN bus transceiver output
+  const int RX_PIN = D2;  // GPIO4 - often used as SDA (I2C)
+  //const int RX_PIN = D3;  // GPIO0 - pulled up - Boot fails
+  //const int RX_PIN = D4;  // GPIO2 - pulled up
+  //const int RX_PIN = D8;  // GPIO15 - pulled to GND - Boot fails
+#endif // ARDUINO_ARCH_ESP32
 
 // TODO - reduce size of large JSON packets like the ones containing guidance instruction icons
 #define JSON_BUFFER_SIZE 4096
 char jsonBuffer[JSON_BUFFER_SIZE];
 
-ESP8266WebServer webServer;
+#ifdef ARDUINO_ARCH_ESP32
+  WebServer webServer;
+#else // ! ARDUINO_ARCH_ESP32
+  ESP8266WebServer webServer;
+#endif // ARDUINO_ARCH_ESP32
 
 char webpage[] PROGMEM = R"=====(
 <!DOCTYPE html>
@@ -1024,7 +1036,7 @@ void setup()
 
     webServer.on("/",[](){
         unsigned long start = millis();
-        webServer.send_P(200, "text/html", webpage);  
+        webServer.send_P(200, "text/html", webpage);
         Serial.printf_P(PSTR("Sending HTML took: %lu msec\n"), millis() - start);
     });
     webServer.on("/dumpOnly", HandleDumpFilter);
@@ -1037,20 +1049,16 @@ void setup()
     Serial.print(WiFi.localIP());
     Serial.print("\n");
 
-#if ! defined VAN_RX_ISR_DEBUGGING && ! defined VAN_RX_IFS_DEBUGGING
-
+  #if ! defined VAN_RX_ISR_DEBUGGING && ! defined VAN_RX_IFS_DEBUGGING
     // Having the default VAN packet queue size of 15 (see VanBusRx.h) seems too little given the time that
     // is needed to send a JSON packet over the Wi-Fi; seeing quite some "VAN PACKET QUEUE OVERRUN!" lines.
     // Looks like it should be set to at least 100.
     #define VAN_PACKET_QUEUE_SIZE 100
-
-#else
-
+  #else
     // Packet debugging requires a lot of extra memory per slot, so the queue must be small to prevent
     // "out of memory" errors
     #define VAN_PACKET_QUEUE_SIZE 15
-
-#endif
+  #endif
 
     VanBusRx.Setup(RX_PIN, VAN_PACKET_QUEUE_SIZE);
     Serial.printf_P(PSTR("VanBusRx queue of size %d is set up\n"), VanBusRx.QueueSize());

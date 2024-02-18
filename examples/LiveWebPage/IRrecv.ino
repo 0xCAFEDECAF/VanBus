@@ -56,7 +56,7 @@ class IRrecv
     int compare(unsigned int oldval, unsigned int newval);
 }; // class IRrecv
 
-volatile uint32_t lastIrPulse = 0;
+volatile unsigned long lastIrPulse = 0;
 
 volatile TIrParams irparams;
 
@@ -64,7 +64,8 @@ void ICACHE_RAM_ATTR irPinChangeIsr()
 {
     if (irparams.rcvstate == STATE_STOP) return;
 
-    uint32_t now = system_get_time();
+    unsigned long now = micros();
+
     if (irparams.rcvstate == STATE_IDLE)
     {
         irparams.millis_ = millis();
@@ -73,7 +74,7 @@ void ICACHE_RAM_ATTR irPinChangeIsr()
     }
     else
     {
-        uint32_t ticks = (now - lastIrPulse) / USECPERTICK + 1;
+        unsigned long ticks = (now - lastIrPulse) / USECPERTICK + 1;  // Arithmetic has safe roll-over
 
         // Timeout after
         #define TIMEOUT_USECS (10000)
@@ -154,9 +155,9 @@ int IRrecv::decode(TIrPacket* results)
     results->rawlen = irparams.rawlen;
     if (irparams.rawlen && irparams.rcvstate != STATE_STOP)
     {
-        uint32_t now = system_get_time();
-        uint32_t then = lastIrPulse;
-        uint32_t ticks = (now - then) / USECPERTICK + 1;
+        unsigned long now = micros();
+        unsigned long then = lastIrPulse;
+        unsigned long ticks = (now - then) / USECPERTICK + 1;  // Arithmetic has safe roll-over
         if (ticks > TIMEOUT_TICKS) irparams.rcvstate = STATE_STOP;
     } // if
     interrupts();

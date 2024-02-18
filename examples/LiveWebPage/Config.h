@@ -1,7 +1,11 @@
 #ifndef Config_h
 #define Config_h
 
-#include <ESP8266WiFi.h>
+#ifdef ARDUINO_ARCH_ESP32
+  #include <WiFi.h>
+#else
+  #include <ESP8266WiFi.h>
+#endif // ARDUINO_ARCH_ESP32
 
 // -----
 // Wi-Fi and IP configuration
@@ -14,20 +18,23 @@
 // Define when using DHCP; comment out when using a static (fixed) IP address.
 #define USE_DHCP
 
-// Define when using a Windows Internet Connection Sharing (ICS) Wi-Fi. Comment out when using Android Wi-Fi hotspot.
-// Note: only applicable when using a static (fixed) IP address, not when using DHCP.
-//#define WINDOWS_ICS
-
 #ifdef USE_DHCP
 
   // Using DHCP; ESP will register HOST_NAME via DHCP option 12.
-  // Note: Neither Windows ICS nor Android Wi-Fi hotspot seem to support registering the host name on their
-  // DHCP server implementation. Moreover, Windows ICS DHCP will NOT assign the previously assigned IP address to
-  // the same MAC address upon new connection.
+  // Notes:
+  // - Neither Windows ICS nor Android Wi-Fi hotspot seem to support registering the host name on their
+  //   DHCP server implementation.
+  // - In Windows 7, ICS DHCP will NOT assign the previously assigned IP address to the same MAC address
+  //   upon new connection, so in that case it not sure what IP address the ESP will get.
 
 #else // ! USE_DHCP
 
-    // Using static (fixed) IP configuration (not DHCP); hostname will not be registered.
+  // Using static (fixed) IP configuration (not DHCP); hostname will not be registered.
+
+  // Define when using a Windows Internet Connection Sharing (ICS) Wi-Fi. Comment out when using Android
+  // Wi-Fi hotspot.
+  // Note: only applicable when using a static (fixed) IP address, not when using DHCP.
+  //#define WINDOWS_ICS
 
   #ifdef WINDOWS_ICS  // When using a Windows ICS hotspot
     #define IP_ADDR "192.168.137.2"
@@ -65,14 +72,23 @@ inline void WifiConfig()
 #ifdef IR_TSOP48XX
 
   // IR receiver data pin
-  #define IR_RECV_PIN D5
+  #ifdef ARDUINO_ARCH_ESP32
+    #define IR_RECV_PIN GPIO_NUM_18
+  #else
+    #define IR_RECV_PIN D5
+  #endif // ARDUINO_ARCH_ESP32
 
-  // Using D7 as VCC and D6 as ground pin for the IR receiver. Should be possible with e.g. the
-  // TSOP4838 IR receiver as it typically uses only 0.7 mA (maximum GPIO current is 12 mA;
-  // see https://tttapa.github.io/ESP8266/Chap04%20-%20Microcontroller.html for ESP8266 and
-  // https://esp32.com/viewtopic.php?f=2&t=2027 for ESP32).
-  #define IR_VCC D7
-  #define IR_GND D6
+  #ifdef ARDUINO_ARCH_ESP32
+    #define IR_VCC GPIO_NUM_23
+    #define IR_GND GPIO_NUM_19
+  #else
+    // Using D7 as VCC and D6 as ground pin for the IR receiver. Should be possible with e.g. the
+    // TSOP4838 IR receiver as it typically uses only 0.7 mA (maximum GPIO current is 12 mA;
+    // see https://tttapa.github.io/ESP8266/Chap04%20-%20Microcontroller.html for ESP8266 and
+    // https://esp32.com/viewtopic.php?f=2&t=2027 for ESP32).
+    #define IR_VCC D7
+    #define IR_GND D6
+  #endif // ARDUINO_ARCH_ESP32
 
 #endif // IR_TSOP48XX
 
@@ -80,12 +96,21 @@ inline void WifiConfig()
 #ifdef IR_TSOP312XX
 
   // IR receiver data pin
-  #define IR_RECV_PIN D7
+  #ifdef ARDUINO_ARCH_ESP32
+    #define IR_RECV_PIN GPIO_NUM_23
+  #else
+    #define IR_RECV_PIN D7
+  #endif // ARDUINO_ARCH_ESP32
 
-  // Using D7 as VCC and D6 as ground pin for the IR receiver. Should be possible with e.g. the
-  // TSOP31238 IR receiver as it typically uses only 0.35 mA.
-  #define IR_VCC D5
-  #define IR_GND D0
+  #ifdef ARDUINO_ARCH_ESP32
+    #define IR_VCC GPIO_NUM_18
+    #define IR_GND GPIO_NUM_26
+  #else
+    // Using D5 as VCC and D0 as ground pin for the IR receiver. Should be possible with e.g. the
+    // TSOP31238 IR receiver as it typically uses only 0.35 mA.
+    #define IR_VCC D5
+    #define IR_GND D0
+  #endif // ARDUINO_ARCH_ESP32
 
 #endif // IR_TSOP312XX
 
@@ -104,12 +129,17 @@ inline void WifiConfig()
 //   of CRC errors in the received VAN bus packets
 #define PRINT_JSON_BUFFERS_ON_SERIAL
 
-// If PRINT_JSON_BUFFERS_ON_SERIAL is defined, which type of VAN-bus packets will be printed on the serial port?
-#define SELECTED_PACKETS VAN_PACKETS_ALL_VAN_PKTS
-//#define SELECTED_PACKETS VAN_PACKETS_COM2000_ETC_PKTS
-//#define SELECTED_PACKETS VAN_PACKETS_HEAD_UNIT_PKTS
-//#define SELECTED_PACKETS VAN_PACKETS_SAT_NAV_PKTS
-//#define SELECTED_PACKETS VAN_PACKETS_NO_VAN_PKTS
+#if defined PRINT_RAW_PACKET_DATA || defined PRINT_JSON_BUFFERS_ON_SERIAL
+
+  // Which type of VAN-bus packets will be printed on the serial port?
+
+  #define SELECTED_PACKETS VAN_PACKETS_ALL_VAN_PKTS
+  //#define SELECTED_PACKETS VAN_PACKETS_COM2000_ETC_PKTS
+  //#define SELECTED_PACKETS VAN_PACKETS_HEAD_UNIT_PKTS
+  //#define SELECTED_PACKETS VAN_PACKETS_SAT_NAV_PKTS
+  //#define SELECTED_PACKETS VAN_PACKETS_NO_VAN_PKTS
+
+#endif // defined PRINT_RAW_PACKET_DATA || defined PRINT_JSON_BUFFERS_ON_SERIAL
 
 //#define PRINT_VAN_CRC_ERROR_PACKETS_ON_SERIAL
 
