@@ -1,3 +1,13 @@
+0.4.0
+    General:
+    * Add support for ESP32 platform/architecture
+
+    README.md:
+    * Fix broken links
+
+    src/VanBusRx.h:
+    * Move method 'TVanPacketRxQueue::GetLastMediaAccessAt' from private to public
+
 0.3.4
     General:
     * Fix compiler warnings
@@ -66,7 +76,7 @@
     * RxPinChangeIsr(): save a few precious bytes of RAM
     * Prevent CPU monopolization by noise on bus
     * TVanPacketRxQueue::Disable(): also run timer1_disable(), just in case
-    * Improved keeping the 'nQueued' counter up to date 
+    * Improved keeping the 'nQueued' counter up to date
     * Add extra patterns for SOF detection
     * Small updates in the bit timing criteria
 
@@ -84,7 +94,7 @@
     * TVanPacketRxDesc::CheckCrcAndRepair(...): check first with only the "uncertain bit" flipped
     * Better handling of unexpected new bit coming after an "ACK" (in which case it is not an "ACK" but the
       first "1" bit of the next byte)
-    * Add extra patterns for SOF detection 
+    * Add extra patterns for SOF detection
     * Small updates in the bit timing criteria
 
     VanBusRx.h:
@@ -211,17 +221,17 @@
     * Various packet parsing improvements
 
     examples/PacketParser.ino:
-    * Disabled Wi-Fi to practically eliminate occurrence of packets with CRC errors 
+    * Disabled Wi-Fi to practically eliminate occurrence of packets with CRC errors
     * Various packet parsing improvements
 
     examples/DisplayNotifications.ino
-    * Disabled Wi-Fi to practically eliminate occurrence of packets with CRC errors 
+    * Disabled Wi-Fi to practically eliminate occurrence of packets with CRC errors
 
     examples/SendPacket.ino
-    * Disabled Wi-Fi to practically eliminate occurrence of packets with CRC errors 
+    * Disabled Wi-Fi to practically eliminate occurrence of packets with CRC errors
 
-    examples/VanBusDump.ino 
-    * Disabled Wi-Fi to practically eliminate occurrence of packets with CRC errors 
+    examples/VanBusDump.ino
+    * Disabled Wi-Fi to practically eliminate occurrence of packets with CRC errors
 
 0.2.0
     Added function to transmit packets onto the VAN bus:
