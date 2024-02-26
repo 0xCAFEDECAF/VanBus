@@ -24,7 +24,7 @@
   // Notes:
   // - Neither Windows ICS nor Android Wi-Fi hotspot seem to support registering the host name on their
   //   DHCP server implementation.
-  // - In Windows 7, ICS DHCP will NOT assign the previously assigned IP address to the same MAC address
+  // - Windows ICS DHCP will NOT assign the previously assigned IP address to the same MAC address
   //   upon new connection, so in that case it not sure what IP address the ESP will get.
 
 #else // ! USE_DHCP

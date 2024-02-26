@@ -13,21 +13,22 @@
  * You can usually find the VAN bus on pins 2 and 3 of ISO block "A" of your head unit (car radio). See
  * https://en.wikipedia.org/wiki/Connectors_for_car_audio and https://github.com/morcibacsi/esp32_rmt_van_rx .
  *
- * There are various possibilities to hook up a ESP8266 based board to your vehicle's VAN bus:
+ * There are various possibilities to hook up a ESP8266/ESP32 based board to your vehicle's VAN bus. For example,
+ * when using a "WEMOS D1 mini" board:
  *
  * 1. Use a MCP2551 transceiver, connected with its CANH and CANL pins to the vehicle's VAN bus.
  *    As the MCP2551 has 5V logic, a 5V <-> 3.3V level converter is needed to connect the CRX / RXD / R pin of the
- *    transceiver to (in this example) GPIO pin 2 (RX_PIN) of your ESP8266 board.
+ *    transceiver to (in this example) pin D2 (GPIO 4) of your board.
  *
  * 2. Use a SN65HVD230 transceiver, connected with its CANH and CANL pins to the vehicle's VAN bus.
  *    The SN65HVD230 transceiver already has 3.3V logic, so it is possible to directly connect the CRX / RXD / R pin of
- *    the transceiver to (in this example) GPIO pin 2 (RX_PIN) of your ESP8266 board.
+ *    the transceiver to (in this example) pin D2 (GPIO 4) of your board.
  *
  * 3. The simplest schematic is not to use a transceiver at all, but connect the VAN DATA line to GrouND using
- *    two 4.7 kOhm resistors. Connect the GPIO pin of your ESP8266 board to the 1:2 voltage divider that is thus
+ *    two 4.7 kOhm resistors. Connect the GPIO pin of your board to the 1:2 voltage divider that is thus
  *    formed by the two resistors. Results may vary.
  *    --> Note: I used this schematic during many long debugging hours, but I cannot guarantee that it won't ultimately
- *        cause your car to explode! (or anything less catastrofic)
+ *        cause your car to explode! (or anything less catastrophic)
  *
  * -----
  * Output
@@ -68,14 +69,18 @@
 
 #include <VanBusRx.h>  // https://github.com/0xCAFEDECAF/VanBus
 
+// GPIO pin connected to VAN bus transceiver output
 #ifdef ARDUINO_ARCH_ESP32
-  const int RX_PIN = GPIO_NUM_22;  // Set to GPIO pin connected to VAN bus transceiver output
+  const int RX_PIN = GPIO_NUM_22;
 #else // ! ARDUINO_ARCH_ESP32
+
   #if defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
     // For ESP-01 board we use GPIO 2 (internal pull-up, keep disconnected or high at boot time)
     #define D2 (2)
   #endif // defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
-  const int RX_PIN = D2;  // Set to GPIO pin connected to VAN bus transceiver output
+
+  // For WEMOS D1 mini board we use D2 (GPIO 4)
+  const int RX_PIN = D2;
 #endif // ARDUINO_ARCH_ESP32
 
 void setup()

@@ -13,21 +13,22 @@
  * You can usually find the VAN bus on pins 2 and 3 of ISO block "A" of your head unit (car radio). See
  * https://en.wikipedia.org/wiki/Connectors_for_car_audio and https://github.com/morcibacsi/esp32_rmt_van_rx .
  *
- * There are various possibilities to hook up a ESP8266 based board to your vehicle's VAN bus:
+ * There are various possibilities to hook up a ESP8266/ESP32 based board to your vehicle's VAN bus. For example,
+ * when using a "WEMOS D1 mini" board:
  *
  * 1. Use a MCP2551 transceiver, connected with its CANH and CANL pins to the vehicle's VAN bus.
  *    As the MCP2551 has 5V logic, a 5V <-> 3.3V level converter is needed to. For this example, connect:
- *    - the CRX / RXD / R pin of the transceiver, via the level converter, to GPIO pin 2 (RX_PIN) of your ESP8266, and
- *    - the CTX / TXD / D pin of the transceiver, via the level converter, to GPIO pin 3 (TX_PIN) of your ESP8266.
+ *    - the CRX / RXD / R pin of the transceiver, via the level converter, to pin D2 (GPIO 4) of your board, and
+ *    - the CTX / TXD / D pin of the transceiver, via the level converter, to pin D3 (GPIO 0) of your board.
  *
  * 2. Use a SN65HVD230 transceiver, connected with its CANH and CANL pins to the vehicle's VAN bus.
  *    The SN65HVD230 transceiver already has 3.3V logic, so it is possible to directly connect the CRX / RXD / R
- *    and the CTX / TXD / D pins of the transceiver to a GPIO pin of your ESP8266 board. For this example, connect:
- *    - the CRX / RXD / R pin of the transceiver to GPIO pin 2 (RX_PIN) of your ESP8266 board.
- *    - the CTX / TXD / D pin of the transceiver to GPIO pin 3 (TX_PIN) of your ESP8266 board, and
+ *    and the CTX / TXD / D pins of the transceiver to a GPIO pin of your board. For this example, connect:
+ *    - the CRX / RXD / R pin of the transceiver to pin D2 (GPIO 4) of your board, and
+ *    - the CTX / TXD / D pin of the transceiver to pin D3 (GPIO 0) of your board.
  *
  * Note: for transmitting packets, it is necessary to also connect the receiving pin. The receiving pin is used to
- *   sense media access from other devices on the bus, so that bus arbitration can be performed.
+ * sense media access from other devices on the bus, so that bus arbitration can be performed.
  */
 
 #include <assert.h>
@@ -41,11 +42,11 @@
 #include <VanBus.h>  // https://github.com/0xCAFEDECAF/VanBus
 
 #ifdef ARDUINO_ARCH_ESP32
-  const int TX_PIN = GPIO_NUM_21; // Set to GPIO pin connected to VAN bus transceiver input
-  const int RX_PIN = GPIO_NUM_22; // Set to GPIO pin connected to VAN bus transceiver output
+  const int TX_PIN = GPIO_NUM_21; // GPIO pin connected to VAN bus transceiver input
+  const int RX_PIN = GPIO_NUM_22; // GPIO pin connected to VAN bus transceiver output
 #else // ! ARDUINO_ARCH_ESP32
-  const int TX_PIN = D3; // Set to GPIO pin connected to VAN bus transceiver input
-  const int RX_PIN = D2; // Set to GPIO pin connected to VAN bus transceiver output
+  const int TX_PIN = D3; // GPIO pin connected to VAN bus transceiver input
+  const int RX_PIN = D2; // GPIO pin connected to VAN bus transceiver output
 #endif // ARDUINO_ARCH_ESP32
 
 void setup()

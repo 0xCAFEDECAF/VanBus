@@ -236,7 +236,7 @@ const char* ParseIrPacketToJson(const TIrPacket& pkt)
     if (at >= IR_JSON_BUFFER_SIZE) return "";
 
   #ifdef PRINT_JSON_BUFFERS_ON_SERIAL
-    Serial.print(F("Parsed to JSON object:\n"));
+    Serial.print(F("IR remote control packet parsed to JSON object:\n"));
     PrintJsonText(jsonBuffer);
   #endif // PRINT_JSON_BUFFERS_ON_SERIAL
 

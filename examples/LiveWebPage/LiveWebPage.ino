@@ -79,14 +79,17 @@
 
 #include <VanBusRx.h>  // https://github.com/0xCAFEDECAF/VanBus
 
+// GPIO pin connected to VAN bus transceiver output
 #ifdef ARDUINO_ARCH_ESP32
-  const int RX_PIN = GPIO_NUM_22;  // Set to GPIO pin connected to VAN bus transceiver output
+  const int RX_PIN = GPIO_NUM_22;
 #else // ! ARDUINO_ARCH_ESP32
+
   #if defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
     // For ESP-01 board we use GPIO 2 (internal pull-up, keep disconnected or high at boot time)
     #define D2 (2)
   #endif // defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
-  // Set to GPIO pin connected to VAN bus transceiver output
+
+  // For WEMOS D1 mini board we use D2 (GPIO 4)
   const int RX_PIN = D2;  // GPIO4 - often used as SDA (I2C)
   //const int RX_PIN = D3;  // GPIO0 - pulled up - Boot fails
   //const int RX_PIN = D4;  // GPIO2 - pulled up
