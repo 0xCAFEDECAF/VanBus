@@ -44,7 +44,13 @@ There are various possibilities to hook up a ESP8266/ESP32 based board to your v
    [here](https://domoticx.net/webshop/can-bus-transceiver-module-5v-mcp2551/) or
    [here](https://nl.aliexpress.com/item/1005004475976642.html).
 
+   Example schema using a [Wemos D1 mini] (ESP8266 based):
+
 ![schema](extras/Schematics/Schematic%20using%20MCP2551_bb.png)
+
+   Example schema using a [LilyGO TTGO T7 Mini32] (ESP32 based):
+
+![schema](extras/Schematics/Schematic%20with%20ESP32%20using%20MCP2551_bb.png)
 
 > 👉 Notes:
 >  * <img src="extras/Schematics/MCP2551%20terminator%20resistors.jpg" align="right" width="200px"/>The two terminator
@@ -399,6 +405,8 @@ Do whatever you like with it, but contributions are appreciated!
 
 ["VAN" bus]: https://en.wikipedia.org/wiki/Vehicle_Area_Network
 [MCP2551]: http://ww1.microchip.com/downloads/en/devicedoc/21667d.pdf
+[Wemos D1 mini]: https://www.tinytronics.nl/en/development-boards/microcontroller-boards/with-wi-fi/wemos-d1-mini-v4-esp8266-ch340
+[LilyGO TTGO T7 Mini32]: https://www.tinytronics.nl/en/development-boards/microcontroller-boards/with-wi-fi/lilygo-ttgo-t7-mini32-v1.3-esp32-4mb-flash
 [level converter]: https://www.tinytronics.nl/shop/en/dc-dc-converters/level-converters/i2c-uart-bi-directional-logic-level-converter-5v-3.3v-2-channel-with-supply
 [SN65HVD230]: https://www.ti.com/lit/ds/symlink/sn65hvd230.pdf?ts=1592992149874
 [voltage divider]: https://www.quora.com/How-many-pins-on-Arduino-Uno-give-a3-3v-pin-output
