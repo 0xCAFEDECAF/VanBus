@@ -1179,7 +1179,6 @@ bool TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
 {
     if (pin != VAN_NO_PIN_ASSIGNED) return false; // Already setup
 
-    pin = rxPin;
     pinMode(rxPin, INPUT_PULLUP);
 
     size = queueSize;
@@ -1206,6 +1205,8 @@ bool TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
     timer1_isr_init();
     timer1_disable();
   #endif // ARDUINO_ARCH_ESP32
+
+    pin = rxPin;
 
     return true;
 } // TVanPacketRxQueue::Setup
