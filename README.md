@@ -7,6 +7,7 @@
 ## 📝 Table of Contents
 - [Description](#description)
 - [Schematics](#schematics)
+- [Building your Project](#building)
 - [Usage](#usage)
   - [General](#general)
   - [Functions](#functions)
@@ -96,7 +97,74 @@ There are various possibilities to hook up a ESP8266/ESP32 based board to your v
 > 👉 Note: I used this schematic during many long debugging hours, but I cannot guarantee that it won't ultimately
      cause your car to explode! (or anything less catastrophic)
 
-## 🚀 Usage<a name = "usage"></a>
+## 🚀 Building your Project<a name = "building"></a>
+
+Before proceeding with this project, make sure you check all the following prerequisites.
+
+### Install Arduino IDE
+
+See [Arduino IDE](https://www.arduino.cc/en/software)
+
+### ESP8266-based board
+
+An example of an ESP8266-based board is the [Wemos D1 mini].
+
+#### 1. Install Board Package in Arduino IDE
+
+For an ESP8266-based board you will need to install the
+[ESP8266 Board Package](http://arduino.esp8266.com/Arduino/versions/2.0.0/doc/installing.html).
+
+I am currently using [version 2.6.3](https://github.com/esp8266/Arduino/releases/tag/2.6.3) but other versions
+may also be working fine.
+
+Follow [this tutorial](https://randomnerdtutorials.com/how-to-install-esp8266-board-arduino-ide/) to install
+the ESP8266 Board Package.
+
+#### 2. Install the VAN Bus Library<a id="install_library"></a>
+
+In the Arduino IDE, go to the "Sketch" menu → "Include Library" → "Manage Libraries..." and install the
+[Vehicle Area Network (VAN) bus packet reader/writer](https://github.com/0xCAFEDECAF/VanBus) library. Hint:
+type "vanbus" in the search box.
+
+For more explanation on using the Arduino library manager, you can browse to:
+* this [tutorial from Arduino](https://docs.arduino.cc/software/ide-v1/tutorials/installing-libraries), and
+* this [explanation from Adafruit](https://learn.adafruit.com/adafruit-all-about-arduino-libraries-install-use/library-manager)
+
+#### 3. Board settings
+
+In the Arduino IDE, go to the "Tools" menu, and choose:
+
+* CPU frequency: 160 MHz
+
+Here is a picture of board settings that have been tested to work:
+
+![Board settings](extras/Arduino%20IDE/Board%20settings%20ESP8266.png)
+
+### ESP32-based board
+
+An example of an ESP32-based board is the [LilyGO TTGO T7 Mini32].
+
+#### 1. Install Board Package in Arduino IDE
+
+For an ESP32-based board you will need the ESP32 board package installed. 
+
+I am currently using [version 1.0.6](https://github.com/espressif/arduino-esp32/releases/tag/1.0.6) but other versions
+may also be working fine.
+
+Follow [this tutorial](https://randomnerdtutorials.com/installing-the-esp32-board-in-arduino-ide-windows-instructions/)
+to install the ESP32 Board Package.
+
+#### 2. Install the VAN Bus Library
+
+See section ['Install the VAN Bus Library', above](#install_library).
+
+#### 3. Board settings
+
+In the Arduino IDE, go to the "Tools" menu, and choose:
+
+\[TODO\]
+
+## 🧰 Usage<a name = "usage"></a>
 
 ### General<a name = "general"></a>
 
