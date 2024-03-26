@@ -94,7 +94,10 @@ There are various possibilities to hook up a ESP8266/ESP32 based board to your v
 
 ![schema](extras/Schematics/Schematic%20using%20voltage%20divider_bb.png)
 
-> 👉 Note: I used this schematic during many long debugging hours, but I cannot guarantee that it won't ultimately
+> 👉 Notes:
+>  * This schematic seems to work well only with an ESP8266-based board, like the [Wemos D1 mini]. With an
+     ESP32-based board I get a lot of CRC errors.
+>  * I used this schematic during many long debugging hours, but I cannot guarantee that it won't ultimately
      cause your car to explode! (or anything less catastrophic)
 
 ## 🚀 Building your Project<a name = "building"></a>
@@ -162,7 +165,11 @@ See section ['Install the VAN Bus Library', above](#install_library).
 
 In the Arduino IDE, go to the "Tools" menu, and choose:
 
-\[TODO\]
+* CPU frequency: 240 MHz
+
+Here is a picture of board settings that have been tested to work:
+
+![Board settings](extras/Arduino%20IDE/Board%20settings%20ESP32.png)
 
 ## 🧰 Usage<a name = "usage"></a>
 
