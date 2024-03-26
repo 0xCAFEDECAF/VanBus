@@ -1,6 +1,8 @@
 0.4.0
     General:
     * Add support for ESP32 platform/architecture
+    * Added shell (.sh) and batch (.bat) scripts that help to set up the Arduino IDE with all the
+      correct board options
 
     README.md:
     * Fix broken links
