@@ -1,7 +1,7 @@
 {
     "name": "VanBus",
     "keywords": "van-bus, van-bus-packets, car, arduino, automotive, protocol, psa, peugeot, citroen, esp8266, network, sniffer, receiver, can, can-bus, m2m, iot",
-    "description": "Vehicle Area Network (VAN) bus packet reader/writer, for reading from and writing to a VAN bus as used by PSA (Peugeot, Citroen) for various models up to 2009. It supports the Espressif ESP8266/8285 family hardware.",
+    "description": "Vehicle Area Network (VAN) bus packet reader/writer, for reading from and writing to a VAN bus as used by PSA (Peugeot, Citroen) for various models up to 2009. It supports the Espressif ESP8266/8285 and ESP32 family hardware.",
     "repository": {
         "type": "git",
         "url": "https://github.com/0xCAFEDECAF/VanBus"
