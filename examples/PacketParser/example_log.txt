@@ -1,0 +1,206 @@
+// Example log as it was copied from the Arduino IDE Serial Monitor.
+// Recorded on 2024-05-14.
+
+13:59:50.120 -> received pkts: 39366, corrupt: 0 (0.000%), repaired: 0 (---%) [SB:0, DCB:0, TCB:0, DSB:0], UCB:0, overall: 0 (0.000%), avg1bit: 690, maxQueued: 8/15
+13:59:55.095 -> received pkts: 39390, corrupt: 0 (0.000%), repaired: 0 (---%) [SB:0, DCB:0, TCB:0, DSB:0], UCB:0, overall: 0 (0.000%), avg1bit: 691, maxQueued: 8/15
+14:00:00.124 -> received pkts: 39415, corrupt: 0 (0.000%), repaired: 0 (---%) [SB:0, DCB:0, TCB:0, DSB:0], UCB:0, overall: 0 (0.000%), avg1bit: 691, maxQueued: 8/15
+14:00:05.104 -> received pkts: 39439, corrupt: 0 (0.000%), repaired: 0 (---%) [SB:0, DCB:0, TCB:0, DSB:0], UCB:0, overall: 0 (0.000%), avg1bit: 691, maxQueued: 8/15
+14:00:10.114 -> received pkts: 39464, corrupt: 0 (0.000%), repaired: 0 (---%) [SB:0, DCB:0, TCB:0, DSB:0], UCB:0, overall: 0 (0.000%), avg1bit: 691, maxQueued: 8/15
+14:00:14.875 -> --> MFD language and units: language=DUTCH, units=CELSIUS KILOMETRES_METRES 24_H_CLOCK
+14:00:14.875 -> Raw: #9487 ( 8/15)  5(10) 0E 984 8 (W-0) 00-00-00-06-08:D0-C8 NO_ACK OK D0C8 CRC_OK
+14:00:14.875 ->                                           ·  ·  ·  ·  · 
+14:00:15.129 -> received pkts: 39489, corrupt: 0 (0.000%), repaired: 0 (---%) [SB:0, DCB:0, TCB:0, DSB:0], UCB:0, overall: 0 (0.000%), avg1bit: 691, maxQueued: 8/15
+14:00:20.092 -> received pkts: 39514, corrupt: 0 (0.000%), repaired: 0 (---%) [SB:0, DCB:0, TCB:0, DSB:0], UCB:0, overall: 0 (0.000%), avg1bit: 691, maxQueued: 8/15
+14:00:21.649 -> --> Device report: Head unit: AUDIO_SETTINGS_ANNOUNCE
+14:00:21.649 -> Raw: #9522 (13/15)  3( 8) 0E 8C4 C (WA0) 8A-21-40:3D-54 ACK OK 3D54 CRC_OK uBit=64
+14:00:21.703 ->                                           ·  !  @ 
+14:00:21.703 -> --> Audio settings: power=ON, tape=PRESENT, cd=NOT_PRESENT, source=TUNER, ext_mute=OFF, mute=OFF,
+14:00:21.703 ->     volume=0(UPD), audio_menu=CLOSED, bass=0, treble=0, loudness=OFF, fader=0, balance=0, auto_volume=ON
+14:00:21.703 -> Raw: #9523 (14/15) 11(16) 0E 4D4 E (RA0) 80-0C-01-00-31-80-3F-3F-3F-3F-80:E3-1E ACK OK E31E CRC_OK
+14:00:21.703 ->                                           ·  ·  ·  ·  1  ·  ?  ?  ?  ?  · 
+14:00:21.803 -> --> Audio settings: power=ON, tape=PRESENT, cd=NOT_PRESENT, source=TUNER, ext_mute=OFF, mute=OFF,
+14:00:21.803 ->     volume=0, audio_menu=CLOSED, bass=0, treble=0, loudness=OFF, fader=0, balance=0, auto_volume=ON
+14:00:21.803 -> Raw: #9524 (15/15) 11(16) 0E 4D4 E (RA0) 81-0C-01-00-31-00-3F-3F-3F-3F-81:DD-C6 ACK OK DDC6 CRC_OK
+14:00:21.803 ->                                           ·  ·  ·  ·  1  ·  ?  ?  ?  ?  · 
+14:00:22.351 -> --> Device report: Head unit: AUDIO_SETTINGS_ANNOUNCE
+14:00:22.351 -> Raw: #9527 ( 3/15)  3( 8) 0E 8C4 C (WA0) 8A-21-40:3D-54 ACK OK 3D54 CRC_OK uBit=64
+14:00:22.351 ->                                           ·  !  @ 
+14:00:22.351 -> --> Audio settings: power=ON, tape=PRESENT, cd=NOT_PRESENT, source=TUNER, ext_mute=OFF, mute=OFF,
+14:00:22.351 ->     volume=0(UPD), audio_menu=CLOSED, bass=0, treble=0, loudness=OFF, fader=0, balance=0, auto_volume=ON
+14:00:22.351 -> Raw: #9528 ( 4/15) 11(16) 0E 4D4 E (RA0) 82-0C-01-00-31-80-3F-3F-3F-3F-82:99-A2 ACK OK 99A2 CRC_OK
+14:00:22.404 ->                                           ·  ·  ·  ·  1  ·  ?  ?  ?  ?  · 
+14:00:22.805 -> --> Audio settings: power=ON, tape=PRESENT, cd=NOT_PRESENT, source=TUNER, ext_mute=OFF, mute=OFF,
+14:00:22.805 ->     volume=0, audio_menu=CLOSED, bass=0, treble=0, loudness=OFF, fader=0, balance=0, auto_volume=ON
+14:00:22.805 -> Raw: #9531 ( 7/15) 11(16) 0E 4D4 E (RA0) 83-0C-01-00-31-00-3F-3F-3F-3F-83:A7-7A ACK OK A77A CRC_OK
+14:00:22.805 ->                                           ·  ·  ·  ·  1  ·  ?  ?  ?  ?  · 
+14:00:24.057 -> --> Device report: Head unit: AUDIO_SETTINGS_ANNOUNCE
+14:00:24.057 -> Raw: #9538 (14/15)  3( 8) 0E 8C4 C (WA0) 8A-21-40:3D-54 ACK OK 3D54 CRC_OK uBit=64
+14:00:24.057 ->                                           ·  !  @ 
+14:00:24.057 -> --> Audio settings: power=ON, tape=PRESENT, cd=NOT_PRESENT, source=TUNER, ext_mute=OFF, mute=OFF,
+14:00:24.057 ->     volume=1(UPD), audio_menu=CLOSED, bass=0, treble=0, loudness=OFF, fader=0, balance=0, auto_volume=ON
+14:00:24.057 -> Raw: #9539 (15/15) 11(16) 0E 4D4 E (RA0) 84-0C-01-00-31-81-3F-3F-3F-3F-84:B4-A0 ACK OK B4A0 CRC_OK
+14:00:24.057 ->                                           ·  ·  ·  ·  1  ·  ?  ?  ?  ?  · 
+14:00:24.713 -> --> Device report: Head unit: AUDIO_SETTINGS_ANNOUNCE
+14:00:24.713 -> Raw: #9543 ( 4/15)  3( 8) 0E 8C4 C (WA0) 8A-21-40:3D-54 ACK OK 3D54 CRC_OK uBit=64
+14:00:24.713 ->                                           ·  !  @ 
+14:00:24.713 -> --> Audio settings: power=ON, tape=PRESENT, cd=NOT_PRESENT, source=TUNER, ext_mute=OFF, mute=OFF,
+14:00:24.713 ->     volume=0(UPD), audio_menu=CLOSED, bass=0, treble=0, loudness=OFF, fader=0, balance=0, auto_volume=ON
+14:00:24.713 -> Raw: #9544 ( 5/15) 11(16) 0E 4D4 E (RA0) 86-0C-01-00-31-80-3F-3F-3F-3F-86:6C-DA ACK OK 6CDA CRC_OK
+14:00:24.760 ->                                           ·  ·  ·  ·  1  ·  ?  ?  ?  ?  · 
+14:00:24.760 -> --> Device report: Head unit: AUDIO_SETTINGS_ANNOUNCE
+14:00:24.760 -> Raw: #9545 ( 6/15)  3( 8) 0E 8C4 C (WA0) 8A-21-40:3D-54 ACK OK 3D54 CRC_OK uBit=64
+14:00:24.760 ->                                           ·  !  @ 
+14:00:24.813 -> --> Audio settings: power=ON, tape=PRESENT, cd=NOT_PRESENT, source=TUNER, ext_mute=OFF, mute=OFF,
+14:00:24.813 ->     volume=0(UPD), audio_menu=CLOSED, bass=0, treble=0, loudness=OFF, fader=0, balance=0, auto_volume=ON
+14:00:24.860 -> Raw: #9546 ( 7/15) 11(16) 0E 4D4 E (RA0) 80-0C-01-00-31-80-3F-3F-3F-3F-80:E3-1E ACK OK E31E CRC_OK
+14:00:24.860 ->                                           ·  ·  ·  ·  1  ·  ?  ?  ?  ?  · 
+14:00:24.860 -> --> Device report: Head unit: AUDIO_SETTINGS_ANNOUNCE
+14:00:24.860 -> Raw: #9547 ( 8/15)  3( 8) 0E 8C4 C (WA0) 8A-21-40:3D-54 ACK OK 3D54 CRC_OK uBit=64
+14:00:24.860 ->                                           ·  !  @ 
+14:00:24.860 -> --> Audio settings: power=ON, tape=PRESENT, cd=NOT_PRESENT, source=TUNER, ext_mute=OFF, mute=OFF,
+14:00:24.860 ->     volume=0(UPD), audio_menu=CLOSED, bass=0, treble=0, loudness=OFF, fader=0, balance=0, auto_volume=ON
+14:00:24.914 -> Raw: #9548 ( 9/15) 11(16) 0E 4D4 E (RA0) 82-0C-01-00-31-80-3F-3F-3F-3F-82:99-A2 ACK OK 99A2 CRC_OK
+14:00:24.914 ->                                           ·  ·  ·  ·  1  ·  ?  ?  ?  ?  · 
+14:00:24.914 -> --> Device report: Head unit: AUDIO_SETTINGS_ANNOUNCE
+14:00:24.914 -> Raw: #9549 (10/15)  3( 8) 0E 8C4 C (WA0) 8A-21-40:3D-54 ACK OK 3D54 CRC_OK uBit=64
+14:00:24.914 ->                                           ·  !  @ 
+14:00:24.960 -> --> Audio settings: power=ON, tape=PRESENT, cd=NOT_PRESENT, source=TUNER, ext_mute=OFF, mute=OFF,
+14:00:24.960 ->     volume=0(UPD), audio_menu=CLOSED, bass=0, treble=0, loudness=OFF, fader=0, balance=0, auto_volume=ON
+14:00:24.960 -> Raw: #9550 (11/15) 11(16) 0E 4D4 E (RA0) 84-0C-01-00-31-80-3F-3F-3F-3F-84:16-66 ACK OK 1666 CRC_OK
+14:00:24.960 ->                                           ·  ·  ·  ·  1  ·  ?  ?  ?  ?  · 
+14:00:25.114 -> received pkts: 39552, corrupt: 0 (0.000%), repaired: 0 (---%) [SB:0, DCB:0, TCB:0, DSB:0], UCB:0, overall: 0 (0.000%), avg1bit: 694, maxQueued: 8/15
+14:00:25.817 -> --> Audio settings: power=ON, tape=PRESENT, cd=NOT_PRESENT, source=TUNER, ext_mute=OFF, mute=OFF,
+14:00:25.817 ->     volume=0, audio_menu=CLOSED, bass=0, treble=0, loudness=OFF, fader=0, balance=0, auto_volume=ON
+14:00:25.864 -> Raw: #9555 ( 1/15) 11(16) 0E 4D4 E (RA0) 85-0C-01-00-31-00-3F-3F-3F-3F-85:28-BE ACK OK 28BE CRC_OK
+14:00:25.864 ->                                           ·  ·  ·  ·  1  ·  ?  ?  ?  ?  · 
+14:00:26.721 -> --> Device report: Head unit: BUTTON_PRESS_ANNOUNCE
+14:00:26.721 ->     Head unit button pressed: '5'
+14:00:26.721 -> Raw: #9560 ( 6/15)  3( 8) 0E 8C4 C (WA0) 8A-22-05:5A-94 ACK OK 5A94 CRC_OK uBit=64
+14:00:26.721 ->                                           ·  "  · 
+14:00:26.852 -> --> Audio settings: power=ON, tape=PRESENT, cd=NOT_PRESENT, source=TUNER, ext_mute=OFF, mute=OFF,
+14:00:26.852 ->     volume=0, audio_menu=CLOSED, bass=0, treble=0, loudness=OFF, fader=0, balance=0, auto_volume=ON
+14:00:26.852 -> Raw: #9561 ( 7/15) 11(16) 0E 4D4 E (RA0) 86-0C-01-00-31-00-3F-3F-3F-3F-86:6F-5C ACK OK 6F5C CRC_OK uBit=128
+14:00:26.852 ->                                           ·  ·  ·  ·  1  ·  ?  ?  ?  ?  · 
+14:00:28.203 -> --> Device report: Head unit: BUTTON_PRESS_ANNOUNCE
+14:00:28.203 ->     Head unit button pressed: '5' (repeat)
+14:00:28.203 -> Raw: #9568 (14/15)  3( 8) 0E 8C4 C (WA0) 8A-22-85:63-E2 ACK OK 63E2 CRC_OK
+14:00:28.240 ->                                           ·  "  · 
+14:00:28.240 -> --> Device report: Head unit: TUNER_ANNOUNCEMENT
+14:00:28.240 -> Raw: #9569 (15/15)  3( 8) 0E 8C4 C (WA0) 8A-24-40:9B-32 ACK OK 9B32 CRC_OK
+14:00:28.240 ->                                           ·  $  @ 
+14:00:28.287 -> --> Tuner info: band=FM1, memory=5, 101.20 MHz, signal_strength=13,
+14:00:28.287 ->     search_mode=NOT_SEARCHING,
+14:00:28.287 ->     pty_selection_menu=OFF, selected_pty=1(News), pty_standby_mode=NO, pty_match=NO, pty=10(Pop Music),
+14:00:28.287 ->     pi=83C6(Netherlands, supra-regional), regional=OFF, ta=ON (AVAILABLE), rds=ON (AVAILABLE), rds_text="SKYRADIO"
+14:00:28.287 -> Raw: #9570 ( 1/15) 22(27) 0E 554 E (RA0) 83-D1-A9-80-00-04-0D-63-83-C6-A1-0A-53-4B-59-52-41-44-49-4F-00-83:81-4E ACK OK 814E CRC_OK
+14:00:28.287 ->                                           ·  ·  ·  ·  ·  ·  ·  c  ·  ·  ·  ·  S  K  Y  R  A  D  I  O  ·  · 
+14:00:28.425 -> --> Device report: Head unit: BUTTON_PRESS_ANNOUNCE
+14:00:28.425 ->     Head unit button pressed: '5' (held)
+14:00:28.425 -> Raw: #9571 ( 2/15)  3( 8) 0E 8C4 C (WA0) 8A-22-C5:F0-C4 ACK OK F0C4 CRC_OK uBit=64
+14:00:28.425 ->                                           ·  "  · 
+14:00:28.472 -> --> MFD to head unit: preset_request band=FM1, preset=1
+14:00:28.472 -> Raw: #9572 ( 3/15)  2( 7) 0E 8D4 C (WA0) 27-11:37-78 ACK OK 3778 CRC_OK
+14:00:28.525 ->                                           '  · 
+14:00:28.525 -> --> Device report: Head unit: TUNER_PRESETS_REPLY
+14:00:28.525 -> Raw: #9573 ( 4/15)  3( 8) 0E 8C4 C (WA0) 8A-40-40:7B-D6 ACK OK 7BD6 CRC_OK
+14:00:28.525 ->                                           ·  @  @ 
+14:00:28.525 -> --> Tuner preset info: band=FM1, memory=1, " 87.50 MHz"
+14:00:28.525 -> Raw: #9574 ( 5/15) 12(17) 0E 554 E (RA0) 85-D3-11-20-38-37-2E-35-30-00-20-85:80-44 ACK OK 8044 CRC_OK uBit=136
+14:00:28.525 ->                                           ·  ·  ·     8  7  .  5  0  ·     · 
+14:00:28.525 -> --> MFD to head unit: preset_request band=FM1, preset=2
+14:00:28.525 -> Raw: #9576 ( 7/15)  2( 7) 0E 8D4 C (WA0) 27-12:16-36 ACK OK 1636 CRC_OK
+14:00:28.525 ->                                           '  · 
+14:00:28.572 -> --> Device report: Head unit: TUNER_PRESETS_REPLY
+14:00:28.572 -> Raw: #9577 ( 8/15)  3( 8) 0E 8C4 C (WA0) 8A-40-40:7B-D6 ACK OK 7BD6 CRC_OK
+14:00:28.572 ->                                           ·  @  @ 
+14:00:28.626 -> --> Tuner preset info: band=FM1, memory=2, " 87.90 MHz"
+14:00:28.626 -> Raw: #9579 (10/15) 12(17) 0E 554 E (RA0) 86-D3-12-20-38-37-2E-39-30-00-20-86:CE-22 ACK OK CE22 CRC_OK
+14:00:28.626 ->                                           ·  ·  ·     8  7  .  9  0  ·     · 
+14:00:28.626 -> --> Device report: Head unit: TUNER_PRESET_MEMORIZE_BUTTON_PRESS_ANNOUNCE
+14:00:28.626 ->     Head unit button pressed: '5' (held)
+14:00:28.626 -> Raw: #9580 (11/15)  3( 8) 0E 8C4 C (WA0) 8A-42-C5:C4-AA ACK OK C4AA CRC_OK
+14:00:28.626 ->                                           ·  B  · 
+14:00:28.626 -> --> MFD to head unit: preset_request band=FM1, preset=3
+14:00:28.626 -> Raw: #9582 (13/15)  2( 7) 0E 8D4 C (WA0) 27-13:09-0C NO_ACK ERROR_NBITS 090C CRC_OK uBit=56
+14:00:28.673 ->                                           '  · 
+14:00:28.673 -> --> Device report: Head unit: TUNER_PRESETS_REPLY
+14:00:28.673 -> Raw: #9583 (14/15)  3( 8) 0E 8C4 C (WA0) 8A-40-40:7B-D6 ACK OK 7BD6 CRC_OK
+14:00:28.673 ->                                           ·  @  @ 
+14:00:28.726 -> --> Tuner preset info: band=FM1, memory=3, " 98.10 MHz"
+14:00:28.726 -> Raw: #9584 (15/15) 12(17) 0E 554 E (RA0) 87-D3-13-20-39-38-2E-31-30-00-20-87:EF-2A ACK OK EF2A CRC_OK
+14:00:28.726 ->                                           ·  ·  ·     9  8  .  1  0  ·     · 
+14:00:28.726 -> --> MFD to head unit: preset_request band=FM1, preset=4
+14:00:28.726 -> Raw: #9585 ( 1/15)  2( 7) 0E 8D4 C (WA0) 27-14:54-AA ACK OK 54AA CRC_OK
+14:00:28.726 ->                                           '  · 
+14:00:28.726 -> --> Device report: Head unit: TUNER_PRESETS_REPLY
+14:00:28.773 -> Raw: #9586 ( 2/15)  3( 8) 0E 8C4 C (WA0) 8A-40-40:7B-D6 ACK OK 7BD6 CRC_OK
+14:00:28.773 ->                                           ·  @  @ 
+14:00:28.826 -> --> Tuner preset info: band=FM1, memory=4, "SKYRADIO"
+14:00:28.826 -> Raw: #9587 ( 3/15) 12(17) 0E 554 E (RA0) 80-D3-94-53-4B-59-52-41-44-49-4F-80:19-D2 ACK OK 19D2 CRC_OK
+14:00:28.826 ->                                           ·  ·  ·  S  K  Y  R  A  D  I  O  · 
+14:00:28.826 -> --> Device report: Head unit: TUNER_PRESET_MEMORIZE_BUTTON_PRESS_ANNOUNCE
+14:00:28.826 ->     Head unit button pressed: '5' (held)
+14:00:28.826 -> Raw: #9588 ( 4/15)  3( 8) 0E 8C4 C (WA0) 8A-42-C5:C4-AA ACK OK C4AA CRC_OK
+14:00:28.826 ->                                           ·  B  · 
+14:00:28.826 -> --> MFD to head unit: preset_request band=FM1, preset=5
+14:00:28.873 -> Raw: #9589 ( 5/15)  2( 7) 0E 8D4 C (WA0) 27-15:4B-90 ACK OK 4B90 CRC_OK
+14:00:28.873 ->                                           '  · 
+14:00:28.873 -> --> Device report: Head unit: TUNER_PRESETS_REPLY
+14:00:28.873 -> Raw: #9590 ( 6/15)  3( 8) 0E 8C4 C (WA0) 8A-40-40:7B-D6 ACK OK 7BD6 CRC_OK
+14:00:28.873 ->                                           ·  @  @ 
+14:00:28.926 -> --> Audio settings: power=ON, tape=PRESENT, cd=NOT_PRESENT, source=TUNER, ext_mute=OFF, mute=OFF,
+14:00:28.926 ->     volume=0, audio_menu=CLOSED, bass=0, treble=0, loudness=OFF, fader=0, balance=0, auto_volume=ON
+14:00:28.926 -> Raw: #9591 ( 7/15) 11(16) 0E 4D4 E (RA0) 82-0C-01-00-31-00-3F-3F-3F-3F-82:9A-24 ACK OK 9A24 CRC_OK uBit=128
+14:00:28.926 ->                                           ·  ·  ·  ·  1  ·  ?  ?  ?  ?  · 
+14:00:28.973 -> --> Tuner preset info: band=FM1, memory=5, "SKYRADIO"
+14:00:28.973 -> Raw: #9592 ( 8/15) 12(17) 0E 554 E (RA0) 81-D3-95-53-4B-59-52-41-44-49-4F-81:F4-5E ACK OK F45E CRC_OK
+14:00:28.973 ->                                           ·  ·  ·  S  K  Y  R  A  D  I  O  · 
+14:00:29.026 -> --> Device report: Head unit: TUNER_PRESET_MEMORIZE_BUTTON_PRESS_ANNOUNCE
+14:00:29.026 ->     Head unit button pressed: '5' (held)
+14:00:29.026 -> Raw: #9593 ( 9/15)  3( 8) 0E 8C4 C (WA0) 8A-42-C5:C4-AA ACK OK C4AA CRC_OK
+14:00:29.026 ->                                           ·  B  · 
+14:00:29.026 -> --> MFD to head unit: preset_request band=FM1, preset=6
+14:00:29.026 -> Raw: #9594 (10/15)  2( 7) 0E 8D4 C (WA0) 27-16:6A-DE ACK OK 6ADE CRC_OK
+14:00:29.026 ->                                           '  · 
+14:00:29.073 -> --> Device report: Head unit: TUNER_PRESETS_REPLY
+14:00:29.073 -> Raw: #9595 (11/15)  3( 8) 0E 8C4 C (WA0) 8A-40-40:7B-D6 ACK OK 7BD6 CRC_OK
+14:00:29.073 ->                                           ·  @  @ 
+14:00:29.126 -> --> Tuner preset info: band=FM1, memory=6, "108.00 MHz"
+14:00:29.126 -> Raw: #9596 (12/15) 12(17) 0E 554 E (RA0) 82-D3-16-31-30-38-2E-30-30-00-20-82:A1-5C ACK OK A15C CRC_OK uBit=136
+14:00:29.126 ->                                           ·  ·  ·  1  0  8  .  0  0  ·     · 
+14:00:29.126 -> --> MFD to head unit: command=REQUEST_TUNER_INFO
+14:00:29.126 -> Raw: #9598 (14/15)  1( 6) 0E 8D4 C (WA0) D1:7D-0E ACK OK 7D0E CRC_OK
+14:00:29.173 ->                                           · 
+14:00:29.173 -> --> Device report: Head unit: TUNER_REPLY
+14:00:29.173 -> Raw: #9599 (15/15)  3( 8) 0E 8C4 C (WA0) 8A-20-40:4F-B8 ACK OK 4FB8 CRC_OK
+14:00:29.173 ->                                           ·     @ 
+14:00:29.227 -> --> Device report: Head unit: BUTTON_PRESS_ANNOUNCE
+14:00:29.227 ->     Head unit button pressed: '5' (held)
+14:00:29.227 -> Raw: #9600 ( 1/15)  3( 8) 0E 8C4 C (WA0) 8A-22-C5:F0-C4 ACK OK F0C4 CRC_OK uBit=64
+14:00:29.227 ->                                           ·  "  · 
+14:00:29.227 -> --> Tuner info: band=FM1, memory=5, 101.20 MHz, signal_strength=13,
+14:00:29.227 ->     search_mode=NOT_SEARCHING,
+14:00:29.274 ->     pty_selection_menu=OFF, selected_pty=1(News), pty_standby_mode=NO, pty_match=NO, pty=10(Pop Music),
+14:00:29.274 ->     pi=83C6(Netherlands, supra-regional), regional=OFF, ta=ON (AVAILABLE), rds=ON (AVAILABLE), rds_text="SKYRADIO"
+14:00:29.274 -> Raw: #9601 ( 2/15) 22(27) 0E 554 E (RA0) 83-D1-29-80-00-04-0D-63-83-C6-A1-0A-53-4B-59-52-41-44-49-4F-00-83:FB-3A ACK OK FB3A CRC_OK
+14:00:29.274 ->                                           ·  ·  )  ·  ·  ·  ·  c  ·  ·  ·  ·  S  K  Y  R  A  D  I  O  ·  · 
+14:00:29.427 -> --> Device report: Head unit: BUTTON_PRESS_ANNOUNCE
+14:00:29.427 ->     Head unit button pressed: '5' (held)
+14:00:29.427 -> Raw: #9602 ( 3/15)  3( 8) 0E 8C4 C (WA0) 8A-22-C5:F0-C4 ACK OK F0C4 CRC_OK uBit=64
+14:00:29.427 ->                                           ·  "  · 
+14:00:29.628 -> --> Device report: Head unit: BUTTON_PRESS_ANNOUNCE
+14:00:29.628 ->     Head unit button pressed: '5' (held)
+14:00:29.628 -> Raw: #9605 ( 6/15)  3( 8) 0E 8C4 C (WA0) 8A-22-C5:F0-C4 ACK OK F0C4 CRC_OK uBit=64
+14:00:29.628 ->                                           ·  "  · 
+14:00:29.829 -> --> Device report: Head unit: BUTTON_PRESS_ANNOUNCE
+14:00:29.829 ->     Head unit button pressed: '5' (released)
+14:00:29.829 -> Raw: #9607 ( 8/15)  3( 8) 0E 8C4 C (WA0) 8A-22-45:C9-B2 ACK OK C9B2 CRC_OK
+14:00:29.829 ->                                           ·  "  E 
+14:00:29.929 -> --> Audio settings: power=ON, tape=PRESENT, cd=NOT_PRESENT, source=TUNER, ext_mute=OFF, mute=OFF,
+14:00:29.929 ->     volume=0, audio_menu=CLOSED, bass=0, treble=0, loudness=OFF, fader=0, balance=0, auto_volume=ON
+14:00:29.929 -> Raw: #9608 ( 9/15) 11(16) 0E 4D4 E (RA0) 87-0C-01-00-31-00-3F-3F-3F-3F-87:52-02 ACK OK 5202 CRC_OK
+14:00:29.929 ->                                           ·  ·  ·  ·  1  ·  ?  ?  ?  ?  · 
+14:00:30.130 -> received pkts: 39609, corrupt: 0 (0.000%), repaired: 0 (---%) [SB:0, DCB:0, TCB:0, DSB:0], UCB:0, overall: 0 (0.000%), avg1bit: 693, maxQueued: 8/15
+14:00:35.084 -> received pkts: 39634, corrupt: 0 (0.000%), repaired: 0 (---%) [SB:0, DCB:0, TCB:0, DSB:0], UCB:0, overall: 0 (0.000%), avg1bit: 692, maxQueued: 8/15
+14:00:40.085 -> received pkts: 39658, corrupt: 0 (0.000%), repaired: 0 (---%) [SB:0, DCB:0, TCB:0, DSB:0], UCB:0, overall: 0 (0.000%), avg1bit: 692, maxQueued: 8/15
+14:00:45.121 -> received pkts: 39682, corrupt: 0 (0.000%), repaired: 0 (---%) [SB:0, DCB:0, TCB:0, DSB:0], UCB:0, overall: 0 (0.000%), avg1bit: 692, maxQueued: 8/15
