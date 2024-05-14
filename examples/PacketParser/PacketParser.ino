@@ -33,8 +33,8 @@
  *
  * Notes:
  * - All parsing done here is highly experimental, gathered together from various sources and from doing experiments
- *   on my own vehicle (Peugeot 406 Estate with DAM number 9586). Please be suspicious to any interpretation that is
- *   done inside this file. Your mileage may vary.
+ *   on my own vehicle (Peugeot 406 HDI Estate, model year 2003, DAM number 9586). Please be suspicious to any
+ *   interpretation that is done inside this file. Your mileage may vary.
  *
  * -----
  * Wiring
@@ -154,6 +154,13 @@ char* ToHexStr(uint16_t data)
 
     return buffer;
 } // ToHexStr
+
+// Round downwards (even if negative) to nearest multiple of d. Safe for negative values of n and d, and for
+// values of n around 0.
+int32_t _floor(int32_t n, int32_t d)
+{
+    return (n / d - (((n > 0) ^ (d > 0)) && (n % d))) * d;
+} // _floor
 
 // Uses statically allocated buffer, so don't call twice within the same printf invocation
 char* ToHexStr(uint8_t data1, uint8_t data2)
@@ -404,7 +411,7 @@ const char* SatNavGuidancePreferenceStr(uint8_t data)
 //
 // A detailed SatNav guidance instruction consists of 8 bytes:
 // * 0   : turn angle in increments of 22.5 degrees, measured clockwise, starting with 0 at 6 o-clock.
-//         E.g.: 0x4 == 90 deg left, 0x8 = 180 deg = straight ahead, 0xC = 270 deg = 90 deg right.
+//         E.g.: 0x4 == 90 degrees left, 0x8 = 180 degrees = straight ahead, 0xC = 270 degrees = 90 degrees right.
 //         Turn angle is shown here as (vertical) (d|sl)ash ('\', '|', '/', or '-').
 // * 1   : always 0x00 ??
 // * 2, 3: bit pattern indicating which legs are present in the junction or roundabout. Each bit set is for one leg.
@@ -505,15 +512,16 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             Serial.print(F("--> VIN: "));
 
-            if (dataLen != 17)
+          #define VIN_NUMBER_LENGTH 17
+            if (dataLen != VIN_NUMBER_LENGTH)
             {
                 Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
-            char vinTxt[18];
-            memcpy(vinTxt, data, 17);
-            vinTxt[17] = 0;
+            char vinTxt[VIN_NUMBER_LENGTH + 1];
+            memcpy(vinTxt, data, VIN_NUMBER_LENGTH);
+            vinTxt[VIN_NUMBER_LENGTH] = 0;
 
             Serial.printf_P(PSTR("%s\n"), vinTxt);
         }
@@ -560,9 +568,9 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 data[1] & 0x10 ? onStr : offStr,
                 data[1] & 0x20 ? yesStr : noStr,
                 data[1] & 0x40 ? presentStr : notPresentStr,
-                data[2] == 0xFF ? notApplicable3Str : FloatToStr(floatBuf[0], data[2] - 39, 0),  // TODO - or: data[2] / 2
+                data[2] == 0xFF ? notApplicable3Str : FloatToStr(floatBuf[0], data[2] - 39, 0),
                 FloatToStr(floatBuf[1], ((uint32_t)data[3] << 16 | (uint32_t)data[4] << 8 | data[5]) / 10.0, 1),
-                FloatToStr(floatBuf[2], (data[6] - 80) / 2.0, 1)
+                FloatToStr(floatBuf[2], (data[6] / 2.0) - 40, 1)
             );
         }
         break;
@@ -609,7 +617,10 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             if (memcmp(data, packetData, dataLen) == 0) return VAN_PACKET_DUPLICATE;
             memcpy(packetData, data, dataLen);
 
-            uint16_t remainingKmToService = ((uint16_t)data[2] << 8 | data[3]) * 20;
+            uint16_t remainingKmToService20 = (uint16_t)(data[2] & 0x7F) << 8 | data[3];
+            bool remainingKmToServiceOverdue = data[2] & 0x80;
+            int32_t remainingKmToService = remainingKmToService20 * 20;
+            if (remainingKmToServiceOverdue) remainingKmToService = - remainingKmToService;
 
             // Examples:
             // Raw: #1987 (12/15) 16 0E 4FC WA0 90-00-01-AE-F0-00-FF-FF-22-48-FF-7A-56 ACK OK 7A56 CRC_OK
@@ -622,17 +633,15 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
-            // Vehicles made until 2002?
-
             Serial.printf_P(PSTR("\n    - Instrument cluster: %SENABLED\n"), data[0] & 0x80 ? emptyStr : PSTR("NOT "));
             Serial.printf_P(PSTR("    - Speed regulator wheel: %S\n"), data[0] & 0x40 ? onStr : offStr);
-            Serial.printf_P(PSTR("%S"), data[0] & 0x20 ? PSTR("    - Warning LED ON\n") : emptyStr);
+            Serial.printf_P(PSTR("%S"), data[0] & 0x20 ? PSTR("    - Hazard_lights ON\n") : emptyStr);
             Serial.printf_P(PSTR("%S"), data[0] & 0x04 ? PSTR("    - Diesel glow plugs ON\n") : emptyStr);
             Serial.printf_P(PSTR("%S"), data[1] & 0x01 ? PSTR("    - Door OPEN\n") : emptyStr);
             Serial.printf_P(
-                PSTR("    - Remaing km to service: %u (dashboard shows: %u)\n"),
-                remainingKmToService * 20,
-                (remainingKmToService) / 100 * 100
+                PSTR("    - Remaing km to service: %ld (dashboard shows: %ld)\n"),
+                remainingKmToService,
+                _floor(remainingKmToService, 100)
             );
 
             if (data[5] & 0x02)
@@ -676,7 +685,8 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (data[7] != 0xFF)
             {
-                Serial.printf_P(PSTR("    - Fuel level: %u %%\n"), data[7]);  // Never seen this
+                // Never seen this on my 406 HDI, only reported on 206 / petrol ?
+                Serial.printf_P(PSTR("    - Fuel level: %u %%\n"), data[7]);
             } // if
 
             Serial.printf_P(PSTR("    - Oil level: raw=%u,dash=%S\n"),
@@ -763,12 +773,13 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 // 0x28: Cassette tape presence announcement (any source)
                 // 0x30: Internal CD presence announcement (any source)
                 // 0x40: Tuner presets available - reply to 8D4 WA0 27-11
-                // 0x60: Cassette tape data available - reply to 8D4 WA0 D2
+                // 0x42: Tuner preset memorize button press announcement
+                // 0x60: Cassette tape info available - reply to 8D4 WA0 D2
                 // 0x61: Audio settings announcement (source = cassette tape)
                 // 0x62: Button press announcement (source = cassette tape)
                 // 0x64: Start tape announcement (source = cassette tape)
                 // 0x68: Info announcement (source = cassette tape)
-                // 0xC0: Internal CD track data available - reply to 8D4 WA0 D6
+                // 0xC0: Internal CD track info available - reply to 8D4 WA0 D6
                 // 0xC1: Audio settings announcement (source = internal CD)
                 // 0xC2: Button press announcement (source = internal CD)
                 // 0xC4: Searching announcement (source = internal CD)
@@ -797,7 +808,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     ToHexStr(data[1])
                 );
 
-                // Possible bits in data[1]:
+                // Possible meaning of bits in data[1]:
                 // 0x01 - Audio settings announcement
                 // 0x02 - Button press announcement
                 // 0x04 - Status update (CD track or tuner info)
@@ -809,27 +820,11 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 //      - 0xC0 = CD playing
                 //      - 0xD0 = CD track info
                 //
-                // Serial.printf(
-                    // "%s - %s\n",
-                    // data[1] == 0x24 ? "TUNER" : // TUNER - STATUS_UPDATE_ANNOUNCE
-                        // data[1] == 0x20 ? "TUNER" :  // TUNER - REPLY
-                        // (data[1] & 0x0F) == 0x01 ? "HEAD_UNIT" :  // HEAD_UNIT - AUDIO_SETTINGS_ANNOUNCE
-                        // (data[1] & 0x0F) == 0x02 ? "HEAD_UNIT" :  // HEAD_UNIT - BUTTON_PRESS_ANNOUNCE
-                        // (data[1] & 0xF0) == 0x30 ? "CD_PLAYING" :
-                        // (data[1] & 0xF0) == 0x40 ? "TUNER_PRESET" :
-                        // (data[1] & 0xF0) == 0xC0 ? "CD_OR_TAPE" :
-                        // (data[1] & 0xF0) == 0xD0 ? "CD_TRACK" :
-                        // "??",
-                    // data[1] & 0x0F) == 0x00 ? "REPLY" :
-
-                        // // When the following messages are ACK'ed, a report will follow, e.g.
-                        // // 0x4D4 (AUDIO_SETTINGS_IDEN) or 0x554 (HEAD_UNIT_IDEN). When not ACK'ed, will retry a few
-                        // // times.
-                        // (data[1] & 0x0F) == 0x01 ? "AUDIO_SETTINGS_ANNOUNCE" :  // max 3 retries
-                        // (data[1] & 0x0F) == 0x02 ? "BUTTON_PRESS_ANNOUNCE" :  // max 6 retries
-                        // (data[1] & 0x0F) == 0x04 ? "STATUS_UPDATE_ANNOUNCE" :  // max 3 retries
-                        // "??"
-                // );
+                // When the following messages are ACK'ed, a report will follow, e.g. 0x4D4 (AUDIO_SETTINGS_IDEN)
+                // or 0x554 (HEAD_UNIT_IDEN). When not ACK'ed, will retry a few times.
+                // (data[1] & 0x0F) == 0x01 (Audio settings announcement): max 3 retries
+                // (data[1] & 0x0F) == 0x02 (Button press announcement): max 6 retries
+                // (data[1] & 0x0F) == 0x04 (Status update): max 3 retries
 
                 // Button-press announcement?
                 if ((data[1] & 0x0F) == 0x02)
@@ -894,7 +889,9 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 // 07-01-00 - MFD requests "satnav_status_1" ?
                 // 07-01-01 - User selected street from list. MFD requests "satnav_status_1" ?
                 // 07-01-03
+                // 07-06-00 - MFD requests "satnav_guidance_data" and "satnav_guidance"
                 // 07-10-00 - User pressed "Val" on remote control
+                // 07-11-00 - User pressed "Val" on remote control
                 // 07-20-00 - MFD requests next "satnav_report" packet
                 // 07-21-00 - MFD requests "satnav_status_1" and next "satnav_report" packet ?
                 // 07-21-01 - User selected city from list. MFD requests "satnav_status_1" and next "satnav_report"
@@ -929,6 +926,9 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     // User clicks on "Accept" button (usually bottom left of dialog screen)
                     code == 0x0001 ? PSTR("ACCEPT") :
 
+                    code == 0x0002 ? PSTR("STOP_NAVIGATION") :  // User stops navigation via menu on MFD
+                    code == 0x0003 ? PSTR("CHANGE_DESTINATION") :  // User changes navigation destination via menu on MFD
+
                     // Always follows 0x1000
                     code == 0x0100 ? PSTR("END_OF_BUTTON_PRESS") :
 
@@ -938,7 +938,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
                     // User selects a menu entry or letter? User pressed "Val" (middle button on IR remote control).
                     // Always followed by 0x0100.
-                    code == 0x1000 ? PSTR("VAL") :
+                    code == 0x1000 || code == 0x1100 ? PSTR("VAL") :
 
                     // MFD requests sat nav for next report packet (IDEN 0x6CE) in sequence
                     // (Or: select from list using "Val"?)
@@ -953,6 +953,8 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
                     // MFD asks for sat nav guidance data packet (IDEN 0x9CE) and satnav_status_2 (IDEN 0x7CE)
                     code == 0x4400 ? PSTR("REQUEST_SAT_NAV_GUIDANCE_DATA") :
+
+                    code == 0x4700 ? PSTR("ROUTE_COMPUTED") :
 
                     ToHexStr(code)
                 );
@@ -1079,8 +1081,6 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // All known notifications, as literally retrieved from my vehicle (406 year 2003, DAM number 9586; your
             // vehicle may have other texts). Retrieving was done with
             // VanBus/examples/DisplayNotifications/DisplayNotifications.ino .
-
-            // TODO - translate into all languages
 
             // Byte 0, 0x00...0x07
             static const char msg_0_0[] PROGMEM = "Tyre pressure too low!";
@@ -1411,9 +1411,9 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
                     // data[2]: radio band and preset position
                     uint8_t band = data[2] & 0x07;
-                    uint8_t presetPos = data[2] >> 3 & 0x0F;
-                    char presetPosBuffer[12];
-                    sprintf_P(presetPosBuffer, PSTR(", memory=%u"), presetPos);
+                    uint8_t presetMemory = data[2] >> 3 & 0x0F;
+                    char presetMemoryBuffer[12];
+                    sprintf_P(presetMemoryBuffer, PSTR(", memory=%u"), presetMemory);
 
                     // data[3]: search bits
                     bool dxSensitivity = data[3] & 0x02;  // Tuner sensitivity: distant (Dx) or local (Lo)
@@ -1421,7 +1421,8 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
                     uint8_t searchMode = data[3] >> 3 & 0x07;
                     bool searchDirectionUp = data[3] & 0x80;
-                    bool anySearchBusy = (searchMode != TS_NOT_SEARCHING);
+                    bool anySearchBusy = searchMode != TS_NOT_SEARCHING;
+                    bool automaticSearchBusy = anySearchBusy && searchMode != TS_MANUAL;  // Any search except manual
 
                     // data[4] and data[5]: frequency being scanned or tuned in to
                     uint16_t frequency = (uint16_t)data[5] << 8 | data[4];
@@ -1452,7 +1453,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                             "    search_mode=%S%S%S,\n"
                         ),
                         TunerBandStr(band),
-                        presetPos == 0 ? emptyStr : presetPosBuffer,
+                        presetMemory == 0 ? emptyStr : presetMemoryBuffer,
                         frequency == 0x07FF ? notApplicable3Str :
                             band == TB_AM
                                 ? FloatToStr(floatBuf, frequency, 0)  // AM and LW bands
@@ -1467,9 +1468,9 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                         TunerSearchModeStr(searchMode),
 
                         // Search sensitivity: distant (Dx) or local (Lo)
-                        // TODO - not sure if this bit is applicable for the various values of 'searchMode'
-                        // ! anySearchBusy ? emptyStr : dxSensitivity ? PSTR(", sensitivity=Dx") : PSTR(", sensitivity=Lo"),
-                        dxSensitivity ? PSTR(", sensitivity=Dx") : PSTR(", sensitivity=Lo"),
+                        ! automaticSearchBusy
+                            ? emptyStr
+                            : dxSensitivity ? PSTR(", sensitivity=Dx") : PSTR(", sensitivity=Lo"),
 
                         ! anySearchBusy ? emptyStr :
                             searchDirectionUp ? PSTR(", search_direction=UP") : PSTR(", search_direction=DOWN")
@@ -1530,7 +1531,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                                 "    pi=%S, regional=%S, ta=%S %S, rds=%S %S, rds_text=\"%s\"%S\n"
                             ),
                             ptySelectionMenu ? onStr : offStr,
-                            selectedPtyBuffer,
+                            selectedPty == 0x00 ? notApplicable3Str : selectedPtyBuffer,
                             ptyStandbyMode ? yesStr : noStr,
                             ptyMatch ? yesStr : noStr,
                             currPty == 0x00 ? notApplicable3Str : currPtyBuffer,
@@ -1611,8 +1612,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
                     Serial.print(F("--> CD track info: "));
 
-                    // TODO - do we know the fixed numbers? Seems like this can only be 10 or 12.
-                    if (dataLen < 10)
+                    if (dataLen != 19)
                     {
                         Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                         return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
@@ -1634,14 +1634,10 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     if (totalTracksValid) sprintf_P(totalTracksStr, PSTR("%X"), totalTracks);
 
                     char totalTimeStr[7];
-                    bool totalTimeValid = dataLen >= 12;
-                    if (totalTimeValid)
-                    {
-                        uint8_t totalTimeMin = data[9];
-                        uint8_t totalTimeSec = data[10];
-                        totalTimeValid = totalTimeMin != 0xFF && totalTimeSec != 0xFF;
-                        if (totalTimeValid) sprintf_P(totalTimeStr, PSTR("%X:%02X"), totalTimeMin, totalTimeSec);
-                    } // if
+                    uint8_t totalTimeMin = data[9];
+                    uint8_t totalTimeSec = data[10];
+                    bool totalTimeValid = totalTimeMin != 0xFF && totalTimeSec != 0xFF;
+                    if (totalTimeValid) sprintf_P(totalTimeStr, PSTR("%X:%02X"), totalTimeMin, totalTimeSec);
 
                     Serial.printf_P(
                         PSTR(
@@ -2066,7 +2062,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             if (dataLen != 0 && dataLen != 12)
             {
-                Serial.printf_P(PSTR("%S[unexpected packet length]\n"), intro);
+                Serial.printf_P(PSTR("%S%S\n"), intro, unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
@@ -2198,41 +2194,57 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             uint16_t status = (uint16_t)data[1] << 8 | data[2];
 
             Serial.printf_P(
-                PSTR("status=%S%S\n"),
+                PSTR("status=%S%S; bits=%S%S%S%S%S%S%S%S%S%S%S\n"),
 
-                // TODO - check; total guess
                 status == 0x0000 ? emptyStr :
                 status == 0x0001 ? PSTR("DESTINATION_NOT_ON_MAP") :
                 status == 0x0020 ? ToHexStr(status) :  // Seen this but what is it?? Nearly at destination ??
                 status == 0x0080 ? PSTR("READY") :
                 status == 0x0101 ? ToHexStr(status) :  // Seen this but what is it??
-                status == 0x0200 ? PSTR("READING_DISC_1") :
-                status == 0x0220 ? PSTR("NEARLY_AT_DESTINATION") :  // TODO - guessing
-                status == 0x0300 ? PSTR("IN_GUIDANCE_MODE_1") :
-                status == 0x0301 ? PSTR("IN_GUIDANCE_MODE_2") :
+                status == 0x0200 ? PSTR("READING_DISC") :
+                status == 0x0220 ? PSTR("READING_DISC") :  // TODO - guessing
+                status == 0x0300 ? PSTR("IN_GUIDANCE_MODE") :
+                status == 0x0301 ? PSTR("IN_GUIDANCE_MODE") :
                 status == 0x0320 ? PSTR("STOPPING_GUIDANCE") :
                 status == 0x0400 ? PSTR("START_OF_AUDIO_MESSAGE") :
-                status == 0x0410 ? PSTR("ARRIVED_AT_DESTINATION_1") :
-                status == 0x0600 ? ToHexStr(status) :  // Seen this but what is it??
-                status == 0x0700 ? PSTR("INSTRUCTION_AUDIO_MESSAGE_START_1") :
-                status == 0x0701 ? PSTR("INSTRUCTION_AUDIO_MESSAGE_START_2") :
+                status == 0x0410 ? PSTR("ARRIVED_AT_DESTINATION_AUDIO_ANNOUNCEMENT") :
+                status == 0x0430 ? PSTR("ARRIVED_AT_DESTINATION_AUDIO_ANNOUNCEMENT") :
+                status == 0x0600 ? PSTR("START_OF_AUDIO_MESSAGE") :
+                status == 0x0700 ? PSTR("INSTRUCTION_AUDIO_MESSAGE_START") :
+                status == 0x0701 ? PSTR("INSTRUCTION_AUDIO_MESSAGE_START") :
+                status == 0x0710 ? PSTR("ARRIVED_AT_DESTINATION_AUDIO_ANNOUNCEMENT") :  // TODO - guessing
                 status == 0x0800 ? PSTR("END_OF_AUDIO_MESSAGE") :  // Follows 0x0400, 0x0700, 0x0701
                 status == 0x4000 ? PSTR("GUIDANCE_STOPPED") :
-                status == 0x4001 ? ToHexStr(status) :  // Seen this but what is it??
+                status == 0x4001 ? PSTR("DESTINATION_NOT_ON_MAP") :  // TODO - guessing
                 status == 0x4080 ? ToHexStr(status) :  // Seen this but what is it??
-                status == 0x4200 ? PSTR("ARRIVED_AT_DESTINATION_2") :
-                status == 0x9000 ? PSTR("READING_DISC_2") :
-                status == 0x9080 ? PSTR("START_CALCULATING_ROUTE") : // TODO - guessing
-                status == 0xD001 ? ToHexStr(status) :  // Seen this but what is it??
+                status == 0x4200 ? PSTR("ARRIVED_AT_DESTINATION_POPUP") :
+                status == 0x9000 ? PSTR("READING_DISC") :
+                status == 0x9080 ? PSTR("START_COMPUTING_ROUTE") : // TODO - guessing
+                status == 0xD001 ? PSTR("DESTINATION_NOT_ON_MAP") :  // TODO - guessing
                 ToHexStr(status),
 
                 data[4] == 0x0B ? PSTR(" reason=0x0B") :  // Seen with status 0x4001 and 0xD001
                 data[4] == 0x0C ? PSTR(" reason=DISC_UNREADABLE") :
                 data[4] == 0x0E ? PSTR(" reason=NO_DISC") :
-                emptyStr
+                emptyStr,
+
+                data[2] & 0x01 ? PSTR("satnav_destination_not_accessible,") : emptyStr,
+                data[2] & 0x10 ? PSTR("satnav_arrived_at_destination,") : emptyStr,
+
+                data[1] & 0x02 ? PSTR("satnav_guidance_display_can_be_dimmed,") : emptyStr,  // Next instruction is far away
+                data[1] & 0x01 ? PSTR("satnav_new_guidance_instruction,") : emptyStr,
+
+                data[1] & 0x04 ? PSTR("satnav_audio_start,") : emptyStr,
+                data[1] & 0x08 ? PSTR("satnav_audio_end,") : emptyStr,
+                data[1] & 0x10 ? PSTR("satnav_calculating_route,") : emptyStr,
+                data[1] & 0x40 ? PSTR("satnav_guidance_ended,") : emptyStr,
+                data[1] & 0x80 ? PSTR("satnav_calculating_route_2,") : emptyStr,
+
+                data[2] & 0x20 ? PSTR("satnav_last_instruction_given,") : emptyStr,
+                data[2] & 0x80 ? PSTR("satnav_entering_new_dest,") : emptyStr
             );
 
-            return VAN_PACKET_PARSE_TO_BE_DECODED;
+            return VAN_PACKET_PARSE_OK;
         }
         break;
 
@@ -2345,8 +2357,8 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             Serial.printf_P(PSTR("status=%S"),
 
-                satnavStatus2 == 0x00 ? PSTR("INITIALIZING") : // TODO - change to "IDLE"
-                satnavStatus2 == 0x01 ? PSTR("IDLE") : // TODO - change to "READY"
+                satnavStatus2 == 0x00 ? PSTR("INITIALIZING") :
+                satnavStatus2 == 0x01 ? PSTR("IDLE") :
                 satnavStatus2 == 0x05 ? PSTR("IN_GUIDANCE_MODE") :
                 ToHexStr(satnavStatus2)
             );
@@ -2442,15 +2454,18 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
                     status == 0x0000 ? PSTR("CALCULATING_ROUTE") :
                     status == 0x0001 ? PSTR("STOPPING_NAVIGATION") :
-                    status == 0x0101 ? ToHexStr(status) :
+                    status == 0x0003 ? PSTR("READING_OUT_LAST_INSTRUCTION") :  // After pressing left stalk during guidance
+                    status == 0x0101 ? PSTR("VOCAL_SYNTHESIS_LEVEL_SETTING") :  // TODO - Not sure
+                    status == 0x0104 ? PSTR("VOCAL_SYNTHESIS_LEVEL_SETTING_VIA_HEAD_UNIT") :  // TODO - Not sure
 
                     // This starts when the nag screen is accepted and is seen repeatedly when selecting a destination
                     // and during guidance. It stops after a "STOPPING_NAVIGATION" status message.
                     status == 0x0108 ? PSTR("SATNAV_IN_OPERATION") :
 
-                    status == 0x0110 ? ToHexStr(status) :
+                    status == 0x0110 ? PSTR("VOCAL_SYNTHESIS_LEVEL_SETTING") :
                     status == 0x0120 ? PSTR("ACCEPTED_TERMS_AND_CONDITIONS") :
                     status == 0x0140 ? PSTR("GPS_POS_FOUND") :
+                    status == 0x0180 ? ToHexStr(status) :  // Changing distance unit (km <--> mi)?
                     status == 0x0300 ? PSTR("SATNAV_LANGUAGE_SET_TO_FRENCH") :
                     status == 0x0301 ? PSTR("SATNAV_LANGUAGE_SET_TO_ENGLISH") :
                     status == 0x0302 ? PSTR("SATNAV_LANGUAGE_SET_TO_GERMAN") :
@@ -2577,7 +2592,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             Serial.print(F("--> SatNav guidance: "));
 
-            if (dataLen != 3 && dataLen != 4 && dataLen != 6 && dataLen != 13 && dataLen != 16 && dataLen != 23)
+            if (dataLen != 3 && dataLen != 4 && dataLen != 6 && dataLen != 9 && dataLen != 13 && dataLen != 16 && dataLen != 23)
             {
                 Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
@@ -2833,6 +2848,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                         data[4] == 0x41 ? PSTR("KEEP_LEFT_ON_FORK") :
                         data[4] == 0x14 ? PSTR("KEEP_RIGHT_ON_FORK") :
                         data[4] == 0x12 ? PSTR("TAKE_RIGHT_EXIT") :
+                        data[4] == 0x21 ? PSTR("TAKE_LEFT_EXIT") :  // Never seen; just guessing
 
                         ToHexStr(data[4])
                     );
@@ -2844,7 +2860,18 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             }
             else if (data[1] == 0x03)  // Double turn
             {
-                if (dataLen != 23)
+                if (dataLen == 9)
+                {
+                    // Two instruction icons: current (fork) in data[6], next (fork) in data[7]
+                    // Example: 64E E (RA0) 82-03-02-20-02-54-14-14-82
+                }
+                else if (dataLen == 16)
+                {
+                    // Two instruction icons: current (fork) in data[6], next in data[7...14]
+                    Serial.print(F("    next_instruction=\n"));
+                    PrintGuidanceInstruction(data + 7);
+                }
+                else if (dataLen != 23)
                 {
                     Serial.print(FPSTR(indentStr));
                     Serial.printf_P(PSTR("%S\n"), unexpectedPacketLengthStr);
@@ -3105,7 +3132,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 // Combinations:
                 //
                 // * request == 0x02 (SR_ENTER_CITY),
-                //   param == 0x1D:
+                //   param == 0x1D || param == 0x0D:
                 //   - type = 0 (SRT_REQ_N_ITEMS) (dataLen = 4): request (remaining) list length
                 //     -- data[3]: (next) character to narrow down selection with. 0x00 if none.
                 //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): request list
@@ -3114,12 +3141,12 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 //   - type = 2 (SRT_SELECT) (dataLen = 11): select entry
                 //     -- data[5] << 8 | data[6]: selected entry (0-based)
 
-                request == SR_ENTER_CITY && param == 0x1D && type == SRT_REQ_N_ITEMS ? "ENTER_CITY_BY_LETTER" :
-                request == SR_ENTER_CITY && param == 0x1D && type == SRT_REQ_ITEMS ? "ENTER_CITY_GET_LIST" :
-                request == SR_ENTER_CITY && param == 0x1D && type == SRT_SELECT ? "ENTER_CITY_SELECT" :
+                request == SR_ENTER_CITY && (param == 0x1D || param == 0x0D) && type == SRT_REQ_N_ITEMS ? "ENTER_CITY_BY_LETTER" :
+                request == SR_ENTER_CITY && (param == 0x1D || param == 0x0D) && type == SRT_REQ_ITEMS ? "ENTER_CITY_GET_LIST" :
+                request == SR_ENTER_CITY && (param == 0x1D || param == 0x0D) && type == SRT_SELECT ? "ENTER_CITY_SELECT" :
 
                 // * request == 0x05 (SR_ENTER_STREET),
-                //   param == 0x1D:
+                //   param == 0x1D || param == 0x0D:
                 //   - type = 0 (SRT_REQ_N_ITEMS) (dataLen = 4): request (remaining) list length
                 //     -- data[3]: (next) character to narrow down selection with. 0x00 if none.
                 //   - type = 1 (SRT_REQ_ITEMS) (dataLen = 9): request list
@@ -3127,13 +3154,14 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 //     -- data[7] << 8 | data[8]: number of items to retrieve
                 //   - type = 2 (SRT_SELECT) (dataLen = 11): select entry
                 //     -- data[5] << 8 | data[6]: selected entry (0-based)
+                //   param == 0x1D: (TODO also || param == 0x0D ?)
                 //   - type = 3 (SRT_SELECT_CITY_CENTER) (dataLen = 9): select city center
                 //     -- data[5] << 8 | data[6]: offset in list (always 0)
                 //     -- data[7] << 8 | data[8]: number of items to retrieve (always 1)
 
-                request == SR_ENTER_STREET && param == 0x1D && type == SRT_REQ_N_ITEMS ? "ENTER_STREET_BY_LETTER" :
-                request == SR_ENTER_STREET && param == 0x1D && type == SRT_REQ_ITEMS ? "ENTER_STREET_GET_LIST" :
-                request == SR_ENTER_STREET && param == 0x1D && type == SRT_SELECT ? "ENTER_STREET_SELECT" :
+                request == SR_ENTER_STREET && (param == 0x1D || param == 0x0D) && type == SRT_REQ_N_ITEMS ? "ENTER_STREET_BY_LETTER" :
+                request == SR_ENTER_STREET && (param == 0x1D || param == 0x0D) && type == SRT_REQ_ITEMS ? "ENTER_STREET_GET_LIST" :
+                request == SR_ENTER_STREET && (param == 0x1D || param == 0x0D) && type == SRT_SELECT ? "ENTER_STREET_SELECT" :
                 request == SR_ENTER_STREET && param == 0x1D && type == SRT_SELECT_CITY_CENTER ? PSTR("ENTER_STREET_SELECT_CITY_CENTER") :
 
                 // * request == 0x06 (SR_ENTER_HOUSE_NUMBER),
@@ -3358,41 +3386,58 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // data[0] & 0x07: sequence number
             // data[1]: request code
             // data[4] << 8 | data[5]: number of items
-            // data[17...22]: bits indicating available letters, numbers, single quote (') or space
+            // data[10] is some "flags" byte. Values seen:
+            // - 0x40 : No second list
+            // - 0x41 : Second list
+            // - 0x48 : No second list
+            // - 0x50 : No second list
+            // - 0x61 : Second list
+            // - 0xF1 : Second list with same length as first list
+            // data[11] << 8 | data[12]: number of items in second list
+            // data[17...22]: bits indicating available letters, numbers, single quote ('), space or dot (.)
 
-            int16_t listSize = (int16_t)(data[4] << 8 | data[5]);
+            uint16_t listSize = data[4] << 8 | data[5];
+
+            // Sometimes there is a second list size. The first list size (bytes 4 and 5) is the number of items *containing*
+            // the selected characters, the second list size (bytes 11 and 12) is the number of items *starting* with the
+            // selected characters.
+            uint16_t list2Size = data[11] << 8 | data[12];
 
             Serial.printf_P(
-                PSTR("response=%S, list_size=%d, available_characters="),
+                PSTR("response=%S, list_size=%u, list2_size=%u, available_characters="),
                 SatNavRequestStr(data[1]),
-                listSize
+                listSize,
+                list2Size
             );
 
-            // Available letters are bit-coded in bytes 17...20. Print the letter if it is available, print a '.'
+            // Available letters are bit-coded in bytes 17...20. Print the letter if it is available, print a '-'
             // if not.
             for (int byte = 0; byte <= 3; byte++)
             {
                 for (int bit = 0; bit < (byte == 3 ? 2 : 8); bit++)
                 {
-                    Serial.printf_P(PSTR("%c"), data[byte + 17] >> bit & 0x01 ? 65 + 8 * byte + bit : '.');
+                    Serial.printf_P(PSTR("%c"), data[byte + 17] >> bit & 0x01 ? 65 + 8 * byte + bit : '-');
                 } // for
             } // for
 
-            // Special character '
-            Serial.printf_P(PSTR("%c"), data[21] >> 6 & 0x01 ? '\'' : '.');
+            // Special character: single quote (')
+            Serial.printf_P(PSTR("%c"), data[21] >> 6 & 0x01 ? '\'' : '-');
 
             // Available numbers are bit-coded in bytes 20...21, starting with '0' at bit 2 of byte 20, ending
-            // with '9' at bit 3 of byte 21. Print the number if it is available, print a '.' if not.
+            // with '9' at bit 3 of byte 21. Print the number if it is available, print a '-' if not.
             for (int byte = 0; byte <= 1; byte++)
             {
                 for (int bit = (byte == 0 ? 2 : 0); bit < (byte == 1 ? 4 : 8); bit++)
                 {
-                    Serial.printf_P(PSTR("%c"), data[byte + 20] >> bit & 0x01 ? 48 + 8 * byte + bit - 2 : '.');
+                    Serial.printf_P(PSTR("%c"), data[byte + 20] >> bit & 0x01 ? 48 + 8 * byte + bit - 2 : '-');
                 } // for
             } // for
 
             // <Space>, printed here as '_'
-            Serial.printf_P(PSTR("%c"), data[22] >> 1 & 0x01 ? '_' : '.');
+            Serial.printf_P(PSTR("%c"), data[22] >> 1 & 0x01 ? '_' : '-');
+
+            // Special character: dot (.)
+            Serial.printf_P(PSTR("%c"), data[22] >> 3 & 0x01 ? '.' : '-');
 
             Serial.print("\n");
         }
@@ -3552,7 +3597,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             Serial.printf_P(PSTR("Head unit stalk: %S%S%S%S%S\n"),
                 data[5] & 0x02 ? PSTR("SRC button pressed, ") : emptyStr,
-                data[5] & 0x03 ? PSTR("Volume down button pressed, ") : emptyStr,
+                data[5] & 0x04 ? PSTR("Volume down button pressed, ") : emptyStr,
                 data[5] & 0x08 ? PSTR("Volume up button pressed, ") : emptyStr,
                 data[5] & 0x40 ? PSTR("Seek backward button pressed, ") : emptyStr,
                 data[5] & 0x80 ? PSTR("Seek forward button pressed, ") : emptyStr
