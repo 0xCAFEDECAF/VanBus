@@ -106,7 +106,9 @@ Before proceeding with this project, make sure you check all the following prere
 
 ### Install Arduino IDE
 
-See [Arduino IDE](https://www.arduino.cc/en/software)
+See [Arduino IDE](https://www.arduino.cc/en/software). I am currently using
+[version 1.8.19](https://downloads.arduino.cc/arduino-1.8.19-windows.exe) but other versions
+may also be working fine.
 
 ### ESP8266-based board
 
