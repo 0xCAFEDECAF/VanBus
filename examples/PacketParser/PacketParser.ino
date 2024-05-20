@@ -130,7 +130,7 @@ char* ToStr(uint8_t data)
 {
     #define MAX_UINT8_STR_SIZE 4
     static char buffer[MAX_UINT8_STR_SIZE];
-    sprintf_P(buffer, PSTR("%u"), data);
+    sprintf_P(buffer, PSTR("%" PRIu8), data);
 
     return buffer;
 } // ToStr
@@ -140,7 +140,7 @@ char* ToHexStr(uint8_t data)
 {
     #define MAX_UINT8_HEX_STR_SIZE 5
     static char buffer[MAX_UINT8_HEX_STR_SIZE];
-    sprintf_P(buffer, PSTR("0x%02X"), data);
+    sprintf_P(buffer, PSTR("0x%02" PRIX8), data);
 
     return buffer;
 } // ToHexStr
@@ -150,7 +150,7 @@ char* ToHexStr(uint16_t data)
 {
     #define MAX_UINT16_HEX_STR_SIZE 7
     static char buffer[MAX_UINT16_HEX_STR_SIZE];
-    sprintf_P(buffer, PSTR("0x%04X"), data);
+    sprintf_P(buffer, PSTR("0x%04" PRIX16), data);
 
     return buffer;
 } // ToHexStr
@@ -167,7 +167,7 @@ char* ToHexStr(uint8_t data1, uint8_t data2)
 {
     #define MAX_2_UINT8_HEX_STR_SIZE 10
     static char buffer[MAX_2_UINT8_HEX_STR_SIZE];
-    sprintf_P(buffer, PSTR("0x%02X-0x%02X"), data1, data2);
+    sprintf_P(buffer, PSTR("0x%02" PRIX8 "-0x%02" PRIX8), data1, data2);
 
     return buffer;
 } // ToHexStr
@@ -552,7 +552,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             char floatBuf[3][MAX_FLOAT_SIZE];
             Serial.printf_P(
                 PSTR(
-                    "dash_light=%S, dash_actual_brightness=%u; contact_key_position=%S; engine=%S;\n"
+                    "dash_light=%S, dash_actual_brightness=%" PRIu8 "; contact_key_position=%S; engine=%S;\n"
                     "    economy_mode=%S; in_reverse=%S; trailer=%S; water_temp=%S; odometer=%s; exterior_temperature=%s\n"
                 ),
                 data[0] & 0x80 ? PSTR("FULL") : PSTR("DIMMED (LIGHTS ON)"),
@@ -594,13 +594,13 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             } // if
 
             Serial.printf_P(
-                PSTR("button=%S%S%S%S%S, wheel=%d, wheel_rollover=%u\n"),
+                PSTR("button=%S%S%S%S%S, wheel=%d, wheel_rollover=%" PRIu8 "\n"),
                 data[0] & 0x80 ? PSTR("NEXT ") : emptyStr,
                 data[0] & 0x40 ? PSTR("PREV ") : emptyStr,
                 data[0] & 0x08 ? PSTR("VOL_UP ") : emptyStr,
                 data[0] & 0x04 ? PSTR("VOL_DOWN ") : emptyStr,
                 data[0] & 0x02 ? PSTR("SOURCE ") : emptyStr,
-                data[1] - 0x80,
+                (int)data[1] - 0x80,
                 data[0] >> 4 & 0x03
             );
         }
@@ -639,7 +639,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             Serial.printf_P(PSTR("%S"), data[0] & 0x04 ? PSTR("    - Diesel glow plugs ON\n") : emptyStr);
             Serial.printf_P(PSTR("%S"), data[1] & 0x01 ? PSTR("    - Door OPEN\n") : emptyStr);
             Serial.printf_P(
-                PSTR("    - Remaing km to service: %ld (dashboard shows: %ld)\n"),
+                PSTR("    - Remaing km to service: %" PRId32 " (dashboard shows: %" PRId32 ")\n"),
                 remainingKmToService,
                 _floor(remainingKmToService, 100)
             );
@@ -686,10 +686,10 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             if (data[7] != 0xFF)
             {
                 // Never seen this on my 406 HDI, only reported on 206 / petrol ?
-                Serial.printf_P(PSTR("    - Fuel level: %u %%\n"), data[7]);
+                Serial.printf_P(PSTR("    - Fuel level: %" PRIu8 " %%\n"), data[7]);
             } // if
 
-            Serial.printf_P(PSTR("    - Oil level: raw=%u,dash=%S\n"),
+            Serial.printf_P(PSTR("    - Oil level: raw=%" PRIu8 ",dash=%S\n"),
                 data[8],
                 data[8] <= 11 ? PSTR("------") :
                 data[8] <= 25 ? PSTR("O-----") :
@@ -729,7 +729,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     ToHexStr(data[11])
                 );
 
-                Serial.printf_P(PSTR("Cruise control speed: %u\n"), data[12]);
+                Serial.printf_P(PSTR("Cruise control speed: %" PRIu8 "\n"), data[12]);
             } // if
         }
         break;
@@ -1014,10 +1014,10 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             char floatBuf[3][MAX_FLOAT_SIZE];
             Serial.printf_P(
                 PSTR(
-                    "seq=%u; doors=%S%S%S%S%S; right_stalk_button=%S; avg_speed_1=%u; avg_speed_2=%u; "
-                    "exp_moving_avg_speed=%u;\n"
-                    "    distance_1=%u; avg_consumption_1=%s; distance_2=%u; avg_consumption_2=%s; inst_consumption=%S; "
-                    "distance_to_empty=%u\n"
+                    "seq=%" PRIu8 "; doors=%S%S%S%S%S; right_stalk_button=%S; avg_speed_1=%" PRIu8 "; avg_speed_2=%" PRIu8 "; "
+                    "exp_moving_avg_speed=%" PRIu8 ";\n"
+                    "    distance_1=%" PRIu16 "; avg_consumption_1=%s; distance_2=%" PRIu16 "; avg_consumption_2=%s; inst_consumption=%S; "
+                    "distance_to_empty=%" PRIu16 "\n"
                 ),
                 data[0] & 0x07,
                 data[7] & 0x80 ? PSTR("FRONT_RIGHT ") : emptyStr,
@@ -1308,7 +1308,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             char floatBuf[2][MAX_FLOAT_SIZE];
             Serial.printf_P(
-                PSTR("rpm=%S /min; speed=%S km/h; engine_running_seconds=%lu\n"),
+                PSTR("rpm=%S /min; speed=%S km/h; engine_running_seconds=%" PRIu32 "\n"),
                 engineRpm == 0xFFFF ?
                     PSTR("---.-") :
                     FloatToStr(floatBuf[0], engineRpm / 8.0, 1),
@@ -1343,7 +1343,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             char floatBuf[2][MAX_FLOAT_SIZE];
             Serial.printf_P(
                 PSTR(
-                    "hazard_lights=%S; door=%S; dashboard_programmed_brightness=%u, esp=%S,\n"
+                    "hazard_lights=%S; door=%S; dashboard_programmed_brightness=%" PRIu8 ", esp=%S,\n"
                     "    fuel_level_filtered=%S litre, fuel_level_raw=%S litre\n"
                 ),
                 data[0] & 0x02 ? onStr : offStr,
@@ -1364,7 +1364,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             // These packets are sent by the head unit
 
-            uint8_t seq = data[0];
+            //uint8_t seq = data[0];
             uint8_t infoType = data[1];
 
             // Head unit info types
@@ -1413,7 +1413,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     uint8_t band = data[2] & 0x07;
                     uint8_t presetMemory = data[2] >> 3 & 0x0F;
                     char presetMemoryBuffer[12];
-                    sprintf_P(presetMemoryBuffer, PSTR(", memory=%u"), presetMemory);
+                    sprintf_P(presetMemoryBuffer, PSTR(", memory=%" PRIu8), presetMemory);
 
                     // data[3]: search bits
                     bool dxSensitivity = data[3] & 0x02;  // Tuner sensitivity: distant (Dx) or local (Lo)
@@ -1444,7 +1444,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     //          out. Updated when a station is being tuned in to, or when the MAN button is pressed.
                     uint8_t signalStrength = data[6] & 0x0F;
                     char signalStrengthBuffer[3];
-                    sprintf_P(signalStrengthBuffer, PSTR("%u"), signalStrength);
+                    sprintf_P(signalStrengthBuffer, PSTR("%" PRIu8), signalStrength);
 
                     char floatBuf[MAX_FLOAT_SIZE];
                     Serial.printf_P(
@@ -1499,7 +1499,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                         uint8_t countryCode = piCode >> 12 & 0x0F;
                         uint8_t coverageCode = piCode >> 8 & 0x0F;
                         char piBuffer[40];
-                        sprintf_P(piBuffer, PSTR("%04X(%S, %S)"),
+                        sprintf_P(piBuffer, PSTR("%04" PRIX16 "(%S, %S)"),
                             piCode,
                             RadioPiCountry(countryCode),
                             RadioPiAreaCoverage(coverageCode)
@@ -1513,12 +1513,12 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                         bool ptyMatch = (data[10] & 0x20) == 0;  // PTY of station matches selected PTY
                         bool ptySelectionMenu = data[10] & 0x40;
                         char selectedPtyBuffer[40];
-                        sprintf_P(selectedPtyBuffer, PSTR("%u(%S)"), selectedPty, PtyStr(selectedPty));
+                        sprintf_P(selectedPtyBuffer, PSTR("%" PRIu8 "(%S)"), selectedPty, PtyStr(selectedPty));
 
                         // data[11]: PTY code of current station
                         uint8_t currPty = data[11] & 0x1F;
                         char currPtyBuffer[40];
-                        sprintf_P(currPtyBuffer, PSTR("%u(%S)"), currPty, PtyStr(currPty));
+                        sprintf_P(currPtyBuffer, PSTR("%" PRIu8 "(%S)"), currPty, PtyStr(currPty));
 
                         // data[12]...data[20]: RDS text
                         char rdsTxt[9];
@@ -1597,7 +1597,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     strncpy(rdsOrFreqTxt, (const char*) data + 3, 8);
                     rdsOrFreqTxt[8] = 0;
 
-                    Serial.printf_P(PSTR("band=%S, memory=%u, \"%s%S\"\n"),
+                    Serial.printf_P(PSTR("band=%S, memory=%" PRIu8 ", \"%s%S\"\n"),
                         TunerBandStr(tunerBand),
                         tunerMemory,
                         rdsOrFreqTxt,
@@ -1626,24 +1626,24 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     if (! searching) loading = false;
 
                     char trackTimeStr[7];
-                    sprintf_P(trackTimeStr, PSTR("%X:%02X"), data[5], data[6]);
+                    sprintf_P(trackTimeStr, PSTR("%" PRIX8 ":%02" PRIX8), data[5], data[6]);
 
                     uint8_t totalTracks = data[8];
                     bool totalTracksValid = totalTracks != 0xFF;
                     char totalTracksStr[3];
-                    if (totalTracksValid) sprintf_P(totalTracksStr, PSTR("%X"), totalTracks);
+                    if (totalTracksValid) sprintf_P(totalTracksStr, PSTR("%" PRIX8), totalTracks);
 
                     char totalTimeStr[7];
                     uint8_t totalTimeMin = data[9];
                     uint8_t totalTimeSec = data[10];
                     bool totalTimeValid = totalTimeMin != 0xFF && totalTimeSec != 0xFF;
-                    if (totalTimeValid) sprintf_P(totalTimeStr, PSTR("%X:%02X"), totalTimeMin, totalTimeSec);
+                    if (totalTimeValid) sprintf_P(totalTimeStr, PSTR("%" PRIX8 ":%02" PRIX8), totalTimeMin, totalTimeSec);
 
                     Serial.printf_P(
                         PSTR(
                             "status=%S; loading=%S; eject=%S; pause=%S; play=%S; fast_forward=%S; "
                             "rewind=%S;\n"
-                            "    searching=%S; track_time=%S; current_track=%X; total_tracks=%S; total_time=%S, random=%S\n"
+                            "    searching=%S; track_time=%S; current_track=%" PRIX8 "; total_tracks=%S; total_time=%S, random=%S\n"
                         ),
 
                         data[3] == 0x00 ? PSTR("EJECT") :
@@ -1686,7 +1686,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
                 default:
                 {
-                    Serial.printf_P(PSTR("--> Unknown head unit info type 0x%02X: "), infoType);
+                    Serial.printf_P(PSTR("--> Unknown head unit info type 0x%02" PRIX8 ": "), infoType);
                     Serial.printf_P(PSTR("%S\n"), toBeDecodedStr);
                     return VAN_PACKET_PARSE_TO_BE_DECODED;
                 }
@@ -1779,7 +1779,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             Serial.printf_P(
                 PSTR(
                     "power=%S, tape=%S, cd=%S, source=%S, ext_mute=%S, mute=%S,\n"
-                    "    volume=%u%S, audio_menu=%S, bass=%d%S, treble=%d%S, loudness=%S, fader=%d%S, balance=%d%S, "
+                    "    volume=%" PRIu8 "%S, audio_menu=%S, bass=%" PRId8 "%S, treble=%" PRId8 "%S, loudness=%S, fader=%" PRId8 "%S, balance=%" PRId8 "%S, "
                     "auto_volume=%S\n"
                 ),
                 data[2] & 0x01 ? onStr : offStr,  // power
@@ -1981,7 +1981,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 0; // Fan icon not visible at all
 
             Serial.printf_P(
-                PSTR("ac_icon=%S; recirc=%S, rear_heater=%S, reported_fan_speed=%u, set_fan_speed=%u\n"),
+                PSTR("ac_icon=%S; recirc=%S, rear_heater=%S, reported_fan_speed=%" PRIu8 ", set_fan_speed=%" PRIu8 "\n"),
                 ac_icon ? onStr : offStr,
                 data[0] & 0x04 ? onStr : offStr,
                 rear_heater ? yesStr : noStr,
@@ -2118,7 +2118,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 data[2] == 0xD3 ?
                     // "PLAY-SEARCHING" (data[2] == 0xD3) with discs found (data[10] > 0) and invalid values for currentDisc/
                     // currentTrack seems to indicate an error condition, e.g. disc inserted wrong way round.
-                    data[10] >= 0 && currentDisc == 0xFF && currentTrack == 0xFF ? PSTR("ERROR") :
+                    data[10] > 0 && currentDisc == 0xFF && currentTrack == 0xFF ? PSTR("ERROR") :
                     PSTR("PLAY-SEARCHING") :
                 ToHexStr(data[2]),
 
@@ -2132,16 +2132,16 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             uint8_t trackTimeSec = data[5];
             bool trackTimeValid = trackTimeMin != 0xFF && trackTimeSec != 0xFF;
             char trackTimeStr[7];
-            if (trackTimeValid) sprintf_P(trackTimeStr, PSTR("%X:%02X"), trackTimeMin, trackTimeSec);
+            if (trackTimeValid) sprintf_P(trackTimeStr, PSTR("%" PRIX8 ":%02" PRIX8), trackTimeMin, trackTimeSec);
 
             uint8_t totalTracks = data[8];
             bool totalTracksValid = totalTracks != 0xFF;
             char totalTracksStr[3];
-            if (totalTracksValid) sprintf_P(totalTracksStr, PSTR("%X"), totalTracks);
+            if (totalTracksValid) sprintf_P(totalTracksStr, PSTR("%" PRIX8), totalTracks);
 
             Serial.printf_P(
                 PSTR(
-                    "    cartridge=%S; %S in track %X/%S on disc %X; presence=%S-%S-%S-%S-%S-%S\n"
+                    "    cartridge=%S; %S in track %" PRIX8 "/%S on disc %" PRIX8 "; presence=%S-%S-%S-%S-%S-%S\n"
                 ),
                 data[3] == 0x16 ? PSTR("IN") :
                 data[3] == 0x06 ? PSTR("OUT") :
@@ -2392,9 +2392,9 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             // TODO - what is this?
             uint16_t zzz = (uint16_t)data[9] << 8 | data[10];
-            if (zzz != 0x00) Serial.printf_P(PSTR(", zzz=%u"), zzz);
+            if (zzz != 0x00) Serial.printf_P(PSTR(", zzz=%" PRIu16), zzz);
 
-            Serial.printf_P(PSTR(", gps_speed=%u km/h%S"),
+            Serial.printf_P(PSTR(", gps_speed=%" PRIu8 " km/h%S"),
 
                 // 0xE0 as boundary for "reverse": just guessing. Do we ever drive faster than 224 km/h?
                 data[16] < 0xE0 ? data[16] : 0xFF - data[16] + 1,
@@ -2567,9 +2567,9 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             char floatBuf[MAX_FLOAT_SIZE];
             Serial.printf_P(
                 PSTR(
-                    "curr_heading=%u deg, heading_to_dest=%u deg, distance_to_dest=%u %S,"
-                    " distance_to_dest_straight_line=%u %S, turn_at=%u %S,\n"
-                    " heading_on_roundabout=%S deg, minutes_to_travel=%u\n"
+                    "curr_heading=%" PRIu16 " deg, heading_to_dest=%" PRIu16 " deg, distance_to_dest=%" PRIu16 " %S,"
+                    " distance_to_dest_straight_line=%" PRIu16 " %S, turn_at=%" PRIu16 " %S,\n"
+                    " heading_on_roundabout=%S deg, minutes_to_travel=%" PRIu16 "\n"
                 ),
                 currHeading,
                 headingToDestination,
@@ -2673,140 +2673,140 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             //      E.g.: 0x4 is 90 deg left, 0x8 is 180 deg (straight ahead), 0xC is 270 deg (90 deg right).
             //
             // - data[3]: ?? Seen values: 0x00, 0x01, 0x20, 0x42, 0x53
-            //
-            // =====
-            // Just some examples:
-            //
-            //     01-02-53-41 is shown as:
-            //           ^  |
-            //           || |
-            //           \\ /
-            //            ++
-            //            ||
-            //            ||
-            //       (keep left on fork)
-            //
-            //     01-02-53-14 is shown as:
-            //           |  ^
-            //           | ||
-            //           \ //
-            //            ++
-            //            ||
-            //            ||
-            //       (keep right on fork)
-            //
-            //     01-02-53-12 is shown as:
-            //            |  ^
-            //            | ||
-            //            |//
-            //            ++
-            //            ||
-            //            ||
-            //       (take right exit)
-            //
-            //     01-00-53-04-00-12-11-00-00-00-00 is shown as:
-            //               /
-            //              /
-            //         <===+---
-            //            ||
-            //            ||
-            //       (turn left 90 deg; ahead = +202.5 deg; right = 270 deg)
-            //
-            //     01-00-53-04-00-01-11-00-00-00-00 is shown as:
-            //             |
-            //             |
-            //         <===+
-            //            ||
-            //            ||
-            //       (turn left 90 deg; ahead = 180 deg; no right)
-            //
-            //     01-00-53-03-00-11-09-10-00-00-00 is:
-            //                |
-            //                |
-            //             /==+--- (-)
-            //         <==/  ||
-            //               ||
-            //       (turn left -67.5 deg; ahead = 180 deg; right = 270 deg: no entry)
-            //
-            //     01-00-53-05-00-02-21-00-00-00-00 is:
-            //                  /
-            //         <==\    /
-            //             \==+
-            //               ||
-            //               ||
-            //       (turn left 112.5 deg; ahead = +202.5 deg; no right)
-            //
-            //     01-00-53-0C-00-10-21-00-00-00-00
-            //
-            //         --\
-            //            \--+===>
-            //              ||
-            //              ||
-            //       (turn right 270 deg; no ahead; left = 112.5 deg)
-            //
-            //     01-01-53-09-00-22-21-00-00-00-00 is:
-            //                /
-            //               /
-            //             --+
-            //            /   \\
-            //     --\   /     \\
-            //        \--+     ++--\
-            //           \    //    \--
-            //            \++//
-            //             ||
-            //             ||
-            //
-            //       (take second exit on roundabout @ 202.5 degrees, exits on 112.5, 202.5 and 290.5 degrees)
-            //
-            //     01-00-01-0C-00-11-11-00-10-00-00 is:
-            //             |
-            //             |
-            //      (-) ---+===>
-            //            ||
-            //            ||
-            //       (turn right 270 deg; ahead = 180 deg; left = 90: no entry)
-            //
-            //     01-00-01-04-00-10-13-00-03-00-00 is:
-            //
-            //         <===+---
-            //            /||
-            //           / ||
-            //          (-)
-            //       (turn left 90 deg; no ahead; right = 270 deg, sharp left = 22.5 deg: no entry)
-            //
-            //     03-00-53-00-41-0C-00-11-01-00-00-00-00-0B-00-08-11-00-00-00-00 is:
-            //             |
-            //             |
-            //             +===>
-            //            ||
-            //            ||
-            //       (current instruction: turn right 270 deg; ahead = 180 deg; no left)
-            //
-            //     03-00-53-00-41-0C-00-10-11-00-10-00-00-04-00-12-11-00-00-00-00 is:
-            //
-            //      (-) ---+===>
-            //            ||
-            //            ||
-            //       (current instruction: turn right 270 deg; no ahead; left = 90 deg: no entry)
-            //
-            //     03-00-53-00-63-04-00-01-11-00-00-00-00-03-00-08-09-00-00-00-00 and
-            //     03-00-53-00-32-04-00-01-11-00-00-00-00-05-00-02-21-00-00-00-00 is:
-            //             |
-            //             |
-            //         <===+
-            //            ||
-            //            ||
-            //       (current instruction: turn left 90 deg; ahead = 180 deg; no right)
-            //
-            //     03-00-53-00-3A-0B-00-08-11-00-00-00-00-04-00-10-11-00-00-00-00 is:
-            //
-            //                 /==>
-            //      (-) ---+==/
-            //            ||
-            //            ||
-            //       (current instruction: turn right 247.2 deg; no ahead; left = 90 deg)
-            //       (next instruction: turn left 90 deg; no ahead; right = 270 deg)
-            //
+            /*
+               =====
+               Just some examples:
+
+                   01-02-53-41 is shown as:
+                         ^  |
+                         || |
+                         \\ /
+                          ++
+                          ||
+                          ||
+                     (keep left on fork)
+
+                   01-02-53-14 is shown as:
+                         |  ^
+                         | ||
+                         \ //
+                          ++
+                          ||
+                          ||
+                     (keep right on fork)
+
+                   01-02-53-12 is shown as:
+                          |  ^
+                          | ||
+                          |//
+                          ++
+                          ||
+                          ||
+                     (take right exit)
+              
+                   01-00-53-04-00-12-11-00-00-00-00 is shown as:
+                             /
+                            /
+                       <===+---
+                          ||
+                          ||
+                     (turn left 90 deg; ahead = +202.5 deg; right = 270 deg)
+
+                   01-00-53-04-00-01-11-00-00-00-00 is shown as:
+                           |
+                           |
+                       <===+
+                          ||
+                          ||
+                     (turn left 90 deg; ahead = 180 deg; no right)
+
+                   01-00-53-03-00-11-09-10-00-00-00 is:
+                              |
+                              |
+                           /==+--- (-)
+                       <==/  ||
+                             ||
+                     (turn left -67.5 deg; ahead = 180 deg; right = 270 deg: no entry)
+
+                   01-00-53-05-00-02-21-00-00-00-00 is:
+                                /
+                       <==\    /
+                           \==+
+                             ||
+                             ||
+                     (turn left 112.5 deg; ahead = +202.5 deg; no right)
+
+                   01-00-53-0C-00-10-21-00-00-00-00
+
+                       --\
+                          \--+===>
+                            ||
+                            ||
+                     (turn right 270 deg; no ahead; left = 112.5 deg)
+
+                   01-01-53-09-00-22-21-00-00-00-00 is:
+                              /
+                             /
+                           --+
+                          /   \\
+                   --\   /     \\
+                      \--+     ++--\
+                         \    //    \--
+                          \++//
+                           ||
+                           ||
+
+                     (take second exit on roundabout @ 202.5 degrees, exits on 112.5, 202.5 and 290.5 degrees)
+
+                   01-00-01-0C-00-11-11-00-10-00-00 is:
+                           |
+                           |
+                    (-) ---+===>
+                          ||
+                          ||
+                     (turn right 270 deg; ahead = 180 deg; left = 90: no entry)
+
+                   01-00-01-04-00-10-13-00-03-00-00 is:
+
+                       <===+---
+                          /||
+                         / ||
+                        (-)
+                     (turn left 90 deg; no ahead; right = 270 deg, sharp left = 22.5 deg: no entry)
+
+                   03-00-53-00-41-0C-00-11-01-00-00-00-00-0B-00-08-11-00-00-00-00 is:
+                           |
+                           |
+                           +===>
+                          ||
+                          ||
+                     (current instruction: turn right 270 deg; ahead = 180 deg; no left)
+
+                   03-00-53-00-41-0C-00-10-11-00-10-00-00-04-00-12-11-00-00-00-00 is:
+
+                    (-) ---+===>
+                          ||
+                          ||
+                     (current instruction: turn right 270 deg; no ahead; left = 90 deg: no entry)
+
+                   03-00-53-00-63-04-00-01-11-00-00-00-00-03-00-08-09-00-00-00-00 and
+                   03-00-53-00-32-04-00-01-11-00-00-00-00-05-00-02-21-00-00-00-00 is:
+                           |
+                           |
+                       <===+
+                          ||
+                          ||
+                     (current instruction: turn left 90 deg; ahead = 180 deg; no right)
+
+                   03-00-53-00-3A-0B-00-08-11-00-00-00-00-04-00-10-11-00-00-00-00 is:
+
+                               /==>
+                    (-) ---+==/
+                          ||
+                          ||
+                     (current instruction: turn right 247.2 deg; no ahead; left = 90 deg)
+                     (next instruction: turn left 90 deg; no ahead; right = 270 deg)
+            */
 
             Serial.printf_P(PSTR("guidance_instruction=%S\n"),
                 data[1] == 0x01 ? PSTR("SINGLE_TURN") :
@@ -2923,7 +2923,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
-                Serial.printf_P(PSTR("    not_on_map_follow_heading=%u\n"), data[2]);
+                Serial.printf_P(PSTR("    not_on_map_follow_heading=%" PRIu8 "\n"), data[2]);
             } // if
         }
         break;
@@ -3005,7 +3005,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             static char buffer[MAX_SATNAV_STRING_SIZE];
             static int offsetInBuffer = 0;
 
-            uint8_t globalSeqNo = data[0] & 0x07;
+            //uint8_t globalSeqNo = data[0] & 0x07;
             uint8_t packetFragmentNo = data[0] >> 3 & 0x0F; // Starts at 0, rolls over from 15 to 1
             bool lastPacket = data[0] & 0x80;
 
@@ -3352,15 +3352,13 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 uint16_t selectionOrOffset = (uint16_t)data[5] << 8 | data[6];
                 uint16_t length = (uint16_t)data[7] << 8 | data[8];
 
-                //if (selectionOrOffset > 0 && length > 0)
                 if (length > 0)
                 {
-                    Serial.printf_P(PSTR(", offset=%u, length=%u"), selectionOrOffset, length);
+                    Serial.printf_P(PSTR(", offset=%" PRIu16 ", length=%" PRIu16), selectionOrOffset, length);
                 }
-                //else if (selectionOrOffset > 0)
                 else
                 {
-                    Serial.printf_P(PSTR(", selection=%u"), selectionOrOffset);
+                    Serial.printf_P(PSTR(", selection=%" PRIu16), selectionOrOffset);
                 } // if
             } // if
 
@@ -3404,7 +3402,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             uint16_t list2Size = data[11] << 8 | data[12];
 
             Serial.printf_P(
-                PSTR("response=%S, list_size=%u, list2_size=%u, available_characters="),
+                PSTR("response=%S, list_size=%" PRIu16 ", list2_size=%" PRIu16 ", available_characters="),
                 SatNavRequestStr(data[1]),
                 listSize,
                 list2Size
@@ -3521,7 +3519,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
             char floatBuf[2][MAX_FLOAT_SIZE];
             Serial.printf_P(
-                PSTR("rear right=%s km/h, rear left=%s km/h, rear right pulses=%u, rear left pulses=%u\n"),
+                PSTR("rear right=%s km/h, rear left=%s km/h, rear right pulses=%" PRIu16 ", rear left pulses=%" PRIu16 "\n"),
                 FloatToStr(floatBuf[0], ((uint16_t)data[0] << 8 | data[1]) / 100.0, 2),
                 FloatToStr(floatBuf[1], ((uint16_t)data[2] << 8 | data[3]) / 100.0, 2),
                 (uint16_t)data[4] << 8 | data[5],
@@ -3603,7 +3601,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 data[5] & 0x80 ? PSTR("Seek forward button pressed, ") : emptyStr
             );
 
-            Serial.printf_P(PSTR("Head unit stalk wheel position: %d\n"),
+            Serial.printf_P(PSTR("Head unit stalk wheel position: %" PRId8 "\n"),
                 (int8_t)data[6]);
         }
         break;
@@ -3713,7 +3711,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     Serial.printf_P(
                         PSTR(
                             "    power=%S, source=%S,\n"
-                            "    volume=%u%S, balance=%d%S, fader=%d%S, bass=%d%S, treble=%d%S\n"
+                            "    volume=%" PRIu8 "%S, balance=%" PRId8 "%S, fader=%" PRId8 "%S, bass=%" PRId8 "%S, treble=%" PRId8 "%S\n"
                         ),
                         data[2] & 0x01 ? onStr : offStr,
 
@@ -3753,7 +3751,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
-                Serial.printf_P(PSTR("command=HEAD_UNIT_UPDATE_VOLUME, param=%u(%S%S)\n"),
+                Serial.printf_P(PSTR("command=HEAD_UNIT_UPDATE_VOLUME, param=%" PRIu8 "(%S%S)\n"),
                     data[1] & 0x1F,
                     data[1] & 0x40 ? PSTR("relative: ") : PSTR("absolute"),
                     data[1] & 0x40 ?
@@ -3779,7 +3777,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
                 // TODO - bit 7 of data[1] is always 1 ?
 
-                Serial.printf_P(PSTR("command=HEAD_UNIT_UPDATE_AUDIO_LEVELS, balance=%d, fader=%d, bass=%d, treble=%d\n"),
+                Serial.printf_P(PSTR("command=HEAD_UNIT_UPDATE_AUDIO_LEVELS, balance=%" PRId8 ", fader=%" PRId8 ", bass=%" PRId8 ", treble=%" PRId8 "\n"),
                     (int8_t)(0x3F) - (data[1] & 0x7F),
                     (int8_t)(0x3F) - data[2],
                     (int8_t)data[3] - 0x3F,
@@ -3806,7 +3804,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                     return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
                 } // if
 
-                Serial.printf_P(PSTR("preset_request band=%S, preset=%u\n"),
+                Serial.printf_P(PSTR("preset_request band=%S, preset=%" PRIu8 "\n"),
                     TunerBandStr(data[1] >> 4 & 0x07),
                     data[1] & 0x0F
                 );
@@ -3920,7 +3918,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
             // data[9] << 16 | data[10] << 8 | data[11]: Counter incrementing by 1 per second?
             //     Counting is regardless of engine running or not.
 
-            Serial.printf_P(PSTR("counter=%lu\n"),
+            Serial.printf_P(PSTR("counter=%" PRIu32 "\n"),
                 (uint32_t)data[9] << 16 | (uint32_t)data[10] << 8 | data[11]
             );
 

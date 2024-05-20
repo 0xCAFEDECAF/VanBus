@@ -410,7 +410,7 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
 // If the last character is "\n", will also print the ASCII representation of each byte (if possible).
 void TVanPacketRxDesc::DumpRaw(Stream& s, char last) const
 {
-    s.printf("Raw: #%04u (%*u/%u) %2d(%2d) ",
+    s.printf("Raw: #%04" PRIu32 " (%*" PRIu16 "/%d) %2d(%2d) ",
         seqNo % 10000,
         VanBusRx.size > 100 ? 3 : VanBusRx.size > 10 ? 2 : 1,
         slot + 1,
@@ -418,10 +418,10 @@ void TVanPacketRxDesc::DumpRaw(Stream& s, char last) const
         size - 5 < 0 ? 0 : size - 5,
         size);
 
-    if (size >= 1) s.printf("%02X ", bytes[0]);  // SOF
-    if (size >= 3) s.printf("%03X %1X (%s) ", Iden(), CommandFlags(), CommandFlagsStr());
+    if (size >= 1) s.printf("%02" PRIX8 " ", bytes[0]);  // SOF
+    if (size >= 3) s.printf("%03" PRIX16 " %1" PRIX8 " (%s) ", Iden(), CommandFlags(), CommandFlagsStr());
 
-    for (int i = 3; i < size; i++) s.printf("%02X%c", bytes[i], i == size - 3 ? ':' : i < size - 1 ? '-' : ' ');
+    for (int i = 3; i < size; i++) s.printf("%02" PRIX8 "%c", bytes[i], i == size - 3 ? ':' : i < size - 1 ? '-' : ' ');
 
     s.print(AckStr());
     s.print(" ");
@@ -429,7 +429,7 @@ void TVanPacketRxDesc::DumpRaw(Stream& s, char last) const
     s.printf(" %04X", Crc());
     s.printf(" %s", CheckCrc() ? "CRC_OK" : "CRC_ERROR");
 
-    if (uncertainBit1 != NO_UNCERTAIN_BIT) s.printf(" uBit=%u", uncertainBit1);
+    if (uncertainBit1 != NO_UNCERTAIN_BIT) s.printf(" uBit=%d", uncertainBit1);
 
     if (last == '\n')
     {
@@ -482,7 +482,7 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
   #define ONE_BIT_BOUNDARY CPU_CYCLES(1281)
     if (nCycles < ONE_BIT_BOUNDARY)
     {
-        if (nCycles > CPU_CYCLES(712)) jitter = nCycles - CPU_CYCLES(712);  // 712 --> 1292 = 580
+        if (nCycles > CPU_CYCLES(712)) jitter = nCycles - CPU_CYCLES(712);  // 712 --> 1281 = 569
         return 1;
     } // if
 
@@ -1331,7 +1331,7 @@ char* FloatToStr(char* buffer, float f, int prec)
 void TVanPacketRxQueue::DumpStats(Stream& s, bool longForm) const
 {
     uint32_t pktCount = GetCount();
-    static const char PROGMEM formatter[] = "received pkts: %lu, corrupt: %lu (%s%%)";
+    static const char PROGMEM formatter[] = "received pkts: %" PRIu32 ", corrupt: %" PRIu32 " (%s%%)";
     char floatBuf[MAX_FLOAT_SIZE];
 
     uint32_t overallCorrupt = nCorrupt - nRepaired;
@@ -1350,14 +1350,14 @@ void TVanPacketRxQueue::DumpStats(Stream& s, bool longForm) const
                 : FloatToStr(floatBuf, 100.0 * nCorrupt / pktCount, 3));
 
         s.printf_P(
-            PSTR(", repaired: %lu (%s%%)"),
+            PSTR(", repaired: %" PRIu32 " (%s%%)"),
             nRepaired,
             nCorrupt == 0
                 ? "---" 
                 : FloatToStr(floatBuf, 100.0 * nRepaired / nCorrupt, 0));
 
         s.printf_P(
-            PSTR(" [SB:%lu, DCB:%lu, TCB:%lu, DSB:%lu], UCB:%lu"),
+            PSTR(" [SB:%" PRIu32 ", DCB:%" PRIu32 ", TCB:%" PRIu32 ", DSB:%" PRIu32 "], UCB:%" PRIu32),
             nOneBitErrors,
             nTwoConsecutiveBitErrors,
             nThreeConsecutiveSameBitErrors,
@@ -1365,7 +1365,7 @@ void TVanPacketRxQueue::DumpStats(Stream& s, bool longForm) const
             nUncertainBitErrors);
 
         s.printf_P(
-            PSTR(", overall: %lu (%s%%)"),
+            PSTR(", overall: %" PRIu32 " (%s%%)"),
             overallCorrupt,
             pktCount == 0
                 ? "-.---" 
@@ -1430,15 +1430,15 @@ void TIfsDebugPacket::Dump(Stream& s) const
         s.printf("%3u", i);
 
         const uint32_t nCyclesMeasured = ifsData->nCyclesMeasured;
-        if (nCyclesMeasured >= USHRT_MAX) s.printf("  >%5lu", USHRT_MAX); else s.printf(" %7lu", nCyclesMeasured);
+        if (nCyclesMeasured >= USHRT_MAX) s.printf("  >%5" PRIu32, USHRT_MAX); else s.printf(" %7" PRIu32, nCyclesMeasured);
 
         s.print(" -> ");
 
         const uint16_t nBits = ifsData->nBits;
-        if (nBits >= UCHAR_MAX) s.printf(" >%3u", UCHAR_MAX); else s.printf("%5u", nBits);
+        if (nBits >= UCHAR_MAX) s.printf(" >%3" PRIu16, UCHAR_MAX); else s.printf("%5" PRIu16, nBits);
 
         const uint16_t pinLevel = ifsData->pinLevel;
-        s.printf("    \"%u\"", pinLevel);
+        s.printf("    \"%" PRIu16 "\"", pinLevel);
 
         s.printf(" %11.11s", TVanPacketRxDesc::StateStr(ifsData->fromState));
         s.printf(" %11.11s", TVanPacketRxDesc::StateStr(ifsData->toState));
@@ -1504,16 +1504,16 @@ void TIsrDebugPacket::Dump(Stream& s) const
 
         if (i <= 1) reset();
 
-        s.printf("%3u", i);
+        s.printf("%3d", i);
 
         const uint32_t nCyclesMeasured = isrData->nCyclesMeasured;
-        if (nCyclesMeasured >= USHRT_MAX) s.printf("  >%5lu", USHRT_MAX); else s.printf(" %7lu", nCyclesMeasured);
+        if (nCyclesMeasured >= USHRT_MAX) s.printf("  >%5" PRIu32, USHRT_MAX); else s.printf(" %7" PRIu32, nCyclesMeasured);
 
         const uint32_t jitter = isrData->fromJitter;
         if (jitter != 0)
         {
-            s.printf("%+5d", jitter);
-            s.printf(" =%7lu", nCyclesMeasured + jitter);
+            s.printf("%+5" PRIu32, jitter);
+            s.printf(" =%7" PRIu32, nCyclesMeasured + jitter);
         }
         else
         {
@@ -1523,7 +1523,7 @@ void TIsrDebugPacket::Dump(Stream& s) const
         s.print(" -> ");
 
         const uint16_t nBits = isrData->nBits;
-        if (nBits >= UCHAR_MAX) s.printf(" >%3u", UCHAR_MAX); else s.printf("%5u", nBits);
+        if (nBits >= UCHAR_MAX) s.printf(" >%3" PRIu16, UCHAR_MAX); else s.printf("%5" PRIu16, nBits);
 
         s.printf(" %5u", isrData->atBit);
 
@@ -1532,7 +1532,7 @@ void TIsrDebugPacket::Dump(Stream& s) const
         {
             #define MAX_UINT32_STR_SIZE 11
             static char buffer[MAX_UINT32_STR_SIZE];
-            sprintf(buffer, "(%d)", addedCycles);
+            sprintf(buffer, "(%" PRIu32 ")", addedCycles);
             s.printf("%8s", buffer);
         }
         else
@@ -1541,7 +1541,8 @@ void TIsrDebugPacket::Dump(Stream& s) const
         } // if
 
         const uint16_t pinLevel = isrData->pinLevel;
-        s.printf(" \"%u\"->\"%u\",\"%u\"", isrData->prevPinLevel, pinLevel, isrData->pinLevelAtReturnFromIsr);
+        s.printf(" \"%" PRIu16 "\"->\"%" PRIu16 "\",\"%" PRIu16 "\"",
+            isrData->prevPinLevel, pinLevel, isrData->pinLevelAtReturnFromIsr);
 
         s.printf(" %11.11s", TVanPacketRxDesc::StateStr(isrData->fromState));
         s.printf(" %11.11s ", TVanPacketRxDesc::StateStr(isrData->toState));
@@ -1576,7 +1577,7 @@ void TIsrDebugPacket::Dump(Stream& s) const
         if (sofSeen && prevAtBit + isrData->nBits < 10) s.print("|");  // End of SOF byte marker
 
         const uint16_t flipBits = isrData->flipBits;
-        if (flipBits == 0) s.print("    "); else s.printf(" %02X ", flipBits);
+        if (flipBits == 0) s.print("    "); else s.printf(" %02" PRIX16 " ", flipBits);
 
         if (eodSeen)
         {

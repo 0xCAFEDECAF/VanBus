@@ -190,7 +190,7 @@ void loop()
 
         case 'c':
         {
-            Serial.print("Starting to send all MFD notifications, one by one\n");
+            Serial.print("Starting to cycle through all MFD notifications, sending one by one\n");
             cycling = true;
             CycleMessage(true);
         }
@@ -199,7 +199,7 @@ void loop()
         case 's':
         {
             cycling = false;
-            Serial.print("Stopped sending all MFD notifications\n");
+            Serial.print("Stopped cycling through all MFD notifications\n");
         }
         break;
 

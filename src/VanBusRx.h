@@ -194,12 +194,12 @@ class TVanPacketRxDesc
 
     // String representation of various fields.
     // Notes:
-    // - Uses statically allocated buffer, so don't call twice within the same printf invocation
+    // - Uses statically allocated buffer, so don't call twice within the same printf invocation.
     // - Make sure to check VAN_MAX_DUMP_RAW_SIZE when making changes to any of the ...Str() methods.
     const char* CommandFlagsStr() const
     {
         static char result[4];
-        sprintf(result, "%c%c%1u",
+        sprintf(result, "%c%c%" PRIu8,
             bytes[2] & 0x02 ? 'R' : 'W',  // R/W
             bytes[2] & 0x04 ? 'A' : '-',  // RAK
             bytes[2] & 0x01  // RTR

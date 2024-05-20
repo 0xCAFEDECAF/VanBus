@@ -11,7 +11,7 @@
 #include "VanBus.h"
 
 // Normally this value should be 8 * 5 to have a  1-bit time of 8 microseconds.
-// However, it appears that results are better when adding one or a few tenths of a microsecond.
+// However, it seems that results may be better when adding a few tenths of a microsecond.
 #ifdef ARDUINO_ARCH_ESP32
   #define VAN_BIT_TIMER_TICKS (8 * 5 + 3)
 #else // ! ARDUINO_ARCH_ESP32
@@ -207,11 +207,11 @@ void TVanPacketTxDesc::Dump() const
     if (! busOccupied && bitOk && nCollisions == 0 && ! bitError) return;
 
     uint32_t ifsBits = interFrameCpuCycles / CPU_F_FACTOR / VAN_BIT_TIMER_TICKS / 16;
-    Serial.printf_P(PSTR("#%lu, ifsBits=%lu%s"), n, ifsBits, busOccupied ? ", busOccupied" : "");
+    Serial.printf_P(PSTR("#%" PRIu32 ", ifsBits=%" PRIu32 "%s"), n, ifsBits, busOccupied ? ", busOccupied" : "");
 
     if (nCollisions > 0)
     {
-        Serial.printf_P(PSTR(", nCollisions=%lu, firstCollisionAtBit=%lu"), nCollisions, firstCollisionAtBit);
+        Serial.printf_P(PSTR(", nCollisions=%" PRIu32 ", firstCollisionAtBit=%" PRIu32), nCollisions, firstCollisionAtBit);
     } // if
 
     Serial.printf_P(PSTR("%s%s\n"), bitOk ? "" : ", NO bitOk", bitError ? ", bitError" : "");
@@ -226,8 +226,8 @@ void TVanPacketTxQueue::StartBitSendTimer()
     // If we start the SendBitIsr now, we might introduce extra wobbling in the RxPinChangeIsr, causing CRC errors
     // Preference is to not have the timer1 interrupt handler being called while a packet is being received.
 
-    uint32_t curr = ESP.getCycleCount();
-    uint32_t nCycles = curr - VanBusRx.GetLastMediaAccessAt();  // Arithmetic has safe roll-over
+    //uint32_t curr = ESP.getCycleCount();
+    //uint32_t nCycles = curr - VanBusRx.GetLastMediaAccessAt();  // Arithmetic has safe roll-over
     //if (nCycles < (8 /* EOF */ + 5 /* IFS */) * (VAN_BIT_TIMER_TICKS * 16) * CPU_F_FACTOR) return;
 
     NO_INTERRUPTS;
@@ -280,7 +280,7 @@ bool TVanPacketTxQueue::WaitForHeadAvailable(unsigned int timeOutMs)
 bool TVanPacketTxQueue::SyncSendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs)
 {
     // If the Tx queue is full, wait a bit
-    if (! WaitForHeadAvailable())
+    if (! WaitForHeadAvailable(timeOutMs))
     {
         ++nDropped;
         return false;
@@ -292,9 +292,6 @@ bool TVanPacketTxQueue::SyncSendPacket(uint16_t iden, uint8_t cmdFlags, const ui
     // Wait here for the packet transmission to be finished
     if (! WaitForHeadAvailable()) return false;
 
-    // TODO - remove
-    _head->Dump();
-
     AdvanceHead();
 
     return true;
@@ -305,7 +302,7 @@ bool TVanPacketTxQueue::SyncSendPacket(uint16_t iden, uint8_t cmdFlags, const ui
 bool TVanPacketTxQueue::SendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs)
 {
     // If the Tx queue is full, wait a bit
-    if (! WaitForHeadAvailable())
+    if (! WaitForHeadAvailable(timeOutMs))
     {
         ++nDropped;
         return false;
@@ -323,7 +320,7 @@ bool TVanPacketTxQueue::SendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_
 void TVanPacketTxQueue::DumpStats(Stream& s) const
 {
     s.printf_P(
-        PSTR("transmitted pkts: %lu, single collisions: %lu, multiple collisions: %lu, dropped: %lu\n"),
+        PSTR("transmitted pkts: %" PRIu32 ", single collisions: %" PRIu32 ", multiple collisions: %" PRIu32 ", dropped: %" PRIu32 "\n"),
         GetCount(),
         nSingleCollisions,
         nMultipleCollisions,

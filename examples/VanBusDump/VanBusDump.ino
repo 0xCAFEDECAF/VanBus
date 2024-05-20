@@ -109,7 +109,10 @@ void loop()
     TVanPacketRxDesc pkt;
     if (VanBusRx.Receive(pkt))
     {
-        bool crcOk = pkt.CheckCrcAndRepair();
+      #ifdef VAN_RX_ISR_DEBUGGING
+        bool crcOk =
+      #endif // VAN_RX_ISR_DEBUGGING
+        pkt.CheckCrcAndRepair();
 
         // Show byte content of packet
         pkt.DumpRaw(Serial);
