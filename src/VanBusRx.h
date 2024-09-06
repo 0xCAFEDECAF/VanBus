@@ -241,6 +241,10 @@ class TVanPacketRxDesc
             (
                 Iden() == 0x6CE  // SATNAV_REPORT_IDEN
                 || Iden() == 0x64E  // SATNAV_GUIDANCE_IDEN
+                || Iden() == 0x54E  // SATNAV_STATUS_1_IDEN
+                || Iden() == 0x7CE  // SATNAV_STATUS_2_IDEN
+                || Iden() == 0x8CE  // SATNAV_STATUS_3_IDEN
+                || Iden() == 0x9CE  // SATNAV_GUIDANCE_DATA_IDEN
             );
     } // IsSatnavPacket
 
