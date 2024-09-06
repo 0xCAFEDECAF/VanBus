@@ -150,6 +150,26 @@ bool TVanPacketRxDesc::CheckCrc() const
     return crc15 == 0x19B7;
 } // TVanPacketRxDesc::CheckCrc
 
+// Checks the CRC value of a VAN packet. If OK, increases the "repair" counters.
+bool TVanPacketRxDesc::CheckCrcFix(bool (TVanPacketRxDesc::*wantToCount)() const, uint32_t* pCounter1, uint32_t* pCounter2)
+{
+    if (CheckCrc())
+    {
+        if (wantToCount == 0 || (this->*wantToCount)())
+        {
+            // Increase general counters
+            VanBusRx.nCorrupt++;
+            VanBusRx.nRepaired++;
+
+            // Increase specific counter(s)
+            (*pCounter1)++;
+            if (pCounter2) (*pCounter2)++;
+        } // if
+        return true;
+    } // if
+    return false;
+} // TVanPacketRxDesc::CheckCrcFix
+
 // Checks the CRC value of a VAN packet. If not, tries to repair it by flipping each bit.
 // Yes, we can sometimes repair a corrupt packet by flipping one or two bits :-)
 // Optional parameter 'wantToCount' is a pointer-to-method of class TVanPacketRxDesc, returning a boolean.

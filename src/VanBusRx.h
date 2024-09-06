@@ -189,6 +189,7 @@ class TVanPacketRxDesc
     unsigned long Millis() { return millis_; }  // Packet time stamp in milliseconds
     uint16_t Crc() const;
     bool CheckCrc() const;
+    bool CheckCrcFix(bool (TVanPacketRxDesc::*wantToCount)() const, uint32_t* pCounter1, uint32_t* pCounter2 = nullptr);
     bool CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)() const = 0);
     void DumpRaw(Stream& s, char last = '\n') const;
 
