@@ -182,10 +182,22 @@ bool TVanPacketRxDesc::CheckCrcFix(bool (TVanPacketRxDesc::*wantToCount)() const
 // Note: let's keep the counters sane by calling this only once.
 bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)() const)
 {
-    // TODO - if this fixes the packet, VanBusRx.nCorrupt and VanBusRx.nRepaired are not increased
+    uint8_t lastBit = bytes[size - 1] & 0x01;
+
     bytes[size - 1] &= 0xFE;  // Last bit of last byte (LSB of CRC) is always 0
 
-    if (CheckCrc()) return true;
+    if (CheckCrc())
+    {
+        // Is flipping the last bit fixing the packet?
+        if (lastBit == 0x01 && (wantToCount == 0 || (this->*wantToCount)()))
+        {
+            VanBusRx.nRepaired++;
+            VanBusRx.nOneBitErrors++;
+            VanBusRx.nCorrupt++;
+        } // if
+        return true;
+    } // if
+
 
     if (uncertainBit1 != NO_UNCERTAIN_BIT)
     {
