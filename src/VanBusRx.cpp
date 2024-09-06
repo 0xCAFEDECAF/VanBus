@@ -170,6 +170,10 @@ bool TVanPacketRxDesc::CheckCrcFix(bool (TVanPacketRxDesc::*wantToCount)() const
     return false;
 } // TVanPacketRxDesc::CheckCrcFix
 
+// CRC packet errors which can be fixed by inserting an extra bit indicate that the bit time measurements can be
+// extended somewhat.
+static long int addToBitTime = 0;
+
 // Checks the CRC value of a VAN packet. If not, tries to repair it by flipping each bit.
 // Yes, we can sometimes repair a corrupt packet by flipping one or two bits :-)
 // Optional parameter 'wantToCount' is a pointer-to-method of class TVanPacketRxDesc, returning a boolean.
@@ -238,7 +242,12 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
                 // 11 = 0001 0001 --> 0001 0000 --> 0000 0000 = 00
                 bytes[atByte] = (bytes[atByte] & invMask) | rBit;
 
-                if (CheckCrcFix(wantToCount, &VanBusRx.nBitDeletionErrors)) return true;
+                if (CheckCrcFix(wantToCount, &VanBusRx.nBitDeletionErrors))
+                {
+                    addToBitTime += CPU_CYCLES(4);
+                    if (addToBitTime > CPU_CYCLES(20)) addToBitTime = CPU_CYCLES(20);
+                    return true;
+                } // if
             } // for
         } // for
 
@@ -631,6 +640,8 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
     // Conversion from elapsed CPU cycles to number of bits, including built-up jitter
     static uint32_t jitter = 0;
     uint32_t nCycles = nCyclesMeasured + jitter;
+
+    nCycles += addToBitTime;
 
     // Experiment
 
@@ -1393,7 +1404,7 @@ void TVanPacketRxQueue::DumpStats(Stream& s, bool longForm) const
                 : FloatToStr(floatBuf, 100.0 * overallCorrupt / pktCount, 3));
     } // if
 
-    s.printf_P(PSTR(", avg1bit: %lu"), averageOneBitTime / CPU_F_FACTOR);
+    s.printf_P(PSTR(", addBitTime: %ld"), addToBitTime / CPU_F_FACTOR);
 
     s.printf_P(PSTR(", maxQueued: %d/%d\n"), GetMaxQueued(), QueueSize());
 } // TVanPacketRxQueue::DumpStats
