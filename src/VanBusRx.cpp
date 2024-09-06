@@ -363,43 +363,6 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
         } // for
     } // for
 
-    // Flip three equal bits in a row (seen this only once, ever)
-
-    for (int atByte = 1; atByte < size; atByte++)
-    {
-        const int atBits[] = {7, 6, 3, 2};  // No use to flip around the Manchester bits
-
-        for (int i = 0; i < 4; i++)
-        {
-            int atBit = atBits[i];
-
-            // Guess the compiler will be really good at optimizing this
-            uint8_t mask = 1 << atBit--;
-            mask |= 1 << atBit--;
-            mask |= 1 << atBit;
-
-            uint8_t bits = (bytes[atByte] & mask) >> atBit;
-
-            // Only proceed if we see three consecutive same bit values
-            if (bits != 0x00 && bits != 0x07) break;
-            
-            bytes[atByte] ^= mask;  // Flip
-
-            if (CheckCrc())
-            {
-                if (wantToCount == 0 || (this->*wantToCount)())
-                {
-                    VanBusRx.nRepaired++;
-                    VanBusRx.nThreeConsecutiveSameBitErrors++;
-                    VanBusRx.nCorrupt++;
-                } // if
-                return true;
-            } // if
-
-            bytes[atByte] ^= mask;  // Flip back
-        } // for
-    } // for
-
     if (wantToCount == 0 || (this->*wantToCount)()) VanBusRx.nCorrupt++;
 
     return false;
@@ -1357,10 +1320,9 @@ void TVanPacketRxQueue::DumpStats(Stream& s, bool longForm) const
                 : FloatToStr(floatBuf, 100.0 * nRepaired / nCorrupt, 0));
 
         s.printf_P(
-            PSTR(" [SB:%" PRIu32 ", DCB:%" PRIu32 ", TCB:%" PRIu32 ", DSB:%" PRIu32 "], UCB:%" PRIu32),
+            PSTR(" [SB:%" PRIu32 ", DCB:%" PRIu32 ", DSB:%" PRIu32 "], UCB:%" PRIu32),
             nOneBitErrors,
             nTwoConsecutiveBitErrors,
-            nThreeConsecutiveSameBitErrors,
             nTwoSeparateBitErrors,
             nUncertainBitErrors);
 

@@ -360,7 +360,6 @@ class TVanPacketRxQueue
         , nRepaired(0)
         , nOneBitErrors(0)
         , nTwoConsecutiveBitErrors(0)
-        , nThreeConsecutiveSameBitErrors(0)
         , nTwoSeparateBitErrors(0)
         , nUncertainBitErrors(0)
         , nQueued(0)
@@ -417,7 +416,6 @@ class TVanPacketRxQueue
     uint32_t nRepaired;
     uint32_t nOneBitErrors;
     uint32_t nTwoConsecutiveBitErrors;
-    uint32_t nThreeConsecutiveSameBitErrors;
     uint32_t nTwoSeparateBitErrors;
     uint32_t nUncertainBitErrors;
     volatile int nQueued;

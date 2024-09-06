@@ -3890,7 +3890,8 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                 return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
             } // if
 
-            // No idea who is sending this packet (sat nav unit?) and what this packet means.
+            // This packet seems to be sent regularly by the sat nav.
+            // No idea what this packet means. Could it be the current GPS position?
 
             // Examples:
             //
