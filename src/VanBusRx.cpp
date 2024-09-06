@@ -482,7 +482,7 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
     // All timing values were found by trial and error
     jitter = 0;
 
-    if (nCycles < CPU_CYCLES(560))
+    if (nCycles < CPU_CYCLES(555))
     {
         if (nCycles > CPU_CYCLES(112)) jitter = nCycles - CPU_CYCLES(112);
         return 0;
@@ -669,7 +669,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
 
         if (jitter < CPU_CYCLES(300))
         {
-          #define MOVE_TOWARDS_TWO_BITS_AT CPU_CYCLES(1235)
+          #define MOVE_TOWARDS_TWO_BITS_AT CPU_CYCLES(1229)
           #define MOVE_TOWARDS_TWO_BITS ONE_BIT_BOUNDARY - MOVE_TOWARDS_TWO_BITS_AT
             if (nCyclesMeasured > CPU_CYCLES(987) && nCyclesMeasured < ONE_BIT_BOUNDARY && nCycles >= CPU_CYCLES(1220))
             {
@@ -1032,7 +1032,7 @@ void ICACHE_RAM_ATTR RxPinChangeIsr()
                 if (nCycles > CPU_CYCLES(2624)) jitter = nCycles - CPU_CYCLES(2624); else jitter = 0;
             }
         }
-        else if (atBit == 7 || atBit == 8)
+        else if (atBit == 7/* || atBit == 8*/)
         {
             if (nBits == 1)
             {
