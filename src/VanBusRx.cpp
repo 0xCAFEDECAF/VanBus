@@ -198,6 +198,53 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
         return true;
     } // if
 
+    if (lastBit != 0x01)
+    {
+        // Try to shift one bit to the right, starting from the last byte backwards
+
+        // Typically happens with the following packets:
+        // - Before fix: 0E 5E4 C (WA0) 00-EE:2E-E0 - CRC_ERROR
+        // - After fix:  0E 5E4 C (WA0) 00-FF:1F-F8 - CRC_OK
+        // In this aspect, these packets could be considered "trainer" packets.
+
+        // Save a copy
+        uint8_t savedBytes[VAN_MAX_PACKET_SIZE];
+        memcpy(savedBytes, bytes, size);
+
+        // Byte 0 can be skipped; it does not count for CRC
+        for (int atByte = size - 1; atByte > 0; atByte--)
+        {
+            for (int atBit = 1; atBit < 8; atBit++)
+            {
+                                                   // Examples for 'atBit = 8':
+                uint16_t rMask = 1 << atBit;       // 1 0000 0000
+                uint8_t wMask = rMask >> 1;        //   1000 0000
+                uint8_t invMask = ~wMask;          //   0111 1111
+
+                uint16_t b = bytes[atByte];        //   1110 1111
+                uint16_t wBit = b & wMask;         //   1000 0000
+
+                if (atBit == 4) b = ~b;
+                uint16_t rBit = (b & rMask) >> 1;
+
+                if (rBit == wBit) continue;
+
+                // Insert a bit at 'atBit'.
+                // The inserted bit is the bit just in front of it, or its inverse at bit 3 or 7.
+                // Examples:
+                // EE = 1110 1110 --> 1110 1111 --> 1111 1111 = FF
+                // 2E = 0010 1110 --> 0010 1111 --> 0001 1111 = 1F
+                // E0 = 1110 0000 --> 1110 1000 --> 1111 1000 = F8
+                // 11 = 0001 0001 --> 0001 0000 --> 0000 0000 = 00
+                bytes[atByte] = (bytes[atByte] & invMask) | rBit;
+
+                if (CheckCrcFix(wantToCount, &VanBusRx.nBitDeletionErrors)) return true;
+            } // for
+        } // for
+
+        // Restore the copy
+        memcpy(bytes, savedBytes, size);
+    } // if
 
     if (uncertainBit1 != NO_UNCERTAIN_BIT)
     {
@@ -1319,7 +1366,8 @@ void TVanPacketRxQueue::DumpStats(Stream& s, bool longForm) const
                 : FloatToStr(floatBuf, 100.0 * nRepaired / nCorrupt, 0));
 
         s.printf_P(
-            PSTR(" [SB:%" PRIu32 ", DCB:%" PRIu32 ", DSB:%" PRIu32 "], UCB:%" PRIu32),
+            PSTR(" [DB:%" PRIu32 ", SB:%" PRIu32 ", DCB:%" PRIu32 ", DSB:%" PRIu32 "], UCB:%" PRIu32),
+            nBitDeletionErrors,
             nOneBitErrors,
             nTwoConsecutiveBitErrors,
             nTwoSeparateBitErrors,

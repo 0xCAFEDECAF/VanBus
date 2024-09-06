@@ -363,6 +363,7 @@ class TVanPacketRxQueue
         , count(0)
         , nCorrupt(0)
         , nRepaired(0)
+        , nBitDeletionErrors(0)
         , nOneBitErrors(0)
         , nTwoConsecutiveBitErrors(0)
         , nTwoSeparateBitErrors(0)
@@ -419,6 +420,7 @@ class TVanPacketRxQueue
     uint32_t count;
     uint32_t nCorrupt;
     uint32_t nRepaired;
+    uint32_t nBitDeletionErrors;
     uint32_t nOneBitErrors;
     uint32_t nTwoConsecutiveBitErrors;
     uint32_t nTwoSeparateBitErrors;
