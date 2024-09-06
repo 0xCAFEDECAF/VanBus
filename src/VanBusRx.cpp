@@ -211,17 +211,7 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
         uint8_t uncertainMask = 1 << uncertainAtBit;
         bytes[uncertainAtByte] ^= uncertainMask;  // Flip
 
-        if (CheckCrc())
-        {
-            if (wantToCount == 0 || (this->*wantToCount)())
-            {
-                VanBusRx.nRepaired++;
-                VanBusRx.nOneBitErrors++;
-                VanBusRx.nUncertainBitErrors++;
-                VanBusRx.nCorrupt++;
-            } // if
-            return true;
-        } // if
+        if (CheckCrcFix(wantToCount, &VanBusRx.nOneBitErrors, &VanBusRx.nUncertainBitErrors)) return true;
 
         bytes[uncertainAtByte] ^= uncertainMask;  // Flip back
     } // if
@@ -254,16 +244,11 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
                 uint8_t mask = 1 << atBit;
                 bytes[atByte] ^= mask;  // Flip
 
-                // Is there a way to quickly re-calculate the CRC value when bit is flipped?
-                if (CheckCrc())
+                // TODO - is there a way to quickly re-calculate the CRC value when bit is flipped?
+
+                if (CheckCrcFix(wantToCount, &VanBusRx.nOneBitErrors))
                 {
-                    if (wantToCount == 0 || (this->*wantToCount)())
-                    {
-                        VanBusRx.nRepaired++;
-                        VanBusRx.nOneBitErrors++;
-                        if (i == 1) VanBusRx.nUncertainBitErrors++;
-                        VanBusRx.nCorrupt++;
-                    } // if
+                    if (i == 1) VanBusRx.nUncertainBitErrors++;
                     return true;
                 } // if
 
@@ -272,15 +257,10 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
                 {
                     uint8_t mask2 = 1 << (atBit + 1);
                     bytes[atByte] ^= mask2;  // Flip
-                    if (CheckCrc())
+
+                    if (CheckCrcFix(wantToCount, &VanBusRx.nTwoConsecutiveBitErrors))
                     {
-                        if (wantToCount == 0 || (this->*wantToCount)())
-                        {
-                            VanBusRx.nRepaired++;
-                            VanBusRx.nTwoConsecutiveBitErrors++;
-                            if (i == 1) VanBusRx.nUncertainBitErrors++;
-                            VanBusRx.nCorrupt++;
-                        } // if
+                        if (i == 1) VanBusRx.nUncertainBitErrors++;
                         return true;
                     } // if
 
@@ -290,15 +270,10 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
                 {
                     // atByte > 0, so atByte - 1 is safe
                     bytes[atByte - 1] ^= 1 << 0;  // Flip
-                    if (CheckCrc())
+
+                    if (CheckCrcFix(wantToCount, &VanBusRx.nTwoConsecutiveBitErrors))
                     {
-                        if (wantToCount == 0 || (this->*wantToCount)())
-                        {
-                            VanBusRx.nRepaired++;
-                            VanBusRx.nTwoConsecutiveBitErrors++;
-                            if (i == 1) VanBusRx.nUncertainBitErrors++;
-                            VanBusRx.nCorrupt++;
-                        } // if
+                        if (i == 1) VanBusRx.nUncertainBitErrors++;
                         return true;
                     } // if
 
@@ -376,16 +351,8 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
                     if (skip2) continue;
 
                     bytes[atByte2] ^= currMask2;  // Flip
-                    if (CheckCrc())
-                    {
-                        if (wantToCount == 0 || (this->*wantToCount)())
-                        {
-                            VanBusRx.nRepaired++;
-                            VanBusRx.nTwoSeparateBitErrors++;
-                            VanBusRx.nCorrupt++;
-                        } // if
-                        return true;
-                    } // if
+
+                    if (CheckCrcFix(wantToCount, &VanBusRx.nTwoSeparateBitErrors)) return true;
 
                     bytes[atByte2] ^= currMask2;  // Flip back
                 } // for
