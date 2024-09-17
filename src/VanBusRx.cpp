@@ -542,7 +542,7 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
     return _nBits;
 } // nBitsTakingIntoAccountJitter
 
-void ICACHE_RAM_ATTR SetTxBitTimer()
+void IRAM_ATTR SetTxBitTimer()
 {
   #ifdef ARDUINO_ARCH_ESP32
     timerAlarmDisable(timer);
@@ -576,7 +576,7 @@ void ICACHE_RAM_ATTR SetTxBitTimer()
 
 // If the timeout expires, the packet is VAN_RX_DONE. 'ack' has already been initially set to VAN_NO_ACK,
 // and then to VAN_ACK if a new bit was received within the time-out period.
-void ICACHE_RAM_ATTR WaitAckIsr()
+void IRAM_ATTR WaitAckIsr()
 {
     SetTxBitTimer();
 
@@ -594,7 +594,7 @@ portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 #endif // ARDUINO_ARCH_ESP32
 
 // Pin level change interrupt handler
-void ICACHE_RAM_ATTR RxPinChangeIsr()
+void IRAM_ATTR RxPinChangeIsr()
 {
     // Pin levels
 
@@ -1286,7 +1286,7 @@ void TVanPacketRxQueue::SetDropPolicy(int startAt, bool (*isEssential)(const TVa
     isEssentialPacket = isEssential;
 } // TVanPacketRxQueue::SetDropPolicy
 
-void ICACHE_RAM_ATTR TVanPacketRxQueue::_AdvanceHead()
+void IRAM_ATTR TVanPacketRxQueue::_AdvanceHead()
 {
     _head->millis_ = millis();
     _head->state = VAN_RX_DONE;

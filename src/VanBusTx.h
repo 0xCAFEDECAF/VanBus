@@ -121,7 +121,7 @@ class TVanPacketTxQueue
     bool WaitForHeadAvailable(unsigned int timeOutMs = 10);
 
     // Only to be called from ISR, unsafe otherwise
-    void ICACHE_RAM_ATTR _AdvanceTail()
+    void IRAM_ATTR _AdvanceTail()
     {
         _tail->state = VAN_TX_DONE;
         if (++_tail == end) _tail = pool;  // roll over if needed

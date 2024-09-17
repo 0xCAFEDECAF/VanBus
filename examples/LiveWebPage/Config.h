@@ -125,8 +125,6 @@ inline void WifiConfig()
 #define PRINT_RAW_PACKET_DATA
 
 // Define to see JSON buffers printed on the serial port
-// Note: for some reason, having JSON buffers printed on the serial port seems to reduce the number
-//   of CRC errors in the received VAN bus packets
 #define PRINT_JSON_BUFFERS_ON_SERIAL
 
 #if defined PRINT_RAW_PACKET_DATA || defined PRINT_JSON_BUFFERS_ON_SERIAL

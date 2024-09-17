@@ -19,7 +19,7 @@
 #endif // ARDUINO_ARCH_ESP32
 
 // Finish packet transmission
-void ICACHE_RAM_ATTR FinishPacketTransmission(TVanPacketTxDesc* txDesc)
+void IRAM_ATTR FinishPacketTransmission(TVanPacketTxDesc* txDesc)
 {
     // Save statistics
     if (txDesc->nCollisions != 0)
@@ -49,7 +49,7 @@ void ICACHE_RAM_ATTR FinishPacketTransmission(TVanPacketTxDesc* txDesc)
 } // 
 
 // Send one bit on the VAN bus
-void ICACHE_RAM_ATTR SendBitIsr()
+void IRAM_ATTR SendBitIsr()
 {
     uint32_t curr = ESP.getCycleCount();  // Store CPU cycle counter value as soon as possible
 
