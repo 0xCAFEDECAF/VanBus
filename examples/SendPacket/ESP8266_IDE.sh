@@ -3,7 +3,7 @@
 # This script sets up the Arduino IDE with all the correct board options (as found in the IDE "Tools" menu)
 
 # Board spec for "Wemos D1 mini"
-BOARDSPEC=esp8266:esp8266:d1_mini:xtal=160,ssl=basic,eesz=4M1M,ip=lm2n
+BOARDSPEC=esp8266:esp8266:d1_mini:xtal=160,ssl=basic,mmu=3232,non32xfer=fast,eesz=4M1M,ip=hb2n
 
 # Fill in your COM port here
 COMPORT=/dev/ttyUSB0
