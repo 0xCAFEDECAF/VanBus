@@ -1,3 +1,26 @@
+0.4.1
+    General:
+    * Fix compiler warnings
+    * Replace deprecated attribute ICACHE_RAM_ATTR by IRAM_ATTR
+    * Update Arduino IDE setup scripts to cover version 3.1.2 of ESP8266 board package
+
+    README.md:
+    * Mention version of Arduino IDE
+    * Refer to ESP8266 board package version 3.1.2
+
+    src/VanBusRx.h:
+    * Add a few IDENs to be recognized by TVanPacketRxDesc::IsSatnavPacket
+
+    src/VanBusRx.cpp:
+    * Remove unused code "flip three equal bits in a row" (seen this only once, ever)
+    * Add and invoke new method TVanPacketRxDesc::CheckCrcFix
+    * Try to handle bit deletion errors
+
+    examples/PacketParser:
+    * Various small fixes and updates
+    * Add example of log output
+    * Prevent RX queue overrun
+
 0.4.0
     General:
     * Add support for ESP32 platform/architecture
