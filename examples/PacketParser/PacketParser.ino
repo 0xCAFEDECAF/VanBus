@@ -3954,7 +3954,10 @@ void setup()
     delay(1);
   #endif // ARDUINO_ARCH_ESP8266
 
-    VanBusRx.Setup(RX_PIN);
+    // Printing on Serial can take quite some time, and sometimes packets come in fast, so let's
+    // set up the receive queue a bit larger than the default of 15
+  #define VAN_PACKET_QUEUE_SIZE 60
+    VanBusRx.Setup(RX_PIN, VAN_PACKET_QUEUE_SIZE);
     Serial.printf_P(PSTR("VanBusRx queue of size %d is set up\n"), VanBusRx.QueueSize());
 } // setup
 
