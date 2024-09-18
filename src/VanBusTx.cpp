@@ -10,7 +10,7 @@
 
 #include "VanBus.h"
 
-// Normally this value should be 8 * 5 to have a  1-bit time of 8 microseconds.
+// Normally this value should be 8 * 5 to have a 1-bit time of 8 microseconds.
 // However, it seems that results may be better when adding a few tenths of a microsecond.
 #ifdef ARDUINO_ARCH_ESP32
   #define VAN_BIT_TIMER_TICKS (8 * 5 + 3)
@@ -34,11 +34,11 @@ void IRAM_ATTR FinishPacketTransmission(TVanPacketTxDesc* txDesc)
     {
         VanBusRx.RegisterTxIsr(NULL);
 
-  #ifdef ARDUINO_ARCH_ESP32
-    timerAlarmDisable(timer);
-  #else // ! ARDUINO_ARCH_ESP32
-    timer1_disable();
-  #endif // ARDUINO_ARCH_ESP32
+      #ifdef ARDUINO_ARCH_ESP32
+        timerAlarmDisable(timer);
+      #else // ! ARDUINO_ARCH_ESP32
+        timer1_disable();
+      #endif // ARDUINO_ARCH_ESP32
 
     } // if 
 

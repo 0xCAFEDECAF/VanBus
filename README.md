@@ -117,10 +117,10 @@ An example of an ESP8266-based board is the [Wemos D1 mini].
 #### 1. Install Board Package in Arduino IDE
 
 For an ESP8266-based board you will need to install the
-[ESP8266 Board Package](http://arduino.esp8266.com/Arduino/versions/2.0.0/doc/installing.html).
+[ESP8266 Board Package](https://arduino-esp8266.readthedocs.io/en/stable/installing.html).
 
-I am currently using [version 2.6.3](https://github.com/esp8266/Arduino/releases/tag/2.6.3) but other versions
-may also be working fine.
+I am currently using [version 3.1.2](https://github.com/esp8266/Arduino/releases/tag/3.1.2) but other versions
+seem to be also working fine (I tested with versions 2.6.3 ... 3.1.2).
 
 Follow [this tutorial](https://randomnerdtutorials.com/how-to-install-esp8266-board-arduino-ide/) to install
 the ESP8266 Board Package.
