@@ -157,7 +157,8 @@ I am currently using [version 1.0.6](https://github.com/espressif/arduino-esp32/
 may also be working fine.
 
 Follow [this tutorial](https://randomnerdtutorials.com/installing-the-esp32-board-in-arduino-ide-windows-instructions/)
-to install the ESP32 Board Package.
+to install the ESP32 Board Package. Alternatively, turn to
+[this page](https://docs.espressif.com/projects/arduino-esp32/en/latest/installing.html) for instructions.
 
 #### 2. Install the VAN Bus Library
 
