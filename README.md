@@ -1,8 +1,18 @@
 <h3 align="center">PSA (Peugeot, Citroën) VAN bus reader/writer for Arduino-ESP8266 and ESP32</h3>
 
+<p align="center">Reading and writing packets from/to PSA vehicles' VAN bus.</p>
+
 ---
 
-<p align="center">Reading and writing packets from/to PSA vehicles' VAN bus.</p>
+[![Release Version](https://img.shields.io/github/release/0xCAFEDECAF/VanBus.svg?style=plastic)](https://github.com/0xCAFEDECAF/VanBus/releases/latest/)
+[![Release Date](https://img.shields.io/github/release-date/0xCAFEDECAF/VanBus.svg?style=plastic)](https://github.com/0xCAFEDECAF/VanBus/releases/latest/)
+
+[![arduino-library-badge](https://www.ardu-badge.com/badge/VanBus.svg)](https://www.ardu-badge.com/VanBus)
+
+[![Platform ESP8266](https://img.shields.io/badge/Platform-Espressif8266-yellow)](https://github.com/esp8266/Arduino)
+[![Platform ESP32](https://img.shields.io/badge/Platform-Espressif32-orange)](https://github.com/espressif/arduino-esp32)
+
+[![Framework](https://img.shields.io/badge/Framework-Arduino-blue)](https://www.arduino.cc/)
 
 ## 📝 Table of Contents
 - [Description](#description)
