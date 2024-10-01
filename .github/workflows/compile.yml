@@ -1,0 +1,66 @@
+name: Compile Library and Build Example Sketches
+
+# The workflow will run on every push and pull request to the repository
+on:
+  - push
+  - pull_request
+
+jobs:
+  compile-sketch:
+    runs-on: ubuntu-latest
+
+    # Here we tell GitHub that the jobs must be determined
+    # dynamically depending on a matrix configuration.
+    strategy:
+      matrix:
+        # The matrix will produce one job for each configuration
+        # parameter of type `arduino-platform`, in this case a
+        # total of 2.
+        arduino-platform: ["esp8266:esp8266", "esp32:esp32@1.0.6"]
+        # This is usually optional but we need to statically define the
+        # FQBN of the boards we want to test for each platform. In the
+        # future the CLI might automatically detect and download the core
+        # needed to compile against a certain FQBN, at that point the
+        # following 'Install platform' section will be useless.
+        include:
+          # This works like this: when the platform is "esp8266:esp8266", the
+          # variable `fqbn` is set to "esp8266:esp8266:d1_mini".
+          - arduino-platform: "esp8266:esp8266"
+            url: "https://arduino.esp8266.com/stable/package_esp8266com_index.json"
+            fqbn: "esp8266:esp8266:d1_mini"
+            websockets-library-version: "WebSockets"  # We can install latest
+          - arduino-platform: "esp32:esp32@1.0.6"
+            url: "https://dl.espressif.com/dl/package_esp32_index.json"
+            fqbn: "esp32:esp32:esp32"
+            websockets-library-version: "WebSockets@2.4.0"  # On esp32:esp32@1.0.6 we cannot go beyond version 2.4.0
+
+    steps:
+      # This step makes the contents of the repository available to the workflow.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # We use the `arduino/setup-arduino-cli` action to install and
+      # configure the Arduino CLI on the system.
+      - name: Setup Arduino CLI
+        uses: arduino/setup-arduino-cli@v2
+
+      # We then install the platform, which one will be determined
+      # dynamically by the build matrix.
+      - name: Install platform
+        run: |
+          arduino-cli core install ${{ matrix.arduino-platform }} --additional-urls ${{ matrix.url }}
+
+      # Install the required libraries.
+      - name: Install libraries
+        run: |
+          arduino-cli lib install VanBus ${{ matrix.websockets-library-version }}
+
+      # Finally, we compile the sketches, using the FQBN that was set
+      # in the build matrix.
+      - name: Compile example sketches
+        run: |
+          arduino-cli compile --fqbn ${{ matrix.fqbn }} ./examples/VanBusDump
+          arduino-cli compile --fqbn ${{ matrix.fqbn }} ./examples/PacketParser
+          arduino-cli compile --fqbn ${{ matrix.fqbn }} ./examples/LiveWebPage
+          arduino-cli compile --fqbn ${{ matrix.fqbn }} ./examples/SendPacket
+          arduino-cli compile --fqbn ${{ matrix.fqbn }} ./examples/DisplayNotifications
