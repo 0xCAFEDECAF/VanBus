@@ -9,7 +9,7 @@ const char PROGMEM unknownStr[] = "UNKNOWN";
 
 void PrintSystemSpecs()
 {
-    Serial.printf_P(PSTR("CPU Speed: %u MHz (CPU_F_FACTOR = %d)\n"), ESP.getCpuFreqMHz(), CPU_F_FACTOR);
+    Serial.printf_P(PSTR("CPU Speed: %u MHz (CPU_F_FACTOR = %ld)\n"), ESP.getCpuFreqMHz(), CPU_F_FACTOR);
     Serial.printf_P(PSTR("SDK: %s\n"), ESP.getSdkVersion());
 
   #ifndef ARDUINO_ARCH_ESP32
@@ -24,14 +24,14 @@ void PrintSystemSpecs()
     Serial.printf_P(PSTR("Flash ide size: %s MBytes\n"), FloatToStr(floatBuf, ideSize/1024.0/1024.0, 2));
     Serial.printf_P(PSTR("Flash ide speed: %s MHz\n"), FloatToStr(floatBuf, ESP.getFlashChipSpeed()/1000000.0, 2));
     FlashMode_t ideMode = ESP.getFlashChipMode();
-    Serial.printf_P(PSTR("Flash ide mode: %S\n"),
+    Serial.printf_P(PSTR("Flash ide mode: %s\n"),
         ideMode == FM_QIO ? qioStr :
         ideMode == FM_QOUT ? qoutStr :
         ideMode == FM_DIO ? dioStr :
         ideMode == FM_DOUT ? doutStr :
         unknownStr);
   #ifndef ARDUINO_ARCH_ESP32
-    Serial.printf_P(PSTR("Flash chip configuration %S\n"), ideSize != realSize ? PSTR("wrong!") : PSTR("ok."));
+    Serial.printf_P(PSTR("Flash chip configuration %s\n"), ideSize != realSize ? PSTR("wrong!") : PSTR("ok."));
   #endif // ARDUINO_ARCH_ESP32
 
     Serial.print(F("Wi-Fi MAC address: "));
@@ -67,7 +67,7 @@ const char* EspSystemDataToJson(char* buf, const int n)
             "\"esp_flash_size_ide\": \"%s MBytes\",\n"
             "\"esp_flash_speed_ide\": \"%s MHz\",\n"
 
-            "\"esp_flash_mode_ide\": \"%S\",\n"
+            "\"esp_flash_mode_ide\": \"%s\",\n"
 
             "\"esp_mac_address\": \"%s\",\n"
             "\"esp_ip_address\": \"%s\",\n"

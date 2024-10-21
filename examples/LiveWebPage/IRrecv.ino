@@ -60,7 +60,7 @@ volatile unsigned long lastIrPulse = 0;
 
 volatile TIrParams irparams;
 
-void ICACHE_RAM_ATTR irPinChangeIsr()
+void IRAM_ATTR irPinChangeIsr()
 {
     if (irparams.rcvstate == STATE_STOP) return;
 
@@ -130,7 +130,7 @@ enum IrButton_t
     IB_VALIDATE = 0xF98D3EE1
 }; // enum IrButton_t
 
-// Returns a PSTR (allocated in flash, saves RAM). In printf formatter use "%S" (capital S) instead of "%s".
+// Returns a PSTR (allocated in flash, saves RAM)
 PGM_P IrButtonStr(unsigned long data)
 {
     return
@@ -226,7 +226,7 @@ const char* ParseIrPacketToJson(const TIrPacket& pkt)
         "\"event\": \"display\",\n"
         "\"data\":\n"
         "{\n"
-            "\"mfd_remote_control\": \"%S%S\"\n"
+            "\"mfd_remote_control\": \"%s%s\"\n"
         "}\n"
     "}\n";
 
@@ -304,7 +304,7 @@ bool IrReceive(TIrPacket& irPacket)
   #ifdef DEBUG_IR_RECV
     Serial.printf_P
     (
-        PSTR("[irRecv] val = 0x%lX (%S), intv = %lu, held = %S"),
+        PSTR("[irRecv] val = 0x%lX (%s), intv = %lu, held = %s"),
         irPacket.value,
         irPacket.buttonStr,
         interval,

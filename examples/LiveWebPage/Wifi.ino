@@ -45,7 +45,7 @@ void SetupWifi()
 
     WiFi.hostname(GetHostname());
 
-    Serial.printf_P(PSTR("Wi-Fi signal strength (RSSI): %ld dB\n"), WiFi.RSSI());
+    Serial.printf_P(PSTR("Wi-Fi signal strength (RSSI): %d dB\n"), WiFi.RSSI());
 
     delay(1);
 } // SetupWifi
