@@ -29,13 +29,11 @@ jobs:
             url: "https://arduino.esp8266.com/stable/package_esp8266com_index.json"
             fqbn: "esp8266:esp8266:d1_mini"
             board-options: "xtal=160,ssl=basic,mmu=3232,non32xfer=fast,eesz=4M1M,ip=hb2n"
-            compiler-warnings: "all"
             websockets-library-version: "WebSockets"  # We can install latest
           - arduino-platform: "esp32:esp32@1.0.6"
             url: "https://dl.espressif.com/dl/package_esp32_index.json"
             fqbn: "esp32:esp32:esp32"
             board-options: "CPUFreq=240,FlashFreq=80,FlashSize=4M,PartitionScheme=default,DebugLevel=none"
-            compiler-warnings: "default"
             websockets-library-version: "WebSockets@2.4.0"  # On esp32:esp32@1.0.6 we cannot go beyond version 2.4.0
 
     steps:
@@ -63,8 +61,8 @@ jobs:
       # in the build matrix.
       - name: Compile example sketches
         run: |
-          arduino-cli compile --fqbn ${{ matrix.fqbn }} --board-options  ${{ matrix.board-options }} --warnings ${{ matrix.compiler-warnings }} ./examples/VanBusDump
-          arduino-cli compile --fqbn ${{ matrix.fqbn }} --board-options  ${{ matrix.board-options }} --warnings ${{ matrix.compiler-warnings }} ./examples/PacketParser
-          arduino-cli compile --fqbn ${{ matrix.fqbn }} --board-options  ${{ matrix.board-options }} --warnings ${{ matrix.compiler-warnings }} ./examples/LiveWebPage
-          arduino-cli compile --fqbn ${{ matrix.fqbn }} --board-options  ${{ matrix.board-options }} --warnings ${{ matrix.compiler-warnings }} ./examples/SendPacket
-          arduino-cli compile --fqbn ${{ matrix.fqbn }} --board-options  ${{ matrix.board-options }} --warnings ${{ matrix.compiler-warnings }} ./examples/DisplayNotifications
+          arduino-cli compile --fqbn ${{ matrix.fqbn }} --board-options  ${{ matrix.board-options }} --warnings all ./examples/VanBusDump
+          arduino-cli compile --fqbn ${{ matrix.fqbn }} --board-options  ${{ matrix.board-options }} --warnings all ./examples/PacketParser
+          arduino-cli compile --fqbn ${{ matrix.fqbn }} --board-options  ${{ matrix.board-options }} --warnings all ./examples/LiveWebPage
+          arduino-cli compile --fqbn ${{ matrix.fqbn }} --board-options  ${{ matrix.board-options }} --warnings all ./examples/SendPacket
+          arduino-cli compile --fqbn ${{ matrix.fqbn }} --board-options  ${{ matrix.board-options }} --warnings all ./examples/DisplayNotifications
