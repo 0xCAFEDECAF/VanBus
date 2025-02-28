@@ -120,16 +120,26 @@ class TVanPacketTxQueue
     static void StartBitSendTimer();
     bool WaitForHeadAvailable(unsigned int timeOutMs = 10);
 
+    static bool alarmEnabled;
+
     // Only to be called from ISR, unsafe otherwise
     void IRAM_ATTR _AdvanceTail()
     {
         _tail->state = VAN_TX_DONE;
-        if (++_tail == end) _tail = pool;  // roll over if needed
+        TVanPacketTxDesc *newTail = _tail + 1;
+        if (newTail == end) {
+            newTail = pool;  // Roll over if needed
+        }
+        _tail = newTail;
     } // _AdvanceTail
 
     void AdvanceHead()
     {
-        if (++_head == end) _head = pool;  // roll over if needed
+        TVanPacketTxDesc *newHead = _head + 1;
+        if (newHead == end) {
+            newHead = pool;  // Roll over if needed
+        }
+        _head = newHead;
         count++;
     } // AdvanceHead
 
