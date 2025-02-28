@@ -542,10 +542,16 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
     return _nBits;
 } // nBitsTakingIntoAccountJitter
 
+void IRAM_ATTR txTimerISRWrapper(void *arg) {
+    // Converts the void* argument to a pointer to the real ISR
+    auto callback = reinterpret_cast<void(*)()>(arg);
+    callback();  // Call the old ISR function
+}
+
 void IRAM_ATTR SetTxBitTimer()
 {
   #ifdef ARDUINO_ARCH_ESP32
-    timerAlarmDisable(timer);
+    timerStop(timer);
   #else // ! ARDUINO_ARCH_ESP32
     timer1_disable();
   #endif // ARDUINO_ARCH_ESP32
@@ -556,9 +562,8 @@ void IRAM_ATTR SetTxBitTimer()
 
       #ifdef ARDUINO_ARCH_ESP32
 
-        timerAttachInterrupt(timer, VanBusRx.txTimerIsr, true);
-        timerAlarmWrite(timer, VanBusRx.txTimerTicks, true);
-        timerAlarmEnable(timer);
+        timerAttachInterruptArg(timer, txTimerISRWrapper, reinterpret_cast<void*>(VanBusRx.txTimerIsr));
+        timerAlarm(timer, VanBusRx.txTimerTicks, true, 0);
 
       #else // ! ARDUINO_ARCH_ESP32
 
@@ -592,6 +597,11 @@ portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 #else // ! ARDUINO_ARCH_ESP32
 #define EXIT_CRITICAL_ISR
 #endif // ARDUINO_ARCH_ESP32
+
+void IRAM_ATTR waitAckIsrWrapper(void *arg) {
+    (void)arg;  // Ignore arg
+    WaitAckIsr();
+}
 
 // Pin level change interrupt handler
 void IRAM_ATTR RxPinChangeIsr()
@@ -846,7 +856,7 @@ void IRAM_ATTR RxPinChangeIsr()
            )
         {
           #ifdef ARDUINO_ARCH_ESP32
-            timerAlarmDisable(timer);
+            timerStop(timer);
           #else // ! ARDUINO_ARCH_ESP32
             timer1_disable();
           #endif // ARDUINO_ARCH_ESP32
@@ -1165,10 +1175,9 @@ void IRAM_ATTR RxPinChangeIsr()
 
           #ifdef ARDUINO_ARCH_ESP32
 
-            timerAlarmDisable(timer);
-            timerAttachInterrupt(timer, &WaitAckIsr, true);
-            timerAlarmWrite(timer, 40 * 5, false); // 5 time slots = 5 * 8 us = 40 us
-            timerAlarmEnable(timer);
+            timerStop(timer);
+            timerAttachInterruptArg(timer, waitAckIsrWrapper, nullptr);
+            timerAlarm(timer, 40 * 5, false, 0); // 5 time slots = 5 * 8 us = 40 us
 
           #else // ! ARDUINO_ARCH_ESP32
 
@@ -1219,8 +1228,10 @@ bool TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
 
   #ifdef ARDUINO_ARCH_ESP32
     // Clock to timer (prescaler) is always 80MHz, even F_CPU is 160 MHz. We want 0.2 microsecond resolution.
-    timer = timerBegin(0, 80 / 5, true);
-    timerAlarmDisable(timer);
+    // Prescaler : 80 MHz / 5 = 16 | Frequency : 80 MHz / 16 = 5 MHz
+    timer = timerBegin(5'000'000);
+
+    timerEnd(timer);
   #else // ! ARDUINO_ARCH_ESP32
     timer1_isr_init();
     timer1_disable();
@@ -1263,7 +1274,7 @@ void TVanPacketRxQueue::Disable()
     if (pin == VAN_NO_PIN_ASSIGNED) return; // Call Setup first!
 
   #ifdef ARDUINO_ARCH_ESP32
-    timerAlarmDisable(timer);
+    timerEnd(timer);
   #else // ! ARDUINO_ARCH_ESP32
     timer1_disable();
   #endif // ARDUINO_ARCH_ESP32
@@ -1312,10 +1323,15 @@ void IRAM_ATTR TVanPacketRxQueue::_AdvanceHead()
     if (nQueued <= startDroppingPacketsAt || (isEssentialPacket != 0 && (*isEssentialPacket)(*_head)))
     {
         // Move to next slot in queue
-        if (++_head == end) _head = pool;  // Roll over if needed
+        TVanPacketRxDesc *newHead = _head + 1;
+        if (newHead == end) {
+            newHead = pool;  // Roll over if needed
+        }
+        _head = newHead;
 
         // Keep track of queue fill level
-        if (++nQueued > maxQueued) maxQueued = nQueued;
+        int newNQueud = nQueued + 1;
+        if (newNQueud > maxQueued) maxQueued = newNQueud;
     }
     else
     {

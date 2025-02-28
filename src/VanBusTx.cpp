@@ -35,18 +35,18 @@ void IRAM_ATTR FinishPacketTransmission(TVanPacketTxDesc* txDesc)
         VanBusRx.RegisterTxIsr(NULL);
 
       #ifdef ARDUINO_ARCH_ESP32
-        timerAlarmDisable(timer);
+        timerEnd(timer);
       #else // ! ARDUINO_ARCH_ESP32
         timer1_disable();
       #endif // ARDUINO_ARCH_ESP32
-
+        TVanPacketTxQueue::alarmEnabled = false;
     } // if 
 
     VanBusRx.SetLastMediaAccessAt(ESP.getCycleCount()); // It was me! :-)
 
     // Start listening again at other devices on the bus
     attachInterrupt(digitalPinToInterrupt(VanBusRx.pin), RxPinChangeIsr, CHANGE);
-} // 
+} //
 
 // Send one bit on the VAN bus
 void IRAM_ATTR SendBitIsr()
@@ -144,6 +144,11 @@ void IRAM_ATTR SendBitIsr()
     } // if
 } // SendBitIsr
 
+void IRAM_ATTR sendBitIsrWrapper(void *arg) {
+    (void)arg;  // Ignore arg
+    SendBitIsr();
+}
+
 // Initializes the VAN packet transmitter
 void TVanPacketTxQueue::Setup(uint8_t theRxPin, uint8_t theTxPin)
 {
@@ -236,13 +241,13 @@ void TVanPacketTxQueue::StartBitSendTimer()
 
 #ifdef ARDUINO_ARCH_ESP32
 
-    if (! timerAlarmEnabled(timer))
+    if (!alarmEnabled)
     {
         // Set a repetitive timer
-        timerAlarmDisable(timer);
-        timerAttachInterrupt(timer, &SendBitIsr, true);
-        timerAlarmWrite(timer, VAN_BIT_TIMER_TICKS, true);
-        timerAlarmEnable(timer);
+        timerEnd(timer);
+        timerAttachInterruptArg(timer, sendBitIsrWrapper, nullptr);
+        timerAlarm(timer, VAN_BIT_TIMER_TICKS, true, 0);
+        alarmEnabled = true;
     } // if
 
 #else // ! ARDUINO_ARCH_ESP32
@@ -270,7 +275,15 @@ bool TVanPacketTxQueue::WaitForHeadAvailable(unsigned int timeOutMs)
     unsigned int waitPoll = timeOutMs;
 
     // Relying on short-circuit boolean evaluation
-    while (! SlotAvailable() && (timeOutMs == 0 || --waitPoll > 0)) delay(1);
+    while (!SlotAvailable()) {
+        if (timeOutMs != 0) {
+            if (waitPoll == 0)
+                break;
+            waitPoll--;
+        }
+        delay(1);
+    }
+
 
     return SlotAvailable();
 } // TVanPacketTxQueue::WaitForHeadAvailable
