@@ -13,7 +13,7 @@ set MAIN_INO=%MYFOLDER%.ino
 if defined COMPORT set COMPORT_PARAM=--port %COMPORT%
 
 rem  Fill in your Arduino IDE installation path here
-set IDE_PATH=C:\Program Files (x86)\arduino-1.8.19
+set IDE_PATH=C:\Program Files (x86)\Arduino
 
 rem  Pre-set the board settings
 "%IDE_PATH%\arduino_debug.exe" %COMPORT_PARAM% --board %BOARDSPEC% --save-prefs
