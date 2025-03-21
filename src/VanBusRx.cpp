@@ -172,7 +172,15 @@ bool TVanPacketRxDesc::CheckCrcFix(bool (TVanPacketRxDesc::*wantToCount)() const
 
 // CRC packet errors which can be fixed by inserting an extra bit indicate that the bit time measurements can be
 // extended somewhat.
-static long int addToBitTime = 0;
+#ifdef ARDUINO_ARCH_ESP32
+ #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(2, 0, 0)
+  static long int addToBitTime = CPU_CYCLES(12);
+ #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(2, 0, 0)
+  static long int addToBitTime = CPU_CYCLES(0);
+ #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(2, 0, 0)
+#else // ! ARDUINO_ARCH_ESP32
+ static long int addToBitTime = CPU_CYCLES(0);
+#endif // ARDUINO_ARCH_ESP32
 
 // Checks the CRC value of a VAN packet. If not, tries to repair it by flipping each bit.
 // Yes, we can sometimes repair a corrupt packet by flipping one or two bits :-)
@@ -545,7 +553,11 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
 void IRAM_ATTR SetTxBitTimer()
 {
   #ifdef ARDUINO_ARCH_ESP32
+  #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+    timerStop(timer);
+  #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
     timerAlarmDisable(timer);
+  #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
   #else // ! ARDUINO_ARCH_ESP32
     timer1_disable();
   #endif // ARDUINO_ARCH_ESP32
@@ -556,9 +568,14 @@ void IRAM_ATTR SetTxBitTimer()
 
       #ifdef ARDUINO_ARCH_ESP32
 
+      #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+        timerAttachInterrupt(timer, VanBusRx.txTimerIsr);
+        timerAlarm(timer, VanBusRx.txTimerTicks, true, 0);
+      #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
         timerAttachInterrupt(timer, VanBusRx.txTimerIsr, true);
         timerAlarmWrite(timer, VanBusRx.txTimerTicks, true);
         timerAlarmEnable(timer);
+      #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
 
       #else // ! ARDUINO_ARCH_ESP32
 
@@ -578,7 +595,11 @@ void IRAM_ATTR SetTxBitTimer()
 // and then to VAN_ACK if a new bit was received within the time-out period.
 void IRAM_ATTR WaitAckIsr()
 {
+  #if ! defined ARDUINO_ARCH_ESP32
     SetTxBitTimer();
+  #elif ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(2, 0, 0)
+    SetTxBitTimer();
+  #endif
 
     NO_INTERRUPTS;
     if (VanBusRx._head->state == VAN_RX_WAITING_ACK) VanBusRx._AdvanceHead();
@@ -586,11 +607,7 @@ void IRAM_ATTR WaitAckIsr()
 } // WaitAckIsr
 
 #ifdef ARDUINO_ARCH_ESP32
-hw_timer_t * timer = NULL;
-portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
-#define EXIT_CRITICAL_ISR portEXIT_CRITICAL_ISR(&mux)
-#else // ! ARDUINO_ARCH_ESP32
-#define EXIT_CRITICAL_ISR
+hw_timer_t* timer = NULL;
 #endif // ARDUINO_ARCH_ESP32
 
 // Pin level change interrupt handler
@@ -759,7 +776,6 @@ void IRAM_ATTR RxPinChangeIsr()
             debugIsr->atBit = atBit; \
             isrDebugPacket->at++; \
         } \
-        EXIT_CRITICAL_ISR; \
         return; \
     }
 
@@ -773,7 +789,6 @@ void IRAM_ATTR RxPinChangeIsr()
     { \
         const int pinLevelAtReturnFromIsr = GPIP(VanBusRx.pin); \
         pinLevelChangedDuringInterruptHandling = jitter < CPU_CYCLES(100) && pinLevelAtReturnFromIsr != pinLevel; \
-        EXIT_CRITICAL_ISR; \
         return; \
     }
 
@@ -785,10 +800,6 @@ void IRAM_ATTR RxPinChangeIsr()
     prevPinLevel = pinLevel;
 
     uint16_t flipBits = 0;
-
-  #ifdef ARDUINO_ARCH_ESP32
-    portENTER_CRITICAL_ISR(&mux);
-  #endif // ARDUINO_ARCH_ESP32
 
     // Media access detection for packet transmission
     if (pinLevel == VAN_BIT_RECESSIVE)
@@ -846,7 +857,15 @@ void IRAM_ATTR RxPinChangeIsr()
            )
         {
           #ifdef ARDUINO_ARCH_ESP32
+
+          #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+            //if (timerRead(timer) > 0) timerStop(timer);
+            //timerStop(timer);
+            // if (timerRead(timer) < 40) timerStop(timer);
+          #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
             timerAlarmDisable(timer);
+          #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+
           #else // ! ARDUINO_ARCH_ESP32
             timer1_disable();
           #endif // ARDUINO_ARCH_ESP32
@@ -1165,10 +1184,24 @@ void IRAM_ATTR RxPinChangeIsr()
 
           #ifdef ARDUINO_ARCH_ESP32
 
+          #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+            if (timerRead(timer) > 0)
+            {
+                timerStop(timer);
+                timerWrite(timer, 0);
+            } // if
+            timerStart(timer);
+          #elif ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(2, 0, 0)
+            // timerAlarmDisable(timer);
+            // timerAttachInterrupt(timer, &WaitAckIsr, true);  // Causes crash
+            timerAlarmWrite(timer, 40 * 5, false); // 5 time slots = 5 * 8 us = 40 us
+            timerAlarmEnable(timer);
+          #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(2, 0, 0)
             timerAlarmDisable(timer);
             timerAttachInterrupt(timer, &WaitAckIsr, true);
             timerAlarmWrite(timer, 40 * 5, false); // 5 time slots = 5 * 8 us = 40 us
             timerAlarmEnable(timer);
+          #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
 
           #else // ! ARDUINO_ARCH_ESP32
 
@@ -1214,19 +1247,29 @@ bool TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
 
     for (TVanPacketRxDesc* rxDesc = pool; rxDesc < end; rxDesc++) rxDesc->slot = rxDesc - pool;
 
-    attachInterrupt(digitalPinToInterrupt(rxPin), RxPinChangeIsr, CHANGE);
-    enabled = true;
-
   #ifdef ARDUINO_ARCH_ESP32
+
+  #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+    #define TIMER_FREQ (1000000)
+    timer = timerBegin(TIMER_FREQ);
+    timerAttachInterrupt(timer, &WaitAckIsr);
+    timerAlarm(timer, 40, false, 0);
+  #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
     // Clock to timer (prescaler) is always 80MHz, even F_CPU is 160 MHz. We want 0.2 microsecond resolution.
     timer = timerBegin(0, 80 / 5, true);
     timerAlarmDisable(timer);
+    timerAttachInterrupt(timer, &WaitAckIsr, true);
+  #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+
   #else // ! ARDUINO_ARCH_ESP32
     timer1_isr_init();
     timer1_disable();
   #endif // ARDUINO_ARCH_ESP32
 
     pin = rxPin;
+
+    attachInterrupt(digitalPinToInterrupt(rxPin), RxPinChangeIsr, CHANGE);
+    enabled = true;
 
     return true;
 } // TVanPacketRxQueue::Setup
@@ -1263,7 +1306,13 @@ void TVanPacketRxQueue::Disable()
     if (pin == VAN_NO_PIN_ASSIGNED) return; // Call Setup first!
 
   #ifdef ARDUINO_ARCH_ESP32
+
+  #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+    timerStop(timer);
+  #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
     timerAlarmDisable(timer);
+  #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+
   #else // ! ARDUINO_ARCH_ESP32
     timer1_disable();
   #endif // ARDUINO_ARCH_ESP32

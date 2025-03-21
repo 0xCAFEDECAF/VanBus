@@ -25,7 +25,15 @@ void SetupWifi()
     WiFi.mode(WIFI_STA);  // Otherwise it may be in WIFI_AP_STA mode, broadcasting an SSID like AI_THINKER_XXXXXX
     WiFi.disconnect();  // After reset via HW button sometimes cannot seem to reconnect without this
     WiFi.persistent(false);
+  #ifdef ARDUINO_ARCH_ESP32
+   #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+    WiFi.setAutoReconnect(true);
+   #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
     WiFi.setAutoConnect(true);
+   #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+  #else // ! ARDUINO_ARCH_ESP32
+    WiFi.setAutoConnect(true);
+  #endif // ARDUINO_ARCH_ESP32
 
   #ifndef ARDUINO_ARCH_ESP32
     WiFi.setPhyMode(WIFI_PHY_MODE_11N);

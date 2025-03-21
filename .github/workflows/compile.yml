@@ -16,7 +16,7 @@ jobs:
         # The matrix will produce one job for each configuration
         # parameter of type `arduino-platform`, in this case a
         # total of 2.
-        arduino-platform: ["esp8266:esp8266", "esp32:esp32@1.0.6"]
+        arduino-platform: ["esp8266:esp8266", "esp32:esp32@1.0.6", "esp32:esp32@2.0.17", "esp32:esp32"]
         # This is usually optional but we need to statically define the
         # FQBN of the boards we want to test for each platform. In the
         # future the CLI might automatically detect and download the core
@@ -35,6 +35,16 @@ jobs:
             fqbn: "esp32:esp32:esp32"
             board-options: "CPUFreq=240,FlashFreq=80,FlashSize=4M,PartitionScheme=default,DebugLevel=none"
             websockets-library-version: "WebSockets@2.4.0"  # On esp32:esp32@1.0.6 we cannot go beyond version 2.4.0
+          - arduino-platform: "esp32:esp32@2.0.17"
+            url: "https://dl.espressif.com/dl/package_esp32_index.json"
+            fqbn: "esp32:esp32:esp32"
+            board-options: "CPUFreq=240,FlashFreq=80,FlashSize=4M,PartitionScheme=default,DebugLevel=none"
+            websockets-library-version: "WebSockets"  # We can install latest
+          - arduino-platform: "esp32:esp32"
+            url: "https://dl.espressif.com/dl/package_esp32_index.json"
+            fqbn: "esp32:esp32:esp32"
+            board-options: "CPUFreq=240,FlashFreq=80,FlashSize=4M,PartitionScheme=default,DebugLevel=none"
+            websockets-library-version: "WebSockets"  # We can install latest
 
     steps:
       # This step makes the contents of the repository available to the workflow.
@@ -55,7 +65,9 @@ jobs:
       # Install the required libraries.
       - name: Install libraries
         run: |
-          arduino-cli lib install VanBus ${{ matrix.websockets-library-version }}
+          arduino-cli config set library.enable_unsafe_install true
+          arduino-cli lib install --git-url https://github.com/0xCAFEDECAF/VanBusTest.git
+          arduino-cli lib install ${{ matrix.websockets-library-version }}
 
       # Finally, we compile the sketches, using the FQBN that was set
       # in the build matrix.

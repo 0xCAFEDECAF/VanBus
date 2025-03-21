@@ -310,8 +310,8 @@ extern portMUX_TYPE mux;
 
 #ifdef ARDUINO_ARCH_ESP32
 
-    #define NO_INTERRUPTS portENTER_CRITICAL(&mux)
-    #define INTERRUPTS portEXIT_CRITICAL(&mux)
+    #define NO_INTERRUPTS
+    #define INTERRUPTS
 
 #else // ! ARDUINO_ARCH_ESP32
 
