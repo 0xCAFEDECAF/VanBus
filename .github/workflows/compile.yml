@@ -66,7 +66,7 @@ jobs:
       - name: Install libraries
         run: |
           arduino-cli config set library.enable_unsafe_install true
-          arduino-cli lib install --git-url https://github.com/0xCAFEDECAF/VanBusTest.git
+          arduino-cli lib install --git-url https://github.com/0xCAFEDECAF/VanBus.git
           arduino-cli lib install ${{ matrix.websockets-library-version }}
 
       # Finally, we compile the sketches, using the FQBN that was set
