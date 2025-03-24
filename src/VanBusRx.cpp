@@ -283,8 +283,8 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
     // One cycle without the uncertain bit flipped, plus (optionally) one cycle with the uncertain bit flipped
     for (int i = 0; i < (uncertainBit1 == NO_UNCERTAIN_BIT ? 1 : 2); i++)
     {
-        int uncertainAtByte;
-        uint8_t uncertainMask;
+        int uncertainAtByte = 0;
+        uint8_t uncertainMask = 0;
 
         // Second cycle?
         if (i == 1)

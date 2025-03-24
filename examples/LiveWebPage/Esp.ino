@@ -9,7 +9,11 @@ const char PROGMEM unknownStr[] = "UNKNOWN";
 
 void PrintSystemSpecs()
 {
+  #ifdef ARDUINO_ARCH_ESP32
+    Serial.printf_P(PSTR("CPU Speed: %" PRIu32 " MHz (CPU_F_FACTOR = %ld)\n"), ESP.getCpuFreqMHz(), CPU_F_FACTOR);
+  #else // ! ARDUINO_ARCH_ESP32
     Serial.printf_P(PSTR("CPU Speed: %u MHz (CPU_F_FACTOR = %ld)\n"), ESP.getCpuFreqMHz(), CPU_F_FACTOR);
+  #endif // ARDUINO_ARCH_ESP32
     Serial.printf_P(PSTR("SDK: %s\n"), ESP.getSdkVersion());
 
   #ifndef ARDUINO_ARCH_ESP32
@@ -57,7 +61,11 @@ const char* EspSystemDataToJson(char* buf, const int n)
             "\"esp_last_reset_info\": \"%s\",\n"
             "\"esp_boot_version\": \"%u\",\n"
           #endif // ARDUINO_ARCH_ESP32
+          #ifdef ARDUINO_ARCH_ESP32
+            "\"esp_cpu_speed\": \"%" PRIu32 " MHz\",\n"
+          #else // ! ARDUINO_ARCH_ESP32
             "\"esp_cpu_speed\": \"%u MHz\",\n"
+          #endif // ARDUINO_ARCH_ESP32
             "\"esp_sdk_version\": \"%s\",\n"
           #ifndef ARDUINO_ARCH_ESP32
             "\"esp_chip_id\": \"0x%08X\",\n"
@@ -73,7 +81,7 @@ const char* EspSystemDataToJson(char* buf, const int n)
             "\"esp_ip_address\": \"%s\",\n"
             "\"esp_wifi_rssi\": \"%d dB\",\n"
 
-            "\"esp_free_ram\": \"%u bytes\"\n"
+            "\"esp_free_ram\": \"%" PRIu32 " bytes\"\n"
         "}\n"
     "}\n";
 

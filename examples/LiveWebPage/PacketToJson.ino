@@ -4375,7 +4375,10 @@ extern uint16_t serialDumpFilter;
 // Optionally, print the new packet on serial port, highlighting the bytes that differ.
 bool IsPacketDataDuplicate(TVanPacketRxDesc& pkt, IdenHandler_t* handler)
 {
+  #ifdef PRINT_RAW_PACKET_DATA
     uint16_t iden = pkt.Iden();
+  #endif // PRINT_RAW_PACKET_DATA
+
     int dataLen = pkt.DataLen();
     const uint8_t* data = pkt.Data();
 

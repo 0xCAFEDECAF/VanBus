@@ -15,6 +15,8 @@ void SetupWifi()
 
     WifiConfig();
 
+    WiFi.hostname(GetHostname());
+
     // TODO - does this decrease the jitter on the bit timings?
   #ifdef ARDUINO_ARCH_ESP32
     WiFi.setSleep(WIFI_PS_NONE);
@@ -50,8 +52,6 @@ void SetupWifi()
         delay(500);
     } // while
     Serial.print(F(" OK\n"));
-
-    WiFi.hostname(GetHostname());
 
     Serial.printf_P(PSTR("Wi-Fi signal strength (RSSI): %d dB\n"), WiFi.RSSI());
 

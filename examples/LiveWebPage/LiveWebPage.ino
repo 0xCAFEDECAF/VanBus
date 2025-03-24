@@ -936,6 +936,7 @@ void HandleDumpFilter()
 
 // Defined in Wifi.ino
 void SetupWifi();
+const char* GetHostname();
 
 // Defined in Esp.ino
 void PrintSystemSpecs();
@@ -1049,6 +1050,8 @@ void setup()
     webSocket.onEvent(webSocketEvent);
 
     Serial.print(F("Please surf to: http://"));
+    Serial.print(GetHostname());
+    Serial.print(F(" or http://"));
     Serial.print(WiFi.localIP());
     Serial.print("\n");
 
