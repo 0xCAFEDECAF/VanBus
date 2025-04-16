@@ -597,8 +597,10 @@ void IRAM_ATTR WaitAckIsr()
 {
   #if ! defined ARDUINO_ARCH_ESP32
     SetTxBitTimer();
-  #elif ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(2, 0, 0)
+  #else
+  #if ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(2, 0, 0)
     SetTxBitTimer();
+  #endif
   #endif
 
     NO_INTERRUPTS;

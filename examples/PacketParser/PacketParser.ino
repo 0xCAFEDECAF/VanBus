@@ -3991,10 +3991,10 @@ void loop()
         uint16_t iden = pkt.Iden();
         if (! IsPacketSelected(iden, VAN_PACKETS_ALL_VAN_PKTS)) continue;
 
-        // Show packet as parsed by ISR
+        // Parse packet as received by ISR and print the result
         VanPacketParseResult_t parseResult = ParseVanPacket(&pkt);
 
-        // Show byte content only for packets that are not a duplicate of a previously received packet
+        // Print byte content only for packets that are not a duplicate of a previously received packet
         if (parseResult != VAN_PACKET_DUPLICATE) pkt.DumpRaw(Serial);
 
         // Process at most 30 packets at a time
