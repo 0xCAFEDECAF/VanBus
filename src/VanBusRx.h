@@ -189,7 +189,6 @@ class TVanPacketRxDesc
     unsigned long Millis() { return millis_; }  // Packet time stamp in milliseconds
     uint16_t Crc() const;
     bool CheckCrc() const;
-    bool CheckCrcFix(bool (TVanPacketRxDesc::*wantToCount)() const, uint32_t* pCounter1, uint32_t* pCounter2 = nullptr);
     bool CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)() const = 0);
     void DumpRaw(Stream& s, char last = '\n') const;
 
@@ -296,6 +295,8 @@ class TVanPacketRxDesc
             "ERROR_??";
     } // ResultStr
 
+    bool CheckCrcFix(bool mustCount, uint32_t* pCounter1, uint32_t* pCounter2 = nullptr);
+
     friend void WaitAckIsr();
     friend void RxPinChangeIsr();
     friend class TVanPacketRxQueue;
@@ -361,6 +362,7 @@ class TVanPacketRxQueue
         , isrDebugPacket(isrDebugPacketPool)
       #endif // VAN_RX_ISR_DEBUGGING
         , count(0)
+        , nCountedForRepair(0)
         , nCorrupt(0)
         , nRepaired(0)
         , nBitDeletionErrors(0)
@@ -387,12 +389,11 @@ class TVanPacketRxQueue
     void SetDropPolicy(int startAt, bool (*isEssential)(const TVanPacketRxDesc&));
 
     bool IsSetup() const { return pin != VAN_NO_PIN_ASSIGNED; }
-    uint32_t GetCount() const { return count; }  // TODO - use ISR_SAFE_GET ?
-
+    uint32_t GetCount() const { return count; }
     void DumpStats(Stream& s, bool longForm = true) const;
     int QueueSize() const { return size; }
-    int GetNQueued() const { return nQueued; }  // TODO - use ISR_SAFE_GET ?
-    int GetMaxQueued() const { return maxQueued; }  // TODO - use ISR_SAFE_GET ?
+    int GetNQueued() const { return nQueued; }
+    int GetMaxQueued() const { return maxQueued; }
 
     uint32_t GetLastMediaAccessAt() { ISR_SAFE_GET(uint32_t, lastMediaAccessAt); };
 
@@ -418,6 +419,7 @@ class TVanPacketRxQueue
 
     // Some statistics. Numbers can roll over.
     uint32_t count;
+    uint32_t nCountedForRepair;
     uint32_t nCorrupt;
     uint32_t nRepaired;
     uint32_t nBitDeletionErrors;

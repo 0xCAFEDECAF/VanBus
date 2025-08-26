@@ -151,11 +151,11 @@ bool TVanPacketRxDesc::CheckCrc() const
 } // TVanPacketRxDesc::CheckCrc
 
 // Checks the CRC value of a VAN packet. If OK, increases the "repair" counters.
-bool TVanPacketRxDesc::CheckCrcFix(bool (TVanPacketRxDesc::*wantToCount)() const, uint32_t* pCounter1, uint32_t* pCounter2)
+bool TVanPacketRxDesc::CheckCrcFix(bool mustCount, uint32_t* pCounter1, uint32_t* pCounter2)
 {
     if (CheckCrc())
     {
-        if (wantToCount == 0 || (this->*wantToCount)())
+        if (mustCount)
         {
             // Increase general counters
             VanBusRx.nCorrupt++;
@@ -187,8 +187,9 @@ bool TVanPacketRxDesc::CheckCrcFix(bool (TVanPacketRxDesc::*wantToCount)() const
 // Optional parameter 'wantToCount' is a pointer-to-method of class TVanPacketRxDesc, returning a boolean.
 // It can be used to limit the repair statistics to take only specific types of packets into account.
 //
-// Example of invocation:
+// Examples of invocation:
 //
+//   if (! pkt.CheckCrcAndRepair()) return -1; // Unrecoverable CRC error
 //   if (! pkt.CheckCrcAndRepair(&TVanPacketRxDesc::IsSatnavPacket)) return -1; // Unrecoverable CRC error
 //
 // Note: let's keep the counters sane by calling this only once.
@@ -198,14 +199,17 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
 
     bytes[size - 1] &= 0xFE;  // Last bit of last byte (LSB of CRC) is always 0
 
+    bool mustCount = wantToCount == 0 || (this->*wantToCount)();
+    if (mustCount) VanBusRx.nCountedForRepair++;
+
     if (CheckCrc())
     {
         // Is flipping the last bit fixing the packet?
-        if (lastBit == 0x01 && (wantToCount == 0 || (this->*wantToCount)()))
+        if (lastBit == 0x01 && mustCount)
         {
+            VanBusRx.nCorrupt++;
             VanBusRx.nRepaired++;
             VanBusRx.nOneBitErrors++;
-            VanBusRx.nCorrupt++;
         } // if
         return true;
     } // if
@@ -250,7 +254,7 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
                 // 11 = 0001 0001 --> 0001 0000 --> 0000 0000 = 00
                 bytes[atByte] = (bytes[atByte] & invMask) | rBit;
 
-                if (CheckCrcFix(wantToCount, &VanBusRx.nBitDeletionErrors))
+                if (CheckCrcFix(mustCount, &VanBusRx.nBitDeletionErrors))
                 {
                     addToBitTime += CPU_CYCLES(4);
                     if (addToBitTime > CPU_CYCLES(20)) addToBitTime = CPU_CYCLES(20);
@@ -275,7 +279,7 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
         uint8_t uncertainMask = 1 << uncertainAtBit;
         bytes[uncertainAtByte] ^= uncertainMask;  // Flip
 
-        if (CheckCrcFix(wantToCount, &VanBusRx.nOneBitErrors, &VanBusRx.nUncertainBitErrors)) return true;
+        if (CheckCrcFix(mustCount, &VanBusRx.nOneBitErrors, &VanBusRx.nUncertainBitErrors)) return true;
 
         bytes[uncertainAtByte] ^= uncertainMask;  // Flip back
     } // if
@@ -310,7 +314,7 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
 
                 // TODO - is there a way to quickly re-calculate the CRC value when bit is flipped?
 
-                if (CheckCrcFix(wantToCount, &VanBusRx.nOneBitErrors))
+                if (CheckCrcFix(mustCount, &VanBusRx.nOneBitErrors))
                 {
                     if (i == 1) VanBusRx.nUncertainBitErrors++;
                     return true;
@@ -322,7 +326,7 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
                     uint8_t mask2 = 1 << (atBit + 1);
                     bytes[atByte] ^= mask2;  // Flip
 
-                    if (CheckCrcFix(wantToCount, &VanBusRx.nTwoConsecutiveBitErrors))
+                    if (CheckCrcFix(mustCount, &VanBusRx.nTwoConsecutiveBitErrors))
                     {
                         if (i == 1) VanBusRx.nUncertainBitErrors++;
                         return true;
@@ -335,7 +339,7 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
                     // atByte > 0, so atByte - 1 is safe
                     bytes[atByte - 1] ^= 1 << 0;  // Flip
 
-                    if (CheckCrcFix(wantToCount, &VanBusRx.nTwoConsecutiveBitErrors))
+                    if (CheckCrcFix(mustCount, &VanBusRx.nTwoConsecutiveBitErrors))
                     {
                         if (i == 1) VanBusRx.nUncertainBitErrors++;
                         return true;
@@ -416,7 +420,7 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
 
                     bytes[atByte2] ^= currMask2;  // Flip
 
-                    if (CheckCrcFix(wantToCount, &VanBusRx.nTwoSeparateBitErrors)) return true;
+                    if (CheckCrcFix(mustCount, &VanBusRx.nTwoSeparateBitErrors)) return true;
 
                     bytes[atByte2] ^= currMask2;  // Flip back
                 } // for
@@ -426,7 +430,7 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
         } // for
     } // for
 
-    if (wantToCount == 0 || (this->*wantToCount)()) VanBusRx.nCorrupt++;
+    if (mustCount) VanBusRx.nCorrupt++;
 
     return false;
 } // TVanPacketRxDesc::CheckCrcAndRepair
@@ -1402,7 +1406,8 @@ char* FloatToStr(char* buffer, float f, int prec)
 void TVanPacketRxQueue::DumpStats(Stream& s, bool longForm) const
 {
     uint32_t pktCount = GetCount();
-    static const char PROGMEM formatter[] = "received pkts: %" PRIu32 ", corrupt: %" PRIu32 " (%s%%)";
+
+    static const char PROGMEM formatter[] = "received pkts: %" PRIu32 ", corrupt: %" PRIu32 "/%" PRIu32 " (%s%%)";
     char floatBuf[MAX_FLOAT_SIZE];
 
     uint32_t overallCorrupt = nCorrupt - nRepaired;
@@ -1416,9 +1421,10 @@ void TVanPacketRxQueue::DumpStats(Stream& s, bool longForm) const
             formatter,
             pktCount,
             nCorrupt,
-            pktCount == 0
+            nCountedForRepair,
+            nCountedForRepair == 0
                 ? "-.---"
-                : FloatToStr(floatBuf, 100.0 * nCorrupt / pktCount, 3));
+                : FloatToStr(floatBuf, 100.0 * nCorrupt / nCountedForRepair, 3));
 
         s.printf_P(
             PSTR(", repaired: %" PRIu32 " (%s%%)"),
@@ -1438,9 +1444,9 @@ void TVanPacketRxQueue::DumpStats(Stream& s, bool longForm) const
         s.printf_P(
             PSTR(", overall: %" PRIu32 " (%s%%)"),
             overallCorrupt,
-            pktCount == 0
+            nCountedForRepair == 0
                 ? "-.---" 
-                : FloatToStr(floatBuf, 100.0 * overallCorrupt / pktCount, 3));
+                : FloatToStr(floatBuf, 100.0 * overallCorrupt / nCountedForRepair, 3));
     }
     else
     {
@@ -1450,9 +1456,10 @@ void TVanPacketRxQueue::DumpStats(Stream& s, bool longForm) const
             formatter,
             pktCount,
             overallCorrupt,
-            pktCount == 0
+            nCountedForRepair,
+            nCountedForRepair == 0
                 ? "-.---"
-                : FloatToStr(floatBuf, 100.0 * overallCorrupt / pktCount, 3));
+                : FloatToStr(floatBuf, 100.0 * overallCorrupt / nCountedForRepair, 3));
     } // if
 
     s.printf_P(PSTR(", addBitTime: %ld"), addToBitTime / CPU_F_FACTOR);
