@@ -70,7 +70,8 @@ void IRAM_ATTR irPinChangeIsr()
     {
         irparams.millis_ = millis();
         irparams.rcvstate = STATE_MARK;
-        irparams.rawbuf[irparams.rawlen++] = 20;
+        irparams.rawbuf[irparams.rawlen] = 20;
+        irparams.rawlen = irparams.rawlen + 1;
     }
     else
     {
@@ -80,8 +81,15 @@ void IRAM_ATTR irPinChangeIsr()
         #define TIMEOUT_USECS (10000)
         #define TIMEOUT_TICKS (TIMEOUT_USECS / USECPERTICK)
 
-        if (ticks > TIMEOUT_TICKS) irparams.rcvstate = STATE_STOP;
-        else if (irparams.rawlen < RAWBUF) irparams.rawbuf[irparams.rawlen++] = ticks;
+        if (ticks > TIMEOUT_TICKS)
+        {
+            irparams.rcvstate = STATE_STOP;
+        }
+        else if (irparams.rawlen < RAWBUF)
+        {
+            irparams.rawbuf[irparams.rawlen] = ticks;
+            irparams.rawlen = irparams.rawlen + 1;
+        } // if
     }
     lastIrPulse = now;
 } // irPinChangeIsr
