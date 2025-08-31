@@ -1367,10 +1367,12 @@ void IRAM_ATTR TVanPacketRxQueue::_AdvanceHead()
     if (nQueued <= startDroppingPacketsAt || (isEssentialPacket != 0 && (*isEssentialPacket)(*_head)))
     {
         // Move to next slot in queue
-        if (++_head == end) _head = pool;  // Roll over if needed
+        _head = _head + 1;
+        if (_head == end) _head = pool;  // Roll over if needed
 
         // Keep track of queue fill level
-        if (++nQueued > maxQueued) maxQueued = nQueued;
+        nQueued = nQueued + 1;
+        if (nQueued > maxQueued) maxQueued = nQueued;
     }
     else
     {

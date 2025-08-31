@@ -124,12 +124,14 @@ class TVanPacketTxQueue
     void IRAM_ATTR _AdvanceTail()
     {
         _tail->state = VAN_TX_DONE;
-        if (++_tail == end) _tail = pool;  // roll over if needed
+        _tail = _tail + 1;
+        if (_tail == end) _tail = pool;  // roll over if needed
     } // _AdvanceTail
 
     void AdvanceHead()
     {
-        if (++_head == end) _head = pool;  // roll over if needed
+        _head = _head + 1;
+        if (_head == end) _head = pool;  // roll over if needed
         count++;
     } // AdvanceHead
 
