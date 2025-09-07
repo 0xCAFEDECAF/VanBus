@@ -1,3 +1,9 @@
+0.4.2
+    General:
+    * Updates for esp32 board package, major versions 2 and 3
+    * Fix compiler warnings
+    * Added 'compile' workflow and badge
+
 0.4.1
     General:
     * Fix compiler warnings

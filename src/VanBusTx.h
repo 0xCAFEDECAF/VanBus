@@ -3,8 +3,6 @@
  *
  * Written by Erik Tromp
  *
- * Version 0.4.1 - September, 2024
- *
  * MIT license, all text above must be included in any redistribution.
  */
 
