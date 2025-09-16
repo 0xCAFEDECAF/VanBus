@@ -1,0 +1,19 @@
+name: Runs the Arduino Linter
+
+# The workflow will run on every push and pull request to the repository
+on:
+  - push
+  - pull_request
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      # This step makes the contents of the repository available to the workflow.
+      - uses: actions/checkout@v4
+
+      - uses: arduino/arduino-lint-action@v2
+        with:
+          library-manager: update
+          compliance: strict

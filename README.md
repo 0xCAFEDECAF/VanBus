@@ -14,6 +14,7 @@
 
 [![Framework](https://img.shields.io/badge/Framework-Arduino-blue)](https://www.arduino.cc/)
 
+[![Runs the Arduino Linter](https://github.com/0xCAFEDECAF/VanBus/actions/workflows/arduino-lint.yml/badge.svg)](https://github.com/0xCAFEDECAF/VanBus/actions/workflows/arduino-lint.yml)
 [![Compile Library and Build Example Sketches](https://github.com/0xCAFEDECAF/VanBus/actions/workflows/compile.yml/badge.svg)](https://github.com/0xCAFEDECAF/VanBus/actions/workflows/compile.yml)
 
 ## 📝 Table of Contents
