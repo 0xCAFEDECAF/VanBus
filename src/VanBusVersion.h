@@ -28,7 +28,12 @@
     #define ESP_ARDUINO_VERSION_VAL(major, minor, patch) ((major << 16) | (minor << 8) | (patch))
 
     // Not really important which patch level we assume; use 6 which is the last in 1.0 .
-    #define ESP_ARDUINO_VERSION ESP_ARDUINO_VERSION_VAL(1, 0, 6)
+    #define ESP_ARDUINO_VERSION_MAJOR 1
+    #define ESP_ARDUINO_VERSION_MINOR 0
+    #define ESP_ARDUINO_VERSION_PATCH 6
+
+    #define ESP_ARDUINO_VERSION \
+        ESP_ARDUINO_VERSION_VAL(ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH)
 
   #endif
 #endif
