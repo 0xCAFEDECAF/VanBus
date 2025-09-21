@@ -583,7 +583,7 @@ void IRAM_ATTR SetTxBitTimer()
 
         timer1_attachInterrupt(VanBusRx.txTimerIsr);
 
-        // Clock to timer (prescaler) is always 80MHz, even F_CPU is 160 MHz
+        // Clock to timer (prescaler) is always 80 MHz, even if F_CPU is 160 MHz
         timer1_enable(TIM_DIV16, TIM_EDGE, TIM_LOOP);
 
         timer1_write(VanBusRx.txTimerTicks);
@@ -882,7 +882,6 @@ void IRAM_ATTR RxPinChangeIsr()
         }
         else
         {
-            // TODO - move (under condition) into timer ISR 'WaitAckIsr'?
             rxDesc->ack = VAN_ACK;
 
             // The timer ISR 'WaitAckIsr' will call 'VanBusRx._AdvanceHead()'
@@ -1212,9 +1211,9 @@ void IRAM_ATTR RxPinChangeIsr()
             timer1_disable();
             timer1_attachInterrupt(WaitAckIsr);
 
-            // Clock to timer (prescaler) is always 80MHz, even F_CPU is 160 MHz
+            // Clock to timer (prescaler) is always 80 MHz, even if F_CPU is 160 MHz
             timer1_enable(TIM_DIV16, TIM_EDGE, TIM_SINGLE);
-            timer1_write(40 * 5); // 5 time slots = 5 * 8 us = 40 us
+            timer1_write(40 * 5); // 5 time slots = 5 * 8 us = 40 us = 200 ticks (0.2 microsecond/tick)
 
           #endif // ARDUINO_ARCH_ESP32
 
@@ -1259,7 +1258,7 @@ bool TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
     timerAttachInterrupt(timer, &WaitAckIsr);
     timerAlarm(timer, 40, false, 0);
   #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-    // Clock to timer (prescaler) is always 80MHz, even F_CPU is 160 MHz. We want 0.2 microsecond resolution.
+    // Clock to timer (prescaler) is always 80 MHz, even if F_CPU is 160 or 240 MHz. We want 0.2 microsecond resolution.
     timer = timerBegin(0, 80 / 5, true);
     timerAlarmDisable(timer);
     timerAttachInterrupt(timer, &WaitAckIsr, true);

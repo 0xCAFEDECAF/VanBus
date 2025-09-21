@@ -65,9 +65,15 @@ void IRAM_ATTR SendBitIsr()
 
     if (txDesc->state == VAN_TX_WAITING)
     {
-        // Wait at least 8 (EOF) + 4 (IFS) bits after last media access
+        // Wait at least 5 (EOF) + 7 (IFS) bits after last media access.
+        // See also Figure 30 of http://ww1.microchip.com/downloads/en/DeviceDoc/doc4205.pdf .
+        //
+        // Note: 80 / 5 = 16 = timer prescaler value (see invocation of 'timerBegin(...)').
+        // This is to convert timer ticks to CPU cycles @ 80 MHz. The CPU_CYCLES macro converts that, in turn,
+        // to actual CPU cycles (e.g. at 160 Mhz).
+        //
         uint32_t nCycles = curr - VanBusRx.GetLastMediaAccessAt();  // Arithmetic has safe roll-over
-        if (nCycles < (8 /* EOF */ + 5 /* IFS */) * (VAN_BIT_TIMER_TICKS * 16) * CPU_F_FACTOR)
+        if (nCycles < (5 /* EOF */ + 7 /* IFS */ + 1 /* safety */ ) * CPU_CYCLES(VAN_BIT_TIMER_TICKS * (80 / 5)))
         {
             txDesc->busOccupied = true;
             return;
@@ -261,7 +267,7 @@ void TVanPacketTxQueue::StartBitSendTimer()
         timer1_disable();
         timer1_attachInterrupt(SendBitIsr);
 
-        // Clock to timer (prescaler) is always 80MHz, even F_CPU is 160 MHz
+        // Clock to timer (prescaler) is always 80 MHz, even if F_CPU is 160 MHz
         timer1_enable(TIM_DIV16, TIM_EDGE, TIM_LOOP);
 
         timer1_write(VAN_BIT_TIMER_TICKS);
