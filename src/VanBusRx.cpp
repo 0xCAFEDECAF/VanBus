@@ -849,15 +849,14 @@ void IRAM_ATTR RxPinChangeIsr()
 
     if (state == VAN_RX_WAITING_ACK)
     {
+        (void) pinLevelChangedDuringInterruptHandling;  // Prevent compiler warning
+
         if (
             // If another bit came after the "ACK", it is not an "ACK" but the first "1" bit of the next byte
             (rxDesc->ack == VAN_ACK && pinLevel == VAN_LOGICAL_LOW)
 
-            // If the "ACK" came too soon or lasted more than 1 time slot, it is not an "ACK" but the first
-            // "1" bit of the next byte
-            || pinLevelChangedDuringInterruptHandling
+            // If the "ACK" came too soon, it is not an "ACK" but the first "1" bit of the next byte
             || nCycles < CPU_CYCLES(650)
-            || nCycles > CPU_CYCLES(1000)
            )
         {
           #ifdef ARDUINO_ARCH_ESP32
@@ -1178,7 +1177,8 @@ void IRAM_ATTR RxPinChangeIsr()
         if ((currentByte & 0x003) == 0 && atBit == 0 && rxDesc->size >= 5
 
             // Experiment for 3 last "0"-bits: too short means it is not EOD
-            && (nBits != 3 || nCycles > CPU_CYCLES(1963)))
+            && (nBits != 3 || nCycles > CPU_CYCLES(1940))
+           )
         {
             rxDesc->state = VAN_RX_WAITING_ACK;
             DEBUG_IFS(toState, VAN_RX_WAITING_ACK);
@@ -1344,8 +1344,10 @@ void IRAM_ATTR TVanPacketRxQueue::_AdvanceHead()
     _head->state = VAN_RX_DONE;
     _head->seqNo = count++;
 
-  #ifdef VAN_RX_ISR_DEBUGGING
+    // The last bit is always 0, no need to be uncertain about that
+    if (_head->uncertainBit1 == 8 * _head->size) _head->uncertainBit1 = NO_UNCERTAIN_BIT;
 
+  #ifdef VAN_RX_ISR_DEBUGGING
     // Keep the ISR debug packet if CRC is wrong, otherwise just overwrite
     if (! _head->CheckCrc())
     {
