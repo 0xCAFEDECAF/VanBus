@@ -574,6 +574,7 @@ void IRAM_ATTR SetTxBitTimer()
         timerAttachInterrupt(timer, VanBusRx.txTimerIsr);
         timerAlarm(timer, VanBusRx.txTimerTicks, true, 0);
       #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+        timerAlarmDisable(timer);
         timerAttachInterrupt(timer, VanBusRx.txTimerIsr, true);
         timerAlarmWrite(timer, VanBusRx.txTimerTicks, true);
         timerAlarmEnable(timer);
@@ -1194,15 +1195,8 @@ void IRAM_ATTR RxPinChangeIsr()
                 timerWrite(timer, 0);
             } // if
             timerStart(timer);
-          #elif ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(2, 0, 0)
-            // timerAlarmDisable(timer);
-            // timerAttachInterrupt(timer, &WaitAckIsr, true);  // Causes crash
-            timerAlarmWrite(timer, 40 * 5, false); // 5 time slots = 5 * 8 us = 40 us
-            timerAlarmEnable(timer);
-          #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(2, 0, 0)
-            timerAlarmDisable(timer);
-            timerAttachInterrupt(timer, &WaitAckIsr, true);
-            timerAlarmWrite(timer, 40 * 5, false); // 5 time slots = 5 * 8 us = 40 us
+          #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+            timerWrite(timer, 0);
             timerAlarmEnable(timer);
           #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
 
@@ -1262,6 +1256,7 @@ bool TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
     timer = timerBegin(0, 80 / 5, true);
     timerAlarmDisable(timer);
     timerAttachInterrupt(timer, &WaitAckIsr, true);
+    timerAlarmWrite(timer, 40 * 5, false); // 5 time slots = 5 * 8 us = 40 us = 200 ticks (0.2 microsecond/tick)
   #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
 
   #else // ! ARDUINO_ARCH_ESP32

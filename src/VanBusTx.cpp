@@ -37,6 +37,8 @@ void IRAM_ATTR FinishPacketTransmission(TVanPacketTxDesc* txDesc)
         timerStop(timer);
       #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
         timerAlarmDisable(timer);
+        timerAttachInterrupt(timer, &WaitAckIsr, true);
+        timerAlarmWrite(timer, 40 * 5, false); // 5 time slots = 5 * 8 us = 40 us = 200 ticks (0.2 microsecond/tick)
       #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
       #else // ! ARDUINO_ARCH_ESP32
         timer1_disable();
@@ -87,6 +89,9 @@ void IRAM_ATTR SendBitIsr()
         txDesc->state = VAN_TX_SENDING;
         atBit = 9;
         p_stuffedByte = txDesc->stuffedBytes;
+
+        // We've already wasted much time here, so let the actual transmission begin in the next time slot
+        return;
     } // if
 
     static int lastSetLevel = VAN_BIT_RECESSIVE;
@@ -111,6 +116,8 @@ void IRAM_ATTR SendBitIsr()
 
             // Backout and start all over again
             txDesc->state = VAN_TX_WAITING;
+
+            return;
         } // if
 
         if (pinLevel == VAN_BIT_RECESSIVE && lastSetLevel == VAN_BIT_DOMINANT) txDesc->bitError = true;
