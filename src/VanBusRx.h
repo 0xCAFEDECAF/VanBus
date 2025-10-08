@@ -55,6 +55,8 @@
 #define VAN_LOGICAL_LOW VAN_BIT_DOMINANT
 #define VAN_LOGICAL_HIGH VAN_BIT_RECESSIVE
 
+#define PIN_LEVEL_UNKNOWN (2)
+
 // F_CPU is set by the Arduino IDE option as chosen in menu Tools > CPU Frequency. It is always a multiple of 80000000.
 #ifndef TIMER_BASE_CLK
   #define TIMER_BASE_CLK (80000000)

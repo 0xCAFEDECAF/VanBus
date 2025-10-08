@@ -1004,7 +1004,7 @@ void IRAM_ATTR RxPinChangeIsr()
             if (jitter > CPU_CYCLES(280)) flipBits |= 0x0001;
         } // if
 
-        if ((flipBits & 0x0001) == 0x0001) prevPinLevel = 2; // next ISR, samePinLevel must always be false.
+        if ((flipBits & 0x0001) == 0x0001) prevPinLevel = PIN_LEVEL_UNKNOWN; // next ISR, samePinLevel must always be false.
     } // if
 
     readBits <<= nBits;
@@ -1339,7 +1339,7 @@ void IRAM_ATTR TVanPacketRxQueue::_AdvanceHead()
     _head->seqNo = count++;
 
     // The last bit is always 0, no need to be uncertain about that
-    if (_head->uncertainBit1 == 8 * _head->size) _head->uncertainBit1 = NO_UNCERTAIN_BIT;
+    if (_head->uncertainBit1 >= 8 * _head->size) _head->uncertainBit1 = NO_UNCERTAIN_BIT;
 
   #ifdef VAN_RX_ISR_DEBUGGING
     // Keep the ISR debug packet if CRC is wrong, otherwise just overwrite
@@ -1585,7 +1585,7 @@ void TIsrDebugPacket::Dump(Stream& s) const
         const uint32_t jitter = isrData->fromJitter;
         if (jitter != 0)
         {
-            s.printf("%+5" PRIu32, jitter);
+            s.printf("+%4" PRIu32, jitter);
             s.printf(" =%7" PRIu32, nCyclesMeasured + jitter);
         }
         else
@@ -1614,8 +1614,15 @@ void TIsrDebugPacket::Dump(Stream& s) const
         } // if
 
         const uint16_t pinLevel = isrData->pinLevel;
-        s.printf(" \"%" PRIu16 "\"->\"%" PRIu16 "\",\"%" PRIu16 "\"",
-            isrData->prevPinLevel, pinLevel, isrData->pinLevelAtReturnFromIsr);
+        if (isrData->prevPinLevel == PIN_LEVEL_UNKNOWN)
+        {
+            s.print(" \"X\"");
+        }
+        else
+        {
+            s.printf(" \"%" PRIu16 "\"", isrData->prevPinLevel);
+        }
+        s.printf("->\"%" PRIu16 "\",\"%" PRIu16 "\"", pinLevel, isrData->pinLevelAtReturnFromIsr);
 
         s.printf(" %11.11s", TVanPacketRxDesc::StateStr(isrData->fromState));
         s.printf(" %11.11s ", TVanPacketRxDesc::StateStr(isrData->toState));
@@ -1650,6 +1657,8 @@ void TIsrDebugPacket::Dump(Stream& s) const
         if (sofSeen && prevAtBit + isrData->nBits < 10) s.print("|");  // End of SOF byte marker
 
         const uint16_t flipBits = isrData->flipBits;
+
+        // TODO - print bit pattern, e.g. "1E" must be printed as "FFFF-" ("F" indicates bit to be flipped)
         if (flipBits == 0) s.print("    "); else s.printf(" %02" PRIX16 " ", flipBits);
 
         if (eodSeen)
