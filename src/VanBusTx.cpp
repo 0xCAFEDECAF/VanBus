@@ -50,7 +50,7 @@ void IRAM_ATTR FinishPacketTransmission(TVanPacketTxDesc* txDesc)
 
     // Start listening again at other devices on the bus
     attachInterrupt(digitalPinToInterrupt(VanBusRx.pin), RxPinChangeIsr, CHANGE);
-} // 
+} // FinishPacketTransmission
 
 // Send one bit on the VAN bus
 void IRAM_ATTR SendBitIsr()

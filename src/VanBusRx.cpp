@@ -850,14 +850,18 @@ void IRAM_ATTR RxPinChangeIsr()
 
     if (state == VAN_RX_WAITING_ACK)
     {
-        (void) pinLevelChangedDuringInterruptHandling;  // Prevent compiler warning
-
         if (
             // If another bit came after the "ACK", it is not an "ACK" but the first "1" bit of the next byte
             (rxDesc->ack == VAN_ACK && pinLevel == VAN_LOGICAL_LOW)
 
-            // If the "ACK" came too soon, it is not an "ACK" but the first "1" bit of the next byte
+            // // If the "ACK" came too soon, it is not an "ACK" but the first "1" bit of the next byte
+            // || nCycles < CPU_CYCLES(650)
+
+            // If the "ACK" came too soon or lasted more than 1 time slot, it is not an "ACK" but the first
+            // "1" bit of the next byte
+            || pinLevelChangedDuringInterruptHandling
             || nCycles < CPU_CYCLES(650)
+            || nCycles > CPU_CYCLES(1000)
            )
         {
           #ifdef ARDUINO_ARCH_ESP32
@@ -877,8 +881,6 @@ void IRAM_ATTR RxPinChangeIsr()
             // Go back to state VAN_RX_LOADING
             rxDesc->state = VAN_RX_LOADING;
             DEBUG_IFS(toState, VAN_RX_LOADING);
-
-            rxDesc->ack = VAN_NO_ACK;
         }
         else
         {
@@ -951,10 +953,6 @@ void IRAM_ATTR RxPinChangeIsr()
             uint16_t currentByte = readBits << 1;
             uint8_t readByte = (currentByte >> 2 & 0xF0) | (currentByte >> 1 & 0x0F);
             rxDesc->bytes[rxDesc->size++] = readByte;
-        }
-        else
-        {
-            rxDesc->result = VAN_RX_ERROR_NBITS;
         } // if
 
         VanBusRx._AdvanceHead();
@@ -1178,11 +1176,12 @@ void IRAM_ATTR RxPinChangeIsr()
         if ((currentByte & 0x003) == 0 && atBit == 0 && rxDesc->size >= 5
 
             // Experiment for 3 last "0"-bits: too short means it is not EOD
-            && (nBits != 3 || nCycles > CPU_CYCLES(1940))
-           )
+            && (nBits != 3 || nCycles > CPU_CYCLES(1963)))
         {
             rxDesc->state = VAN_RX_WAITING_ACK;
             DEBUG_IFS(toState, VAN_RX_WAITING_ACK);
+
+            rxDesc->ack = VAN_NO_ACK;
 
             // Set a timeout for the ACK bit
 
