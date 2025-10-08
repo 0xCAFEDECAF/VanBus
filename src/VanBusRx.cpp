@@ -934,10 +934,10 @@ void IRAM_ATTR RxPinChangeIsr()
         {
             rxDesc->ack = VAN_ACK;
 
-            RELEASE_ANALYSER_WAIT_ACK_ISR;
-
             // The timer ISR 'WaitAckIsr' will call 'VanBusRx._AdvanceHead()'
         } // if
+
+        RELEASE_ANALYSER_WAIT_ACK_ISR;
     } // if
 
     if (state == VAN_RX_VACANT)
