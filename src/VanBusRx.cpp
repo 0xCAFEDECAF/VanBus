@@ -16,6 +16,46 @@
   #include <Esp.h>  // wdt_reset
 #endif
 
+// What would we want to analyse? Uncomment either or none of the #defines below.
+//#define ANALYSE_WAIT_ACK_ISR
+//#define ANALYSE_RX_PIN_CHANGE_ISR
+
+#if defined ANALYSE_WAIT_ACK_ISR && defined ANALYSE_RX_PIN_CHANGE_ISR
+#error "Either #define ANALYSE_WAIT_ACK_ISR or #define ANALYSE_RX_PIN_CHANGE_ISR, but not both"
+#endif
+
+#if defined ANALYSE_WAIT_ACK_ISR || defined ANALYSE_RX_PIN_CHANGE_ISR
+// GPIO pin connected to logic analyser
+ #ifdef ARDUINO_ARCH_ESP32
+  const int ANALYSER_PIN = GPIO_NUM_26;
+ #else // ! ARDUINO_ARCH_ESP32
+  // For WEMOS D1 mini board we use D8 (GPIO 15)
+  const int ANALYSER_PIN = D8;
+ #endif // ARDUINO_ARCH_ESP32
+#endif
+
+#if defined ANALYSE_WAIT_ACK_ISR
+
+  #define TRIGGER_ANALYSER_WAIT_ACK_ISR digitalWrite(ANALYSER_PIN, LOW)
+  #define RELEASE_ANALYSER_WAIT_ACK_ISR digitalWrite(ANALYSER_PIN, HIGH)
+  #define TRIGGER_ANALYSER_RX_PIN_CHANGE_ISR
+  #define RELEASE_ANALYSER_RX_PIN_CHANGE_ISR
+
+#elif defined ANALYSE_RX_PIN_CHANGE_ISR
+
+  #define TRIGGER_ANALYSER_WAIT_ACK_ISR
+  #define RELEASE_ANALYSER_WAIT_ACK_ISR
+  #define TRIGGER_ANALYSER_RX_PIN_CHANGE_ISR digitalWrite(ANALYSER_PIN, LOW)
+  #define RELEASE_ANALYSER_RX_PIN_CHANGE_ISR digitalWrite(ANALYSER_PIN, HIGH)
+
+#else
+  #define TRIGGER_ANALYSER_WAIT_ACK_ISR
+  #define RELEASE_ANALYSER_WAIT_ACK_ISR
+  #define TRIGGER_ANALYSER_RX_PIN_CHANGE_ISR
+  #define RELEASE_ANALYSER_RX_PIN_CHANGE_ISR
+
+#endif // defined ANALYSE_WAIT_ACK_ISR || defined ANALYSE_RX_PIN_CHANGE_ISR
+
 static const uint16_t VAN_CRC_POLYNOM = 0x0F9D;
 
 #define VAN_CRC_TABLE_SIZE 256
@@ -598,6 +638,8 @@ void IRAM_ATTR SetTxBitTimer()
 // and then to VAN_ACK if a new bit was received within the time-out period.
 void IRAM_ATTR WaitAckIsr()
 {
+  RELEASE_ANALYSER_WAIT_ACK_ISR;
+
   #if ! defined ARDUINO_ARCH_ESP32
     SetTxBitTimer();
   #else
@@ -635,6 +677,9 @@ void IRAM_ATTR RxPinChangeIsr()
     // Number of elapsed CPU cycles
     static uint32_t prev = 0;
     const uint32_t curr = ESP.getCycleCount();  // Store CPU cycle counter value as soon as possible
+
+    TRIGGER_ANALYSER_RX_PIN_CHANGE_ISR;
+
     const uint32_t nCyclesMeasured = curr - prev;  // Arithmetic has safe roll-over
     prev = curr;
 
@@ -647,6 +692,7 @@ void IRAM_ATTR RxPinChangeIsr()
         if (++noiseCounter > 30)
         {
             VanBusRx.Disable();
+            RELEASE_ANALYSER_RX_PIN_CHANGE_ISR;
             return;
         } // if
     }
@@ -781,6 +827,7 @@ void IRAM_ATTR RxPinChangeIsr()
             debugIsr->atBit = atBit; \
             isrDebugPacket->at++; \
         } \
+        RELEASE_ANALYSER_RX_PIN_CHANGE_ISR; \
         return; \
     }
 
@@ -794,6 +841,7 @@ void IRAM_ATTR RxPinChangeIsr()
     { \
         const int pinLevelAtReturnFromIsr = GPIP(VanBusRx.pin); \
         pinLevelChangedDuringInterruptHandling = jitter < CPU_CYCLES(100) && pinLevelAtReturnFromIsr != pinLevel; \
+        RELEASE_ANALYSER_RX_PIN_CHANGE_ISR; \
         return; \
     }
 
@@ -885,6 +933,8 @@ void IRAM_ATTR RxPinChangeIsr()
         else
         {
             rxDesc->ack = VAN_ACK;
+
+            RELEASE_ANALYSER_WAIT_ACK_ISR;
 
             // The timer ISR 'WaitAckIsr' will call 'VanBusRx._AdvanceHead()'
         } // if
@@ -1183,6 +1233,8 @@ void IRAM_ATTR RxPinChangeIsr()
 
             rxDesc->ack = VAN_NO_ACK;
 
+            TRIGGER_ANALYSER_WAIT_ACK_ISR;
+
             // Set a timeout for the ACK bit
 
           #ifdef ARDUINO_ARCH_ESP32
@@ -1227,6 +1279,11 @@ void IRAM_ATTR RxPinChangeIsr()
 bool TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
 {
     if (pin != VAN_NO_PIN_ASSIGNED) return false; // Already setup
+
+  #if defined ANALYSE_WAIT_ACK_ISR || defined ANALYSE_RX_PIN_CHANGE_ISR
+    pinMode(ANALYSER_PIN, OUTPUT);
+    digitalWrite(ANALYSER_PIN, HIGH);
+  #endif
 
     pinMode(rxPin, INPUT_PULLUP);
 
