@@ -615,6 +615,7 @@ void IRAM_ATTR SetTxBitTimer()
         timerAlarm(timer, VanBusRx.txTimerTicks, true, 0);
       #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
         timerAlarmDisable(timer);
+        timerDetachInterrupt(timer);
         timerAttachInterrupt(timer, VanBusRx.txTimerIsr, true);
         timerAlarmWrite(timer, VanBusRx.txTimerTicks, true);
         timerAlarmEnable(timer);
@@ -1311,6 +1312,7 @@ bool TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
     // Clock to timer (prescaler) is always 80 MHz, even if F_CPU is 160 or 240 MHz. We want 0.2 microsecond resolution.
     timer = timerBegin(0, 80 / 5, true);
     timerAlarmDisable(timer);
+    timerDetachInterrupt(timer);
     timerAttachInterrupt(timer, &WaitAckIsr, true);
     timerAlarmWrite(timer, 40 * 5, false); // 5 time slots = 5 * 8 us = 40 us = 200 ticks (0.2 microsecond/tick)
   #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
