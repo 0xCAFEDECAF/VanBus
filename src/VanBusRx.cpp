@@ -27,7 +27,7 @@
 #if defined ANALYSE_WAIT_ACK_ISR || defined ANALYSE_RX_PIN_CHANGE_ISR
 // GPIO pin connected to logic analyser
  #ifdef ARDUINO_ARCH_ESP32
-  const int ANALYSER_PIN = GPIO_NUM_26;
+  const int ANALYSER_PIN = GPIO_NUM_5;
  #else // ! ARDUINO_ARCH_ESP32
   // For WEMOS D1 mini board we use D8 (GPIO 15)
   const int ANALYSER_PIN = D8;
@@ -592,14 +592,20 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
     return _nBits;
 } // nBitsTakingIntoAccountJitter
 
+#ifdef ARDUINO_ARCH_ESP32
+ #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+  #define TIMER_FREQ (5000000)
+ #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+#endif // ARDUINO_ARCH_ESP32
+
 void IRAM_ATTR SetTxBitTimer()
 {
   #ifdef ARDUINO_ARCH_ESP32
-  #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+   #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
     timerStop(timer);
-  #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+   #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
     timerAlarmDisable(timer);
-  #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+   #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
   #else // ! ARDUINO_ARCH_ESP32
     timer1_disable();
   #endif // ARDUINO_ARCH_ESP32
@@ -610,16 +616,16 @@ void IRAM_ATTR SetTxBitTimer()
 
       #ifdef ARDUINO_ARCH_ESP32
 
-      #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+       #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
         timerAttachInterrupt(timer, VanBusRx.txTimerIsr);
         timerAlarm(timer, VanBusRx.txTimerTicks, true, 0);
-      #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+       #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
         timerAlarmDisable(timer);
         timerDetachInterrupt(timer);
         timerAttachInterrupt(timer, VanBusRx.txTimerIsr, true);
         timerAlarmWrite(timer, VanBusRx.txTimerTicks, true);
         timerAlarmEnable(timer);
-      #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+       #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
 
       #else // ! ARDUINO_ARCH_ESP32
 
@@ -644,9 +650,9 @@ void IRAM_ATTR WaitAckIsr()
   #if ! defined ARDUINO_ARCH_ESP32
     SetTxBitTimer();
   #else
-  #if ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(2, 0, 0)
+   #if ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(2, 0, 0)
     SetTxBitTimer();
-  #endif
+   #endif
   #endif
 
     NO_INTERRUPTS;
@@ -674,6 +680,7 @@ void IRAM_ATTR RxPinChangeIsr()
     const int pinLevel = GPIP(VanBusRx.pin);
     static int prevPinLevel = VAN_BIT_RECESSIVE;
     static bool pinLevelChangedDuringInterruptHandling = false;
+    (void)pinLevelChangedDuringInterruptHandling;  // Prevent compiler warning "variable set but not used"
 
     // Number of elapsed CPU cycles
     static uint32_t prev = 0;
@@ -903,25 +910,27 @@ void IRAM_ATTR RxPinChangeIsr()
             // If another bit came after the "ACK", it is not an "ACK" but the first "1" bit of the next byte
             (rxDesc->ack == VAN_ACK && pinLevel == VAN_LOGICAL_LOW)
 
-            // // If the "ACK" came too soon, it is not an "ACK" but the first "1" bit of the next byte
-            // || nCycles < CPU_CYCLES(650)
-
-            // If the "ACK" came too soon or lasted more than 1 time slot, it is not an "ACK" but the first
-            // "1" bit of the next byte
-            || pinLevelChangedDuringInterruptHandling
+            // If the "ACK" came too soon, it is not an "ACK" but the first "1" bit of the next byte
             || nCycles < CPU_CYCLES(650)
+
+            // If the "ACK" lasted more than 1 time slot, it is not an "ACK" but the first "1" bit of the next byte
+          #ifdef ARDUINO_ARCH_ESP32
+            || nCycles > CPU_CYCLES(1400)
+          #else
+            || pinLevelChangedDuringInterruptHandling
             || nCycles > CPU_CYCLES(1000)
+          #endif // ! ARDUINO_ARCH_ESP32
            )
         {
           #ifdef ARDUINO_ARCH_ESP32
 
-          #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+           #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
             //if (timerRead(timer) > 0) timerStop(timer);
             //timerStop(timer);
             // if (timerRead(timer) < 40) timerStop(timer);
-          #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+           #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
             timerAlarmDisable(timer);
-          #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+           #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
 
           #else // ! ARDUINO_ARCH_ESP32
             timer1_disable();
@@ -1240,17 +1249,13 @@ void IRAM_ATTR RxPinChangeIsr()
 
           #ifdef ARDUINO_ARCH_ESP32
 
-          #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-            if (timerRead(timer) > 0)
-            {
-                timerStop(timer);
-                timerWrite(timer, 0);
-            } // if
-            timerStart(timer);
-          #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+           #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+            timerWrite(timer, 0);
+            timerAlarm(timer, TIMER_FREQ * 40 / 1000000, false, 0);
+           #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
             timerWrite(timer, 0);
             timerAlarmEnable(timer);
-          #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+           #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
 
           #else // ! ARDUINO_ARCH_ESP32
 
@@ -1303,19 +1308,18 @@ bool TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
 
   #ifdef ARDUINO_ARCH_ESP32
 
-  #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-    #define TIMER_FREQ (1000000)
+   #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
     timer = timerBegin(TIMER_FREQ);
     timerAttachInterrupt(timer, &WaitAckIsr);
-    timerAlarm(timer, 40, false, 0);
-  #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+    timerAlarm(timer, TIMER_FREQ * 40 / 1000000, false, 0);
+   #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
     // Clock to timer (prescaler) is always 80 MHz, even if F_CPU is 160 or 240 MHz. We want 0.2 microsecond resolution.
     timer = timerBegin(0, 80 / 5, true);
     timerAlarmDisable(timer);
     timerDetachInterrupt(timer);
     timerAttachInterrupt(timer, &WaitAckIsr, true);
     timerAlarmWrite(timer, 40 * 5, false); // 5 time slots = 5 * 8 us = 40 us = 200 ticks (0.2 microsecond/tick)
-  #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+   #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
 
   #else // ! ARDUINO_ARCH_ESP32
     timer1_isr_init();
@@ -1363,11 +1367,11 @@ void TVanPacketRxQueue::Disable()
 
   #ifdef ARDUINO_ARCH_ESP32
 
-  #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+   #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
     timerStop(timer);
-  #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+   #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
     timerAlarmDisable(timer);
-  #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+   #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
 
   #else // ! ARDUINO_ARCH_ESP32
     timer1_disable();

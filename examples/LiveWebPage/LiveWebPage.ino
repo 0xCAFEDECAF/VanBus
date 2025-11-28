@@ -53,7 +53,7 @@
  * Building
  *
  * - Wi-Fi/TCP communication seems to be best when setting "build.sdk=NONOSDK22x_191122" in the "platform.txt" file
- *   (see "c:\Users\<user_id>\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\2.X.Y\".
+ *   (see "c:\Users\<user_id>\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\X.Y.Z\".
  *   Keeping the default setting "build.sdk=NONOSDK22x_190703" seems to give a lot more communication hiccups.
  *   Note that the line "build.sdk=NONOSDK22x_191122" is not listed in the "platform.txt" file; you will have to
  *   add it yourself.
@@ -984,7 +984,7 @@ void SendJsonText(const char* json)
     // No, serve only the last one connected (the others are probably already dead)
     webSocket.sendTXT(websocketNum, json);
 
-    // Print a message if the websocket transmissino took outrageously long (normally it takes around 1-2 msec).
+    // Print a message if the websocket transmission took outrageously long (normally it takes around 1-2 msec).
     // If that takes really long (seconds or more), the VAN bus Rx queue will overrun (remember, ESP8266 is
     // a single-thread system).
     unsigned long duration = millis() - start;
