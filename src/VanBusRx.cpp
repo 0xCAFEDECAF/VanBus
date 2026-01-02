@@ -9,13 +9,6 @@
 #include <limits.h>
 #include "VanBusRx.h"
 
-#ifdef ARDUINO_ARCH_ESP32
-  #include <esp_task_wdt.h>
-  #define wdt_reset() esp_task_wdt_reset()
-#else
-  #include <Esp.h>  // wdt_reset
-#endif
-
 // What would we want to analyse? Uncomment either or none of the #defines below.
 //#define ANALYSE_WAIT_ACK_ISR
 //#define ANALYSE_RX_PIN_CHANGE_ISR
@@ -27,6 +20,7 @@
 #if defined ANALYSE_WAIT_ACK_ISR || defined ANALYSE_RX_PIN_CHANGE_ISR
 // GPIO pin connected to logic analyser
  #ifdef ARDUINO_ARCH_ESP32
+  // For LilyGO TTGO T7 Mini32 we use IO05 (GPIO 05)
   const int ANALYSER_PIN = GPIO_NUM_5;
  #else // ! ARDUINO_ARCH_ESP32
   // For WEMOS D1 mini board we use D8 (GPIO 15)
@@ -399,9 +393,6 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
 
     for (int atByte1 = 1; atByte1 < size; atByte1++)
     {
-        // This may take really long...
-        wdt_reset();
-
         for (int atBit1 = 7; atBit1 >= 0; atBit1--)
         {
             // Only flip the last bit in a sequence of equal bits; take into account the Manchester bits
@@ -1628,9 +1619,6 @@ void TIsrDebugPacket::Dump(Stream& s) const
 
     while (at > 2 && i < at)
     {
-        // Printing all this can take really long...
-        if (i % 50 == 0) wdt_reset();
-
         const TIsrDebugData* isrData = samples + i;
         if (i == 0)
         {
