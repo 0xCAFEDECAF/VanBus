@@ -79,21 +79,33 @@
 
 #include <VanBusRx.h>  // https://github.com/0xCAFEDECAF/VanBus
 
-// GPIO pin connected to VAN bus transceiver output
 #ifdef ARDUINO_ARCH_ESP32
-  const int RX_PIN = GPIO_NUM_22;
-#else // ! ARDUINO_ARCH_ESP32
+ #if ! defined ESP_ARDUINO_VERSION || ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(2, 0, 0)
+  #if WEBSOCKETS_VERSION_INT > 2004000
+   #error "On ESP32 board package version 1.0.6 and below, cannot use arduinoWebSockets library above version 2.4.0"
+  #endif
+ #endif
+#endif
 
+// Define GPIO pin connected to VAN bus transceiver output.
+// Use #defines, not const int, so that the Serial.printf_P in setup() shows the correct pin name on the console.
+#ifdef ARDUINO_ARCH_ESP32
+ #ifdef CONFIG_IDF_TARGET_ESP32S2
+  #define RX_PIN GPIO_NUM_33
+ #else
+  // Note: GPIO_NUM_22 is also LED pin on Lilygo TTGO T7 V1.3 Mini32
+  #define RX_PIN GPIO_NUM_22
+ #endif
+#else // ! ARDUINO_ARCH_ESP32
   #if defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
     // For ESP-01 board we use GPIO 2 (internal pull-up, keep disconnected or high at boot time)
     #define D2 (2)
   #endif // defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
-
   // For WEMOS D1 mini board we use D2 (GPIO 4)
-  const int RX_PIN = D2;  // GPIO4 - often used as SDA (I2C)
-  //const int RX_PIN = D3;  // GPIO0 - pulled up - Boot fails
-  //const int RX_PIN = D4;  // GPIO2 - pulled up
-  //const int RX_PIN = D8;  // GPIO15 - pulled to GND - Boot fails
+  #define RX_PIN D2  // GPIO4 - often used as SDA (I2C)
+  //#define RX_PIN D3  // GPIO0 - pulled up - Boot fails
+  //#define RX_PIN D4  // GPIO2 - pulled up
+  //#define RX_PIN D8  // GPIO15 - pulled to GND - Boot fails
 #endif // ARDUINO_ARCH_ESP32
 
 // TODO - reduce size of large JSON packets like the ones containing guidance instruction icons
@@ -1066,6 +1078,9 @@ void setup()
     #define VAN_PACKET_QUEUE_SIZE 15
   #endif
 
+  #define XSTR(x) STR(x)
+  #define STR(x) #x
+    Serial.printf_P(PSTR("Setting up VAN bus receiver on pin %s (GPIO%u)\n"), XSTR(RX_PIN), RX_PIN);
     VanBusRx.Setup(RX_PIN, VAN_PACKET_QUEUE_SIZE);
     Serial.printf_P(PSTR("VanBusRx queue of size %d is set up\n"), VanBusRx.QueueSize());
 

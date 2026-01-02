@@ -69,18 +69,22 @@
 
 #include <VanBusRx.h>  // https://github.com/0xCAFEDECAF/VanBus
 
-// GPIO pin connected to VAN bus transceiver output
+// Define GPIO pin connected to VAN bus transceiver output.
+// Use #defines, not const int, so that the Serial.printf_P in setup() shows the correct pin name on the console.
 #ifdef ARDUINO_ARCH_ESP32
-  const int RX_PIN = GPIO_NUM_22;
+ #ifdef CONFIG_IDF_TARGET_ESP32S2
+  #define RX_PIN GPIO_NUM_33
+ #else
+  // Note: GPIO_NUM_22 is also LED pin on Lilygo TTGO T7 V1.3 Mini32
+  #define RX_PIN GPIO_NUM_22
+ #endif
 #else // ! ARDUINO_ARCH_ESP32
-
   #if defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
     // For ESP-01 board we use GPIO 2 (internal pull-up, keep disconnected or high at boot time)
     #define D2 (2)
   #endif // defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
-
   // For WEMOS D1 mini board we use D2 (GPIO 4)
-  const int RX_PIN = D2;
+  #define RX_PIN D2
 #endif // ARDUINO_ARCH_ESP32
 
 void setup()
@@ -100,6 +104,9 @@ void setup()
     delay(1);
   #endif // ARDUINO_ARCH_ESP8266
 
+  #define XSTR(x) STR(x)
+  #define STR(x) #x
+    Serial.printf_P(PSTR("Setting up VAN bus receiver on pin %s (GPIO%u)\n"), XSTR(RX_PIN), RX_PIN);
     VanBusRx.Setup(RX_PIN);
     Serial.printf_P(PSTR("VanBusRx queue of size %d is set up\n"), VanBusRx.QueueSize());
 } // setup

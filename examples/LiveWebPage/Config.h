@@ -73,15 +73,18 @@ inline void WifiConfig()
 
   // IR receiver data pin
   #ifdef ARDUINO_ARCH_ESP32
-    #define IR_RECV_PIN GPIO_NUM_18
-  #else
-    #define IR_RECV_PIN D5
-  #endif // ARDUINO_ARCH_ESP32
-
-  #ifdef ARDUINO_ARCH_ESP32
+   #ifdef CONFIG_IDF_TARGET_ESP32S2
+    #define IR_RECV_PIN GPIO_NUM_7 // IR receiver data pin
+    #define IR_VCC GPIO_NUM_11
+    #define IR_GND GPIO_NUM_9
+   #else
+    #define IR_RECV_PIN GPIO_NUM_18 // IR receiver data pin
     #define IR_VCC GPIO_NUM_23
     #define IR_GND GPIO_NUM_19
+   #endif
   #else
+    #define IR_RECV_PIN D5 // IR receiver data pin
+
     // Using D7 as VCC and D6 as ground pin for the IR receiver. Should be possible with e.g. the
     // TSOP4838 IR receiver as it typically uses only 0.7 mA (maximum GPIO current is 12 mA;
     // see https://tttapa.github.io/ESP8266/Chap04%20-%20Microcontroller.html for ESP8266 and
@@ -95,21 +98,24 @@ inline void WifiConfig()
 // TSOP312XX
 #ifdef IR_TSOP312XX
 
-  // IR receiver data pin
   #ifdef ARDUINO_ARCH_ESP32
-    #define IR_RECV_PIN GPIO_NUM_23
-  #else
-    #define IR_RECV_PIN D7
-  #endif // ARDUINO_ARCH_ESP32
-
-  #ifdef ARDUINO_ARCH_ESP32
+   #ifdef CONFIG_IDF_TARGET_ESP32S2
+    #define IR_RECV_PIN GPIO_NUM_11 // IR receiver data pin
+    #define IR_VCC GPIO_NUM_7
+    #define IR_GND GPIO_NUM_5
+   #else
+    #define IR_RECV_PIN GPIO_NUM_23 // IR receiver data pin
     #define IR_VCC GPIO_NUM_18
     #define IR_GND GPIO_NUM_26
+   #endif
   #else
+    #define IR_RECV_PIN D7 // IR receiver data pin
+
     // Using D5 as VCC and D0 as ground pin for the IR receiver. Should be possible with e.g. the
     // TSOP31238 IR receiver as it typically uses only 0.35 mA.
     #define IR_VCC D5
     #define IR_GND D0
+
   #endif // ARDUINO_ARCH_ESP32
 
 #endif // IR_TSOP312XX

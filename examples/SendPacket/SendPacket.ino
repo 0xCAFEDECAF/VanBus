@@ -41,12 +41,19 @@
 
 #include <VanBus.h>  // https://github.com/0xCAFEDECAF/VanBus
 
+// Define GPIO pin connected to VAN bus transceiver input and output.
+// Use #defines, not const int, so that the Serial.printf_P in setup() shows the correct pin name on the console.
 #ifdef ARDUINO_ARCH_ESP32
-  const int TX_PIN = GPIO_NUM_21; // GPIO pin connected to VAN bus transceiver input
-  const int RX_PIN = GPIO_NUM_22; // GPIO pin connected to VAN bus transceiver output
+ #ifdef CONFIG_IDF_TARGET_ESP32S2
+  #define TX_PIN GPIO_NUM_18
+  #define RX_PIN GPIO_NUM_33
+ #else
+  #define TX_PIN GPIO_NUM_21
+  #define RX_PIN GPIO_NUM_22
+ #endif
 #else // ! ARDUINO_ARCH_ESP32
-  const int TX_PIN = D3; // GPIO pin connected to VAN bus transceiver input
-  const int RX_PIN = D2; // GPIO pin connected to VAN bus transceiver output
+  #define TX_PIN D3
+  #define RX_PIN D2
 #endif // ARDUINO_ARCH_ESP32
 
 void setup()
@@ -66,8 +73,15 @@ void setup()
     delay(1);
   #endif // ARDUINO_ARCH_ESP8266
 
+  #define XSTR(x) STR(x)
+  #define STR(x) #x
+    Serial.printf_P(
+        PSTR("Setting up VAN bus receiver, RX pin %s (GPIO%u), TX pin %s (GPIO%u)\n"),
+        XSTR(RX_PIN), RX_PIN,
+        XSTR(TX_PIN), TX_PIN
+    );
     VanBus.Setup(RX_PIN, TX_PIN);
-    Serial.printf_P(PSTR("VanBus is set up, rx queue size is %d\n"), VanBusRx.QueueSize());
+    Serial.printf_P(PSTR("VanBus is set up, rx queue size is %d\n"), VanBus.QueueSize());
 } // setup
 
 void loop()
