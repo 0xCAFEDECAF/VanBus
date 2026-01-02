@@ -584,6 +584,15 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
 } // nBitsTakingIntoAccountJitter
 
 #ifdef ARDUINO_ARCH_ESP32
+hw_timer_t* timer = NULL;
+
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+extern hw_timer_t* txTimer;
+#endif
+
+#endif // ARDUINO_ARCH_ESP32
+
+#ifdef ARDUINO_ARCH_ESP32
  #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
   #define TIMER_FREQ (5000000)
  #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
@@ -593,7 +602,7 @@ void IRAM_ATTR SetTxBitTimer()
 {
   #ifdef ARDUINO_ARCH_ESP32
    #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-    timerStop(timer);
+    //timerStop(timer);
    #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
     timerAlarmDisable(timer);
    #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
@@ -608,8 +617,10 @@ void IRAM_ATTR SetTxBitTimer()
       #ifdef ARDUINO_ARCH_ESP32
 
        #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-        timerAttachInterrupt(timer, VanBusRx.txTimerIsr);
-        timerAlarm(timer, VanBusRx.txTimerTicks, true, 0);
+        timerDetachInterrupt(txTimer);
+        timerAttachInterrupt(txTimer, VanBusRx.txTimerIsr);
+        timerAlarm(txTimer, VanBusRx.txTimerTicks, true, 0);
+        timerRestart(txTimer);
        #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
         timerAlarmDisable(timer);
         timerDetachInterrupt(timer);
@@ -636,24 +647,14 @@ void IRAM_ATTR SetTxBitTimer()
 // and then to VAN_ACK if a new bit was received within the time-out period.
 void IRAM_ATTR WaitAckIsr()
 {
-  RELEASE_ANALYSER_WAIT_ACK_ISR;
+    RELEASE_ANALYSER_WAIT_ACK_ISR;
 
-  #if ! defined ARDUINO_ARCH_ESP32
     SetTxBitTimer();
-  #else
-   #if ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(2, 0, 0)
-    SetTxBitTimer();
-   #endif
-  #endif
 
     NO_INTERRUPTS;
     if (VanBusRx._head->state == VAN_RX_WAITING_ACK) VanBusRx._AdvanceHead();
     INTERRUPTS;
 } // WaitAckIsr
-
-#ifdef ARDUINO_ARCH_ESP32
-hw_timer_t* timer = NULL;
-#endif // ARDUINO_ARCH_ESP32
 
 // Pin level change interrupt handler
 void IRAM_ATTR RxPinChangeIsr()
@@ -1359,7 +1360,7 @@ void TVanPacketRxQueue::Disable()
   #ifdef ARDUINO_ARCH_ESP32
 
    #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-    timerStop(timer);
+    //timerStop(timer);
    #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
     timerAlarmDisable(timer);
    #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)

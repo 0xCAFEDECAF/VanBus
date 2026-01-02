@@ -16,6 +16,12 @@
   #define VAN_BIT_TIMER_TICKS (8 * 5 + 1)
 #endif // ARDUINO_ARCH_ESP32
 
+#ifdef ARDUINO_ARCH_ESP32
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+hw_timer_t* txTimer = NULL;
+#endif
+#endif
+
 // Finish packet transmission
 void IRAM_ATTR FinishPacketTransmission(TVanPacketTxDesc* txDesc)
 {
@@ -34,7 +40,7 @@ void IRAM_ATTR FinishPacketTransmission(TVanPacketTxDesc* txDesc)
 
       #ifdef ARDUINO_ARCH_ESP32
       #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-        timerStop(timer);
+        timerDetachInterrupt(txTimer);
       #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
         timerAlarmDisable(timer);
         timerDetachInterrupt(timer);
@@ -168,6 +174,13 @@ void TVanPacketTxQueue::Setup(uint8_t theRxPin, uint8_t theTxPin)
     pinMode(theTxPin, OUTPUT);
     digitalWrite(theTxPin, VAN_BIT_RECESSIVE);  // Set bus state to 'recessive' (CANH and CANL: not driven)
 
+  #ifdef ARDUINO_ARCH_ESP32
+   #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+    #define TIMER_FREQ (5000000)
+    txTimer = timerBegin(TIMER_FREQ);
+   #endif
+  #endif
+
     VanBusRx.Setup(theRxPin);
     VanBusRx.RegisterTxTimerTicks(VAN_BIT_TIMER_TICKS);
 } // TVanPacketTxQueue::Setup
@@ -250,12 +263,14 @@ void TVanPacketTxQueue::StartBitSendTimer()
 
     // Transmitting a packet is done completely by interrupt-servicing
 
-#ifdef ARDUINO_ARCH_ESP32
+ #ifdef ARDUINO_ARCH_ESP32
 
   #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-    timerStop(timer);
-    timerAttachInterrupt(timer, &SendBitIsr);
-    timerAlarm(timer, VAN_BIT_TIMER_TICKS, true, 0);
+    // timerStop(timer);
+    timerDetachInterrupt(txTimer);
+    timerAttachInterrupt(txTimer, &SendBitIsr);
+    timerAlarm(txTimer, VAN_BIT_TIMER_TICKS, true, 0);
+    timerRestart(txTimer);
   #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
     if (! timerAlarmEnabled(timer))
     {
@@ -268,7 +283,7 @@ void TVanPacketTxQueue::StartBitSendTimer()
     } // if
   #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
 
-#else // ! ARDUINO_ARCH_ESP32
+ #else // ! ARDUINO_ARCH_ESP32
 
     if (! timer1_enabled())
     {
