@@ -601,11 +601,9 @@ extern hw_timer_t* txTimer;
 void IRAM_ATTR SetTxBitTimer()
 {
   #ifdef ARDUINO_ARCH_ESP32
-   #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-    //timerStop(timer);
-   #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+   #if ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
     timerAlarmDisable(timer);
-   #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+   #endif // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
   #else // ! ARDUINO_ARCH_ESP32
     timer1_disable();
   #endif // ARDUINO_ARCH_ESP32
@@ -617,10 +615,8 @@ void IRAM_ATTR SetTxBitTimer()
       #ifdef ARDUINO_ARCH_ESP32
 
        #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-        timerDetachInterrupt(txTimer);
-        timerAttachInterrupt(txTimer, VanBusRx.txTimerIsr);
         timerAlarm(txTimer, VanBusRx.txTimerTicks, true, 0);
-        timerRestart(txTimer);
+        timerStart(txTimer);
        #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
         timerAlarmDisable(timer);
         timerDetachInterrupt(timer);
@@ -916,13 +912,9 @@ void IRAM_ATTR RxPinChangeIsr()
         {
           #ifdef ARDUINO_ARCH_ESP32
 
-           #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-            //if (timerRead(timer) > 0) timerStop(timer);
-            //timerStop(timer);
-            // if (timerRead(timer) < 40) timerStop(timer);
-           #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+           #if ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
             timerAlarmDisable(timer);
-           #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+           #endif // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
 
           #else // ! ARDUINO_ARCH_ESP32
             timer1_disable();
@@ -1359,11 +1351,9 @@ void TVanPacketRxQueue::Disable()
 
   #ifdef ARDUINO_ARCH_ESP32
 
-   #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-    //timerStop(timer);
-   #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+   #if ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
     timerAlarmDisable(timer);
-   #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+   #endif // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
 
   #else // ! ARDUINO_ARCH_ESP32
     timer1_disable();
