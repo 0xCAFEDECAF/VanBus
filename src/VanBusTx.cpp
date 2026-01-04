@@ -17,9 +17,7 @@
 #endif // ARDUINO_ARCH_ESP32
 
 #ifdef ARDUINO_ARCH_ESP32
-#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
 hw_timer_t* txTimer = NULL;
-#endif
 #endif
 
 // Finish packet transmission
@@ -42,10 +40,9 @@ void IRAM_ATTR FinishPacketTransmission(TVanPacketTxDesc* txDesc)
       #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
         timerStop(txTimer);
       #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-        timerAlarmDisable(timer);
-        timerDetachInterrupt(timer);
-        timerAttachInterrupt(timer, &WaitAckIsr, true);
-        timerAlarmWrite(timer, 40 * 5, false); // 5 time slots = 5 * 8 us = 40 us = 200 ticks (0.2 microsecond/tick)
+        timerStop(txTimer);
+        timerAlarmDisable(txTimer);
+        timerAlarmWrite(txTimer, 40 * 5, false); // 5 time slots = 5 * 8 us = 40 us = 200 ticks (0.2 microsecond/tick)
       #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
       #else // ! ARDUINO_ARCH_ESP32
         timer1_disable();
@@ -179,6 +176,11 @@ void TVanPacketTxQueue::Setup(uint8_t theRxPin, uint8_t theTxPin)
     #define TIMER_FREQ (5000000)
     txTimer = timerBegin(TIMER_FREQ);
     timerAttachInterrupt(txTimer, &SendBitIsr);
+   #else
+    txTimer = timerBegin(0, 80 / 5, true);
+    timerAlarmDisable(txTimer);
+    //timerDetachInterrupt(txTimer);
+    timerAttachInterrupt(txTimer, &SendBitIsr, true);
    #endif
   #endif
 
@@ -270,15 +272,11 @@ void TVanPacketTxQueue::StartBitSendTimer()
     timerAlarm(txTimer, VAN_BIT_TIMER_TICKS, true, 0);
     timerStart(txTimer);
   #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-    if (! timerAlarmEnabled(timer))
-    {
-        // Set a repetitive timer
-        timerAlarmDisable(timer);
-        timerDetachInterrupt(timer);
-        timerAttachInterrupt(timer, &SendBitIsr, true);
-        timerAlarmWrite(timer, VAN_BIT_TIMER_TICKS, true);
-        timerAlarmEnable(timer);
-    } // if
+    // Set a repetitive timer
+    timerAlarmDisable(txTimer);
+    timerAlarmWrite(txTimer, VAN_BIT_TIMER_TICKS, true);
+    timerAlarmEnable(txTimer);
+    timerStart(txTimer);
   #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
 
  #else // ! ARDUINO_ARCH_ESP32

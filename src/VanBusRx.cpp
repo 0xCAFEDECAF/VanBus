@@ -586,16 +586,9 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
 #ifdef ARDUINO_ARCH_ESP32
 hw_timer_t* timer = NULL;
 
-#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
 extern hw_timer_t* txTimer;
-#endif
 
-#endif // ARDUINO_ARCH_ESP32
-
-#ifdef ARDUINO_ARCH_ESP32
- #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
   #define TIMER_FREQ (5000000)
- #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
 #endif // ARDUINO_ARCH_ESP32
 
 void IRAM_ATTR SetTxBitTimer()
@@ -618,11 +611,12 @@ void IRAM_ATTR SetTxBitTimer()
         timerAlarm(txTimer, VanBusRx.txTimerTicks, true, 0);
         timerStart(txTimer);
        #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-        timerAlarmDisable(timer);
-        timerDetachInterrupt(timer);
-        timerAttachInterrupt(timer, VanBusRx.txTimerIsr, true);
-        timerAlarmWrite(timer, VanBusRx.txTimerTicks, true);
-        timerAlarmEnable(timer);
+        timerAlarmDisable(txTimer);
+        timerDetachInterrupt(txTimer);
+        timerAttachInterrupt(txTimer, VanBusRx.txTimerIsr, true);
+        timerAlarmWrite(txTimer, VanBusRx.txTimerTicks, true);
+        timerAlarmEnable(txTimer);
+        timerStart(txTimer);
        #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
 
       #else // ! ARDUINO_ARCH_ESP32
