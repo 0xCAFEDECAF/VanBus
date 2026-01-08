@@ -36,14 +36,12 @@ void IRAM_ATTR FinishPacketTransmission(TVanPacketTxDesc* txDesc)
     {
         VanBusRx.RegisterTxIsr(NULL);
 
+        timerStop(txTimer);
       #ifdef ARDUINO_ARCH_ESP32
-      #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-        timerStop(txTimer);
-      #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-        timerStop(txTimer);
+      #if ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
         timerAlarmDisable(txTimer);
         timerAlarmWrite(txTimer, 40 * 5, false); // 5 time slots = 5 * 8 us = 40 us = 200 ticks (0.2 microsecond/tick)
-      #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+      #endif // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
       #else // ! ARDUINO_ARCH_ESP32
         timer1_disable();
       #endif // ARDUINO_ARCH_ESP32
@@ -180,7 +178,7 @@ void TVanPacketTxQueue::Setup(uint8_t theRxPin, uint8_t theTxPin)
     txTimer = timerBegin(0, 80 / 5, true);
     timerAlarmDisable(txTimer);
     //timerDetachInterrupt(txTimer);
-    timerAttachInterrupt(txTimer, &SendBitIsr, true);
+    //timerAttachInterrupt(txTimer, &SendBitIsr, true);
    #endif
   #endif
 
@@ -270,14 +268,13 @@ void TVanPacketTxQueue::StartBitSendTimer()
 
   #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
     timerAlarm(txTimer, VAN_BIT_TIMER_TICKS, true, 0);
-    timerStart(txTimer);
   #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
     // Set a repetitive timer
-    timerAlarmDisable(txTimer);
+    // timerAlarmDisable(txTimer);
     timerAlarmWrite(txTimer, VAN_BIT_TIMER_TICKS, true);
     timerAlarmEnable(txTimer);
-    timerStart(txTimer);
   #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+    timerStart(txTimer);
 
  #else // ! ARDUINO_ARCH_ESP32
 

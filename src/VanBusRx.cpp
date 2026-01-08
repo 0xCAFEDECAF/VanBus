@@ -588,7 +588,7 @@ hw_timer_t* timer = NULL;
 
 extern hw_timer_t* txTimer;
 
-  #define TIMER_FREQ (5000000)
+#define TIMER_FREQ (5000000)
 #endif // ARDUINO_ARCH_ESP32
 
 void IRAM_ATTR SetTxBitTimer()
@@ -609,15 +609,18 @@ void IRAM_ATTR SetTxBitTimer()
 
        #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
         timerAlarm(txTimer, VanBusRx.txTimerTicks, true, 0);
-        timerStart(txTimer);
        #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+       #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(2, 0, 0)
         timerAlarmDisable(txTimer);
         timerDetachInterrupt(txTimer);
+       #endif
         timerAttachInterrupt(txTimer, VanBusRx.txTimerIsr, true);
         timerAlarmWrite(txTimer, VanBusRx.txTimerTicks, true);
+       #if ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(2, 0, 0)
         timerAlarmEnable(txTimer);
-        timerStart(txTimer);
+       #endif
        #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+        timerStart(txTimer);
 
       #else // ! ARDUINO_ARCH_ESP32
 
