@@ -44,7 +44,8 @@ Both the ESP8266 / ESP8285 and ESP32 platforms are supported by this library.
 ## 🔌 Schematics<a name = "schematics"></a>
 
 You can usually find the VAN bus on pins 2 and 3 of ISO block "A" of your head unit (car radio). See
-https://en.wikipedia.org/wiki/Connectors_for_car_audio and https://github.com/morcibacsi/esp32_rmt_van_rx#schematics .
+http://web.archive.org/web/20230315215552/https://en.wikipedia.org/wiki/Connectors_for_car_audio and
+https://github.com/morcibacsi/esp32_rmt_van_rx#schematics .
 
 There are various possibilities to hook up a ESP8266/ESP32 based board to your vehicle's VAN bus:
 
@@ -166,8 +167,8 @@ An example of an ESP32-based board is the [LilyGO TTGO T7 Mini32].
 
 For an ESP32-based board you will need the ESP32 board package installed. 
 
-I am currently using [version 1.0.6](https://github.com/espressif/arduino-esp32/releases/tag/1.0.6) but other versions
-may also be working fine. (I tested with version 1.0.6, 2.0.17 and 3.3.1 .)
+I am currently using [version 3.3.3](https://github.com/espressif/arduino-esp32/releases/tag/3.3.3) but other versions
+may also be working fine. (I tested with version 1.0.6, 2.0.17 and 3.3.5 .)
 
 Follow [this tutorial](https://randomnerdtutorials.com/installing-the-esp32-board-in-arduino-ide-windows-instructions/)
 to install the ESP32 Board Package. Alternatively, turn to

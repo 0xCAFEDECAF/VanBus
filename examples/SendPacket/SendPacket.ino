@@ -29,6 +29,10 @@
  *
  * Note: for transmitting packets, it is necessary to also connect the receiving pin. The receiving pin is used to
  * sense media access from other devices on the bus, so that bus arbitration can be performed.
+ *
+ * Tested to work with:
+ * - ESP8266 board package versions 2.6.3 ... 3.1.2
+ * - ESP32 board package versions 1.0.6, 2.0.17, 3.3.5
  */
 
 #include <assert.h>

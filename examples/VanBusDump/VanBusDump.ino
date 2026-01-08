@@ -89,7 +89,12 @@
 
 void setup()
 {
+    // Give COM port device driver time to start
+  #if defined ARDUINO_ARCH_ESP32 && defined CONFIG_IDF_TARGET_ESP32S2
+    delay(3000);
+  #else
     delay(1000);
+  #endif
     Serial.begin(115200);
     Serial.print("Starting VAN bus receiver\n");
 

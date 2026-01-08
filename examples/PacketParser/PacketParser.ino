@@ -41,6 +41,9 @@
  *
  * See paragraph 'Wiring' in the other example sketch, 'VanBusDump.ino'.
  *
+ * Tested to work with:
+ * - ESP8266 board package versions 2.6.3 ... 3.1.2
+ * - ESP32 board package versions 1.0.6, 2.0.17, 3.3.5
  */
 
 #ifdef ARDUINO_ARCH_ESP32
@@ -3948,7 +3951,12 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
 
 void setup()
 {
+    // Give COM port device driver time to start
+  #if defined ARDUINO_ARCH_ESP32 && defined CONFIG_IDF_TARGET_ESP32S2
+    delay(3000);
+  #else
     delay(1000);
+  #endif
     Serial.begin(115200);
     Serial.print(F("Starting VAN bus packet parser\n"));
 
