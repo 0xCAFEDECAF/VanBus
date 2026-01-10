@@ -85,7 +85,7 @@ void IRAM_ATTR SendBitIsr()
         // to actual CPU cycles (e.g. at 160 Mhz).
         //
         uint32_t nCycles = curr - VanBusRx.GetLastMediaAccessAt();  // Arithmetic has safe roll-over
-        if (nCycles < (5 /* EOF */ + 7 /* IFS */ + 1 /* safety */ ) * CPU_CYCLES(VAN_TX_BIT_TIMER_TICKS * TX_TIMER_DIVIDER))
+        if (nCycles < (5 /* EOF */ + 7 /* IFS */ + 1 /* safety */ ) * CPU_CYCLES(VAN_TX_BIT_TIMER_TICKS * (80 / 5)))
         {
             txDesc->busOccupied = true;
             return;
