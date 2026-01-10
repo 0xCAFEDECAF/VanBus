@@ -596,13 +596,9 @@ extern hw_timer_t* txTimer;
 
 void IRAM_ATTR SetTxBitTimer()
 {
-  #ifdef ARDUINO_ARCH_ESP32
-   #if ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-    timerAlarmDisable(timer);
-   #endif // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-  #else // ! ARDUINO_ARCH_ESP32
+  #ifdef ARDUINO_ARCH_ESP8266
     timer1_disable();
-  #endif // ARDUINO_ARCH_ESP32
+  #endif // ARDUINO_ARCH_ESP8266
 
     if (VanBusRx.txTimerIsr)
     {
@@ -910,15 +906,9 @@ void IRAM_ATTR RxPinChangeIsr()
           #endif // ! ARDUINO_ARCH_ESP32
            )
         {
-          #ifdef ARDUINO_ARCH_ESP32
-
-           #if ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-            timerAlarmDisable(timer);
-           #endif // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-
-          #else // ! ARDUINO_ARCH_ESP32
+          #ifdef ARDUINO_ARCH_ESP8266
             timer1_disable();
-          #endif // ARDUINO_ARCH_ESP32
+          #endif // ARDUINO_ARCH_ESP8266
 
             // Go back to state VAN_RX_LOADING
             rxDesc->state = VAN_RX_LOADING;
@@ -1349,15 +1339,9 @@ void TVanPacketRxQueue::Disable()
 {
     if (pin == VAN_NO_PIN_ASSIGNED) return; // Call Setup first!
 
-  #ifdef ARDUINO_ARCH_ESP32
-
-   #if ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-    timerAlarmDisable(timer);
-   #endif // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-
-  #else // ! ARDUINO_ARCH_ESP32
+  #ifdef ARDUINO_ARCH_ESP8266
     timer1_disable();
-  #endif // ARDUINO_ARCH_ESP32
+  #endif // ARDUINO_ARCH_ESP8266
 
     detachInterrupt(digitalPinToInterrupt(VanBusRx.pin));
     enabled = false;
