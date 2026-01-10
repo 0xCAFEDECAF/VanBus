@@ -584,11 +584,14 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
 } // nBitsTakingIntoAccountJitter
 
 #ifdef ARDUINO_ARCH_ESP32
-hw_timer_t* timer = NULL;
 
+hw_timer_t* timer = NULL;
 extern hw_timer_t* txTimer;
 
-#define TIMER_FREQ (5000000)
+#define RX_TIMER_FREQ (5000000)  // In Hz, must multiple of 1000000
+#define RX_TIMER_DIVIDER (TIMER_BASE_CLK / RX_TIMER_FREQ)
+#define RX_TIMER_TICKS_PER_MICROSECOND (RX_TIMER_FREQ / 1000000)
+
 #endif // ARDUINO_ARCH_ESP32
 
 void IRAM_ATTR SetTxBitTimer()
@@ -1232,7 +1235,7 @@ void IRAM_ATTR RxPinChangeIsr()
 
            #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
             timerWrite(timer, 0);
-            timerAlarm(timer, TIMER_FREQ * 40 / 1000000, false, 0);
+            timerAlarm(timer, 40 * RX_TIMER_TICKS_PER_MICROSECOND, false, 0);  // 5 time slots = 5 * 8 us = 40 microseconds
            #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
             timerWrite(timer, 0);
             timerAlarmEnable(timer);
@@ -1290,16 +1293,16 @@ bool TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
   #ifdef ARDUINO_ARCH_ESP32
 
    #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-    timer = timerBegin(TIMER_FREQ);
+    timer = timerBegin(RX_TIMER_FREQ);
     timerAttachInterrupt(timer, &WaitAckIsr);
-    timerAlarm(timer, TIMER_FREQ * 40 / 1000000, false, 0);
+    timerAlarm(timer, 40 * RX_TIMER_TICKS_PER_MICROSECOND, false, 0);  // 5 time slots = 5 * 8 us = 40 microseconds
    #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
     // Clock to timer (prescaler) is always 80 MHz, even if F_CPU is 160 or 240 MHz. We want 0.2 microsecond resolution.
-    timer = timerBegin(0, 80 / 5, true);
+    timer = timerBegin(0, RX_TIMER_DIVIDER, true);
     timerAlarmDisable(timer);
     timerDetachInterrupt(timer);
     timerAttachInterrupt(timer, &WaitAckIsr, true);
-    timerAlarmWrite(timer, 40 * 5, false); // 5 time slots = 5 * 8 us = 40 us = 200 ticks (0.2 microsecond/tick)
+    timerAlarmWrite(timer, 40 * RX_TIMER_TICKS_PER_MICROSECOND, false); // 5 time slots = 5 * 8 us = 40 us = 200 ticks (0.2 microsecond/tick)
    #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
 
   #else // ! ARDUINO_ARCH_ESP32

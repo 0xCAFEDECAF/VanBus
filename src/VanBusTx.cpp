@@ -8,17 +8,25 @@
 
 #include "VanBus.h"
 
-// Normally this value should be 8 * 5 to have a 1-bit time of 8 microseconds.
-// However, it seems that results may be better when adding a few tenths of a microsecond.
 #ifdef ARDUINO_ARCH_ESP32
-  #define VAN_BIT_TIMER_TICKS (8 * 5 + 3)
-#else // ! ARDUINO_ARCH_ESP32
-  #define VAN_BIT_TIMER_TICKS (8 * 5 + 1)
-#endif // ARDUINO_ARCH_ESP32
 
-#ifdef ARDUINO_ARCH_ESP32
-hw_timer_t* txTimer = NULL;
-#endif
+  #define TX_TIMER_FREQ (5000000)  // In Hz, must be multiple of 1000000
+  #define TX_TIMER_DIVIDER (TIMER_BASE_CLK / TX_TIMER_FREQ)
+  #define TX_TIMER_TICKS_PER_MICROSECOND (TX_TIMER_FREQ / 1000000)
+
+  // Normally this value should be 8 * 5 to have a 1-bit time of 8 microseconds.
+  // However, it seems that results may be better when adding a few tenths of a microsecond.
+  #define VAN_TX_BIT_TIMER_TICKS (8 * TX_TIMER_TICKS_PER_MICROSECOND + 3)
+
+  hw_timer_t* txTimer = NULL;
+
+#else // ! ARDUINO_ARCH_ESP32
+
+  // Normally this value should be 8 * 5 to have a 1-bit time of 8 microseconds.
+  // However, it seems that results may be better when adding a few tenths of a microsecond.
+  #define VAN_TX_BIT_TIMER_TICKS (8 * 5 + 1)
+
+#endif // ARDUINO_ARCH_ESP32
 
 // Finish packet transmission
 void IRAM_ATTR FinishPacketTransmission(TVanPacketTxDesc* txDesc)
@@ -40,7 +48,7 @@ void IRAM_ATTR FinishPacketTransmission(TVanPacketTxDesc* txDesc)
         timerStop(txTimer);
       #if ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
         timerAlarmDisable(txTimer);
-        timerAlarmWrite(txTimer, 40 * 5, false); // 5 time slots = 5 * 8 us = 40 us = 200 ticks (0.2 microsecond/tick)
+        timerAlarmWrite(txTimer, 40 * TX_TIMER_TICKS_PER_MICROSECOND, false); // 5 time slots = 5 * 8 us = 40 microseconds
       #endif // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
       #else // ! ARDUINO_ARCH_ESP32
         timer1_disable();
@@ -72,12 +80,12 @@ void IRAM_ATTR SendBitIsr()
         // Wait at least 5 (EOF) + 7 (IFS) bits after last media access.
         // See also Figure 30 of http://ww1.microchip.com/downloads/en/DeviceDoc/doc4205.pdf .
         //
-        // Note: 80 / 5 = 16 = timer prescaler value (see invocation of 'timerBegin(...)').
+        // Note: TX_TIMER_DIVIDER = 80 / 5 = 16 = timer prescaler value (see invocation of 'timerBegin(...)').
         // This is to convert timer ticks to CPU cycles @ 80 MHz. The CPU_CYCLES macro converts that, in turn,
         // to actual CPU cycles (e.g. at 160 Mhz).
         //
         uint32_t nCycles = curr - VanBusRx.GetLastMediaAccessAt();  // Arithmetic has safe roll-over
-        if (nCycles < (5 /* EOF */ + 7 /* IFS */ + 1 /* safety */ ) * CPU_CYCLES(VAN_BIT_TIMER_TICKS * (80 / 5)))
+        if (nCycles < (5 /* EOF */ + 7 /* IFS */ + 1 /* safety */ ) * CPU_CYCLES(VAN_TX_BIT_TIMER_TICKS * TX_TIMER_DIVIDER))
         {
             txDesc->busOccupied = true;
             return;
@@ -171,11 +179,10 @@ void TVanPacketTxQueue::Setup(uint8_t theRxPin, uint8_t theTxPin)
 
   #ifdef ARDUINO_ARCH_ESP32
    #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-    #define TIMER_FREQ (5000000)
-    txTimer = timerBegin(TIMER_FREQ);
+    txTimer = timerBegin(TX_TIMER_FREQ);
     timerAttachInterrupt(txTimer, &SendBitIsr);
    #else
-    txTimer = timerBegin(0, 80 / 5, true);
+    txTimer = timerBegin(0, TX_TIMER_DIVIDER, true);
     timerAlarmDisable(txTimer);
     //timerDetachInterrupt(txTimer);
     //timerAttachInterrupt(txTimer, &SendBitIsr, true);
@@ -183,7 +190,7 @@ void TVanPacketTxQueue::Setup(uint8_t theRxPin, uint8_t theTxPin)
   #endif
 
     VanBusRx.Setup(theRxPin);
-    VanBusRx.RegisterTxTimerTicks(VAN_BIT_TIMER_TICKS);
+    VanBusRx.RegisterTxTimerTicks(VAN_TX_BIT_TIMER_TICKS);
 } // TVanPacketTxQueue::Setup
 
 // Send data as a packet on the VAN bus
@@ -236,7 +243,7 @@ void TVanPacketTxDesc::Dump() const
     // Only if there is something interesting to print
     if (! busOccupied && bitOk && nCollisions == 0 && ! bitError) return;
 
-    uint32_t ifsBits = interFrameCpuCycles / CPU_F_FACTOR / VAN_BIT_TIMER_TICKS / 16;
+    uint32_t ifsBits = interFrameCpuCycles / CPU_F_FACTOR / VAN_TX_BIT_TIMER_TICKS / 16;
     Serial.printf_P(PSTR("#%" PRIu32 ", ifsBits=%" PRIu32 "%s"), n, ifsBits, busOccupied ? ", busOccupied" : "");
 
     if (nCollisions > 0)
@@ -252,13 +259,13 @@ void TVanPacketTxQueue::StartBitSendTimer()
     VanBusRx.RegisterTxIsr(&SendBitIsr);
 
     // TODO - wait here until:
-    // nCycles >= (8 /* EOF */ + 5 /* IFS */) * (VAN_BIT_TIMER_TICKS * 16) * CPU_F_FACTOR
+    // nCycles >= (8 /* EOF */ + 5 /* IFS */) * (VAN_TX_BIT_TIMER_TICKS * 16) * CPU_F_FACTOR
     // If we start the SendBitIsr now, we might introduce extra wobbling in the RxPinChangeIsr, causing CRC errors
     // Preference is to not have the timer1 interrupt handler being called while a packet is being received.
 
     //uint32_t curr = ESP.getCycleCount();
     //uint32_t nCycles = curr - VanBusRx.GetLastMediaAccessAt();  // Arithmetic has safe roll-over
-    //if (nCycles < (8 /* EOF */ + 5 /* IFS */) * (VAN_BIT_TIMER_TICKS * 16) * CPU_F_FACTOR) return;
+    //if (nCycles < (8 /* EOF */ + 5 /* IFS */) * (VAN_TX_BIT_TIMER_TICKS * 16) * CPU_F_FACTOR) return;
 
     NO_INTERRUPTS;
 
@@ -267,11 +274,11 @@ void TVanPacketTxQueue::StartBitSendTimer()
  #ifdef ARDUINO_ARCH_ESP32
 
   #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-    timerAlarm(txTimer, VAN_BIT_TIMER_TICKS, true, 0);
+    timerAlarm(txTimer, VAN_TX_BIT_TIMER_TICKS, true, 0);
   #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
     // Set a repetitive timer
     // timerAlarmDisable(txTimer);
-    timerAlarmWrite(txTimer, VAN_BIT_TIMER_TICKS, true);
+    timerAlarmWrite(txTimer, VAN_TX_BIT_TIMER_TICKS, true);
     timerAlarmEnable(txTimer);
   #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
     timerStart(txTimer);
@@ -287,7 +294,7 @@ void TVanPacketTxQueue::StartBitSendTimer()
         // Clock to timer (prescaler) is always 80 MHz, even if F_CPU is 160 MHz
         timer1_enable(TIM_DIV16, TIM_EDGE, TIM_LOOP);
 
-        timer1_write(VAN_BIT_TIMER_TICKS);
+        timer1_write(VAN_TX_BIT_TIMER_TICKS);
     } // if
 
 #endif // ARDUINO_ARCH_ESP32
