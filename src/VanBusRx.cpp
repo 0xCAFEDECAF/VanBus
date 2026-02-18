@@ -208,11 +208,11 @@ bool TVanPacketRxDesc::CheckCrcFix(bool mustCount, uint32_t* pCounter1, uint32_t
  #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(2, 0, 0)
   static long int addToBitTime = CPU_CYCLES(12);
  #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(2, 0, 0)
-  static long int addToBitTime = CPU_CYCLES(0);
- #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(2, 0, 0)
+  static long int addToBitTime = CPU_CYCLES(6);
+ #endif
 #else // ! ARDUINO_ARCH_ESP32
  static long int addToBitTime = CPU_CYCLES(0);
-#endif // ARDUINO_ARCH_ESP32
+#endif
 
 // Checks the CRC value of a VAN packet. If not, tries to repair it by flipping each bit.
 // Yes, we can sometimes repair a corrupt packet by flipping one or two bits :-)

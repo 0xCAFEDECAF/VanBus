@@ -22,9 +22,7 @@
 
 #else // ! ARDUINO_ARCH_ESP32
 
-  // Normally this value should be 8 * 5 to have a 1-bit time of 8 microseconds.
-  // However, it seems that results may be better when adding a few tenths of a microsecond.
-  #define VAN_TX_BIT_TIMER_TICKS (8 * 5 + 1)
+  #define VAN_TX_BIT_TIMER_TICKS (8 * 5)
 
 #endif // ARDUINO_ARCH_ESP32
 
