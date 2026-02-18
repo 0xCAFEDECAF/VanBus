@@ -66,6 +66,10 @@ void setup()
     Serial.begin(115200);
     Serial.print("Starting VAN bus transmitter\n");
 
+  #ifdef ARDUINO_ARCH_ESP32
+    Serial.printf("ESP_ARDUINO_VERSION: %d.%d.%d\n", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);
+  #endif // ARDUINO_ARCH_ESP32
+
     // Disable WIFI altogether to get rid of long and variable interrupt latency, causing packet CRC errors
     // From: https://esp8266hints.wordpress.com/2017/06/29/save-power-by-reliably-switching-the-esp-wifi-on-and-off/
     WiFi.disconnect(true);
