@@ -1,4 +1,4 @@
-name: Runs the Arduino Linter
+name: Run the Arduino Linter
 
 # The workflow will run on every push and pull request to the repository
 on:

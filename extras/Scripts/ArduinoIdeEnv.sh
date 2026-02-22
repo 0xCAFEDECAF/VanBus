@@ -12,11 +12,8 @@ MAIN_INO=${MYFOLDER}.ino
 
 [[ -n $COMPORT ]] && COMPORT_PARAM="--port ${COMPORT}"
 
-# Fill in your Arduino IDE installation path here
-IDE_PATH="/usr/local/bin"
-
 # Pre-set the board settings
-"${IDE_PATH}/arduino" $COMPORT_PARAM --board $BOARDSPEC --save-prefs
+arduino $COMPORT_PARAM --board $BOARDSPEC --save-prefs
 
 # Now launch the IDE
-"${IDE_PATH}/arduino" "${MYPATH}/${MAIN_INO}"
+arduino "${MYPATH}/${MAIN_INO}"
