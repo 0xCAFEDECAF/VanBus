@@ -898,16 +898,27 @@ void IRAM_ATTR RxPinChangeIsr()
             || nCycles < CPU_CYCLES(650)
 
             // If the "ACK" lasted more than 1 time slot, it is not an "ACK" but the first "1" bit of the next byte
+
           #ifdef ARDUINO_ARCH_ESP32
-            || nCycles > CPU_CYCLES(1400)
+           #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+            #define ACK_TOO_LONG_AFTER (1400)
+           #elif ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(2, 0, 0)
+            #define ACK_TOO_LONG_AFTER (1700)
           #else
+            #define ACK_TOO_LONG_AFTER (1400)
+           #endif
+          #else
+            #define ACK_TOO_LONG_AFTER (1000)
+          #endif
+            || nCycles > CPU_CYCLES(ACK_TOO_LONG_AFTER)
+
+          #ifdef ARDUINO_ARCH_ESP8266
             || pinLevelChangedDuringInterruptHandling
-            || nCycles > CPU_CYCLES(1000)
-          #endif // ! ARDUINO_ARCH_ESP32
+          #endif
            )
         {
           #ifdef ARDUINO_ARCH_ESP8266
-            timer1_disable();
+            timer1_disable();  // TODO - this can be removed? Seems useless.
           #endif // ARDUINO_ARCH_ESP8266
 
             // Go back to state VAN_RX_LOADING
@@ -918,10 +929,10 @@ void IRAM_ATTR RxPinChangeIsr()
         {
             rxDesc->ack = VAN_ACK;
 
+            RELEASE_ANALYSER_WAIT_ACK_ISR;
+
             // The timer ISR 'WaitAckIsr' will call 'VanBusRx._AdvanceHead()'
         } // if
-
-        RELEASE_ANALYSER_WAIT_ACK_ISR;
     } // if
 
     if (state == VAN_RX_VACANT)

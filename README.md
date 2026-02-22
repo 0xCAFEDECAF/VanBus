@@ -167,7 +167,7 @@ An example of an ESP32-based board is the [LilyGO TTGO T7 Mini32].
 
 For an ESP32-based board you will need the ESP32 board package installed. 
 
-I am currently using [version 3.3.3](https://github.com/espressif/arduino-esp32/releases/tag/3.3.3) but other versions
+I am currently using [version 3.3.5](https://github.com/espressif/arduino-esp32/releases/tag/3.3.5) but other versions
 may also be working fine. (I tested with version 1.0.6, 2.0.17 and 3.3.5 .)
 
 Follow [this tutorial](https://randomnerdtutorials.com/installing-the-esp32-board-in-arduino-ide-windows-instructions/)
