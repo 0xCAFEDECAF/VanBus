@@ -22,7 +22,7 @@
 
 #else // ! ARDUINO_ARCH_ESP32
 
-  #define VAN_TX_BIT_TIMER_TICKS (8 * 5)
+  #define VAN_TX_BIT_TIMER_TICKS (8 * TIMER_TICKS_PER_MICROSECOND)
 
 #endif // ARDUINO_ARCH_ESP32
 
@@ -288,7 +288,7 @@ void TVanPacketTxQueue::StartBitSendTimer()
         timer1_attachInterrupt(SendBitIsr);
 
         // Clock to timer (prescaler) is always 80 MHz, even if F_CPU is 160 MHz
-        timer1_enable(TIM_DIV16, TIM_EDGE, TIM_LOOP);
+        timer1_enable(TIMER_DIVIDER, TIM_EDGE, TIM_LOOP);
 
         timer1_write(VAN_TX_BIT_TIMER_TICKS);
     } // if

@@ -64,6 +64,11 @@
 #define CPU_F_FACTOR (F_CPU / TIMER_BASE_CLK)
 #define CPU_CYCLES(_X) ((_X) * CPU_F_FACTOR)
 
+#ifndef ARDUINO_ARCH_ESP32
+  #define TIMER_DIVIDER TIM_DIV16
+  #define TIMER_TICKS_PER_MICROSECOND (5)  // Must match TIM_DIV16 which is 80 MHz / 16 = 5 MHz = 5 ticks/microsec
+#endif
+
 #define VAN_NO_PIN_ASSIGNED (0xFF)
 
 // Forward declarations

@@ -585,12 +585,12 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
 
 #ifdef ARDUINO_ARCH_ESP32
 
-hw_timer_t* timer = NULL;
-extern hw_timer_t* txTimer;
+  hw_timer_t* timer = NULL;
+  extern hw_timer_t* txTimer;
 
-#define RX_TIMER_FREQ (5000000)  // In Hz, must multiple of 1000000
-#define RX_TIMER_DIVIDER (TIMER_BASE_CLK / RX_TIMER_FREQ)
-#define RX_TIMER_TICKS_PER_MICROSECOND (RX_TIMER_FREQ / 1000000)
+  #define RX_TIMER_FREQ (5000000)  // In Hz, must multiple of 1000000
+  #define RX_TIMER_DIVIDER (TIMER_BASE_CLK / RX_TIMER_FREQ)
+  #define RX_TIMER_TICKS_PER_MICROSECOND (RX_TIMER_FREQ / 1000000)
 
 #endif // ARDUINO_ARCH_ESP32
 
@@ -626,7 +626,7 @@ void IRAM_ATTR SetTxBitTimer()
         timer1_attachInterrupt(VanBusRx.txTimerIsr);
 
         // Clock to timer (prescaler) is always 80 MHz, even if F_CPU is 160 MHz
-        timer1_enable(TIM_DIV16, TIM_EDGE, TIM_LOOP);
+        timer1_enable(TIMER_DIVIDER, TIM_EDGE, TIM_LOOP);
 
         timer1_write(VanBusRx.txTimerTicks);
 
@@ -904,7 +904,7 @@ void IRAM_ATTR RxPinChangeIsr()
             #define ACK_TOO_LONG_AFTER (1400)
            #elif ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(2, 0, 0)
             #define ACK_TOO_LONG_AFTER (1700)
-          #else
+           #else
             #define ACK_TOO_LONG_AFTER (1400)
            #endif
           #else
@@ -1248,8 +1248,8 @@ void IRAM_ATTR RxPinChangeIsr()
             timer1_attachInterrupt(WaitAckIsr);
 
             // Clock to timer (prescaler) is always 80 MHz, even if F_CPU is 160 MHz
-            timer1_enable(TIM_DIV16, TIM_EDGE, TIM_SINGLE);
-            timer1_write(40 * 5); // 5 time slots = 5 * 8 us = 40 us = 200 ticks (0.2 microsecond/tick)
+            timer1_enable(TIMER_DIVIDER, TIM_EDGE, TIM_SINGLE);
+            timer1_write(40 * TIMER_TICKS_PER_MICROSECOND); // 5 time slots = 5 * 8 us = 40 us = 200 ticks (0.2 microsecond/tick)
 
           #endif // ARDUINO_ARCH_ESP32
 
