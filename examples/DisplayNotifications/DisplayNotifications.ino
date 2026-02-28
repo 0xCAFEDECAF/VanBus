@@ -3,7 +3,7 @@
  *
  * Written by Erik Tromp
  *
- * Version 0.4.1 - September, 2024
+ * Version 0.5.0 - March, 2026
  *
  * MIT license, all text above must be included in any redistribution.
  *
@@ -32,7 +32,7 @@
  *
  * Tested to work with:
  * - ESP8266 board package 2.6.3 ... 3.1.2
- * - ESP32 board package 1.0.6, 2.0.17
+ * - ESP32 board package 1.0.6, 2.0.17, 3.3.5
  */
 
 #include <assert.h>

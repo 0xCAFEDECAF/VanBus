@@ -1,6 +1,21 @@
+0.5.0
+    General:
+    * Fixes for ESP32 board package
+    * Added 'Arduino Lint' workflow and badge
+
+    src/VanBusRx.cpp, src/VanBusTx.cpp:
+    * Add possibility to drive analyzer pin for use with e.g. Saleae USB Logic Analyzer
+    * Fix buggy packet sending on ESP32:
+      * Use correct timer API invocations
+      * Use separate timer for packet transmission
+    * Cleanup timer `#define`s
+
+    Examples:
+    * Show Arduino board package version on startup
+
 0.4.2
     General:
-    * Updates for esp32 board package, major versions 2 and 3
+    * Updates for ESP32 board package, major versions 2 and 3
     * Fix compiler warnings
     * Added 'compile' workflow and badge
 
