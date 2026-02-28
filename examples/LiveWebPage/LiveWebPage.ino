@@ -1044,7 +1044,7 @@ void setup()
 {
     delay(1000);
     Serial.begin(115200);
-    Serial.print(F("Starting VAN bus live web page server\n"));
+    Serial.print(F("\nStarting VAN bus live web page server\n"));
 
     PrintSystemSpecs();
 

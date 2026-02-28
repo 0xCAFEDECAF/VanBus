@@ -10,6 +10,19 @@ const char PROGMEM unknownStr[] = "UNKNOWN";
 void PrintSystemSpecs()
 {
   #ifdef ARDUINO_ARCH_ESP32
+    Serial.printf("Arduino ESP32 board package version: %d.%d.%d\n",
+        ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);
+  #else
+   #if defined ARDUINO_ESP8266_RELEASE
+    Serial.printf_P(PSTR("Arduino ESP8266 board package version: %s\n"), ARDUINO_ESP8266_RELEASE);
+   #elif defined ARDUINO_ESP8266_DEV
+    Serial.printf_P(PSTR("Arduino ESP8266 board package version: DEV\n"));
+   #else
+    Serial.printf_P(PSTR("Arduino ESP8266 board package version: UNKNOWN\n"));
+   #endif
+  #endif
+
+  #ifdef ARDUINO_ARCH_ESP32
     Serial.printf_P(PSTR("CPU Speed: %" PRIu32 " MHz (CPU_F_FACTOR = %ld)\n"), ESP.getCpuFreqMHz(), CPU_F_FACTOR);
   #else // ! ARDUINO_ARCH_ESP32
     Serial.printf_P(PSTR("CPU Speed: %u MHz (CPU_F_FACTOR = %ld)\n"), ESP.getCpuFreqMHz(), CPU_F_FACTOR);

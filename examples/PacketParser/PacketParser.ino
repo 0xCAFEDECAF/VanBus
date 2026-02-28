@@ -3958,7 +3958,22 @@ void setup()
     delay(1000);
   #endif
     Serial.begin(115200);
-    Serial.print(F("Starting VAN bus packet parser\n"));
+    Serial.print(F("\nStarting VAN bus packet parser\n"));
+
+  #ifdef ARDUINO_ARCH_ESP32
+    Serial.printf("Arduino ESP32 board package version: %d.%d.%d\n",
+        ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);
+  #else
+   #if defined ARDUINO_ESP8266_RELEASE
+    Serial.printf_P(PSTR("Arduino ESP8266 board package version: %s\n"), ARDUINO_ESP8266_RELEASE);
+   #elif defined ARDUINO_ESP8266_DEV
+    Serial.printf_P(PSTR("Arduino ESP8266 board package version: DEV\n"));
+   #else
+    Serial.printf_P(PSTR("Arduino ESP8266 board package version: UNKNOWN\n"));
+   #endif
+  #endif
+
+    Serial.print("\n");
 
     // Disable Wi-Fi altogether to get rid of long and variable interrupt latency, causing packet CRC errors
     // From: https://esp8266hints.wordpress.com/2017/06/29/save-power-by-reliably-switching-the-esp-wifi-on-and-off/

@@ -155,7 +155,21 @@ void setup()
 {
     delay(1000);
     Serial.begin(115200);
-    Serial.print("Sketch to demonstrate the sending of MFD notification messages\n");
+    Serial.print("\nSketch to demonstrate the sending of MFD notification messages\n");
+
+  #ifdef ARDUINO_ARCH_ESP32
+    Serial.printf("Arduino ESP32 board package version: %d.%d.%d\n",
+        ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);
+  #else
+   #if defined ARDUINO_ESP8266_RELEASE
+    Serial.printf_P(PSTR("Arduino ESP8266 board package version: %s\n"), ARDUINO_ESP8266_RELEASE);
+   #elif defined ARDUINO_ESP8266_DEV
+    Serial.printf_P(PSTR("Arduino ESP8266 board package version: DEV\n"));
+   #else
+    Serial.printf_P(PSTR("Arduino ESP8266 board package version: UNKNOWN\n"));
+   #endif
+  #endif
+
     Serial.print("\n");
 
     // Disable Wi-Fi altogether to get rid of long and variable interrupt latency, causing packet CRC errors
@@ -236,13 +250,15 @@ void loop()
     if (millis() - lastSentAt >= 1000UL)  // Arithmetic has safe roll-over
     {
         lastSentAt = millis();
-
         SendExteriorTemperatureMessage(8);  // Send exterior temperature 8 deg C to the MFD
     } // if
 
     // Just to count the number of received packets (shown below in 'VanBus.DumpStats')
     TVanPacketRxDesc pkt;
-    VanBus.Receive(pkt);
+    if (VanBus.Receive(pkt))
+    {
+        pkt.CheckCrcAndRepair();
+    } // if
 
     // Print some boring statistics
     static unsigned long lastDumped = 0;
