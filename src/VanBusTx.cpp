@@ -18,11 +18,17 @@
   // However, it seems that results may be better when adding a few tenths of a microsecond.
   #define VAN_TX_BIT_TIMER_TICKS (8 * TX_TIMER_TICKS_PER_MICROSECOND + 3)
 
+  #define VAN_TX_BIT_TIMER_TICKS_TO_CPU_CYCLES \
+    CPU_CYCLES(VAN_TX_BIT_TIMER_TICKS * TX_TIMER_DIVIDER)
+
   hw_timer_t* txTimer = NULL;
 
 #else // ! ARDUINO_ARCH_ESP32
 
   #define VAN_TX_BIT_TIMER_TICKS (8 * TIMER_TICKS_PER_MICROSECOND)
+
+  #define VAN_TX_BIT_TIMER_TICKS_TO_CPU_CYCLES \
+    CPU_CYCLES(VAN_TX_BIT_TIMER_TICKS * (TIMER_BASE_CLK / 1000000 / TIMER_TICKS_PER_MICROSECOND))
 
 #endif // ARDUINO_ARCH_ESP32
 
@@ -77,12 +83,8 @@ void IRAM_ATTR SendBitIsr()
         // Wait at least 5 (EOF) + 7 (IFS) bits after last media access.
         // See also Figure 30 of http://ww1.microchip.com/downloads/en/DeviceDoc/doc4205.pdf .
         //
-        // Note: TX_TIMER_DIVIDER = 80 / 5 = 16 = timer prescaler value (see invocation of 'timerBegin(...)').
-        // This is to convert timer ticks to CPU cycles @ 80 MHz. The CPU_CYCLES macro converts that, in turn,
-        // to actual CPU cycles (e.g. at 160 Mhz).
-        //
         uint32_t nCycles = curr - VanBusRx.GetLastMediaAccessAt();  // Arithmetic has safe roll-over
-        if (nCycles < (5 /* EOF */ + 7 /* IFS */ + 1 /* safety */ ) * CPU_CYCLES(VAN_TX_BIT_TIMER_TICKS * (80 / 5)))
+        if (nCycles < (5 /* EOF */ + 7 /* IFS */ + 1 /* safety */ ) * VAN_TX_BIT_TIMER_TICKS_TO_CPU_CYCLES)
         {
             txDesc->busOccupied = true;
             return;
