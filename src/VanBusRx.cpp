@@ -9,6 +9,7 @@
 #include <limits.h>
 #include "VanBusRx.h"
 
+// #defines to drive an analyzer pin, for use with e.g. Saleae USB Logic Analyzer.
 // What would we want to analyse? Uncomment either or none of the #defines below.
 //#define ANALYSE_WAIT_ACK_ISR
 //#define ANALYSE_RX_PIN_CHANGE_ISR

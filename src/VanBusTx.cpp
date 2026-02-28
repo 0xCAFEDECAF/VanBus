@@ -242,7 +242,7 @@ void TVanPacketTxDesc::Dump() const
     // Only if there is something interesting to print
     if (! busOccupied && bitOk && nCollisions == 0 && ! bitError) return;
 
-    uint32_t ifsBits = interFrameCpuCycles / CPU_F_FACTOR / VAN_TX_BIT_TIMER_TICKS / 16;
+    uint32_t ifsBits = interFrameCpuCycles / VAN_TX_BIT_TIMER_TICKS_TO_CPU_CYCLES;
     Serial.printf_P(PSTR("#%" PRIu32 ", ifsBits=%" PRIu32 "%s"), n, ifsBits, busOccupied ? ", busOccupied" : "");
 
     if (nCollisions > 0)
@@ -328,6 +328,8 @@ bool TVanPacketTxQueue::SyncSendPacket(uint16_t iden, uint8_t cmdFlags, const ui
     // Wait here for the packet transmission to be finished
     if (! WaitForHeadAvailable()) return false;
 
+    //_head->Dump();
+
     AdvanceHead();
 
     return true;
@@ -346,6 +348,8 @@ bool TVanPacketTxQueue::SendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_
 
     _head->PreparePacket(iden, cmdFlags, data, dataLen);
     StartBitSendTimer();
+
+    //_head->Dump();
 
     AdvanceHead();
 
