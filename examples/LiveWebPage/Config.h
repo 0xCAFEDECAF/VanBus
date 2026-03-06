@@ -105,16 +105,16 @@ inline void WifiConfig()
     #define IR_GND GPIO_NUM_5
    #else
     #define IR_RECV_PIN GPIO_NUM_23 // IR receiver data pin
-    #define IR_VCC GPIO_NUM_18
-    #define IR_GND GPIO_NUM_26
+    #define IR_VCC GPIO_NUM_19
+    #define IR_GND GPIO_NUM_18
    #endif
   #else
     #define IR_RECV_PIN D7 // IR receiver data pin
 
-    // Using D5 as VCC and D0 as ground pin for the IR receiver. Should be possible with e.g. the
+    // Using D6 as VCC and D5 as ground pin for the IR receiver. Should be possible with e.g. the
     // TSOP31238 IR receiver as it typically uses only 0.35 mA.
-    #define IR_VCC D5
-    #define IR_GND D0
+    #define IR_VCC D6
+    #define IR_GND D5
 
   #endif // ARDUINO_ARCH_ESP32
 
