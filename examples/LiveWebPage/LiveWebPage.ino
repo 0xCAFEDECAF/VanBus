@@ -92,9 +92,11 @@
 #ifdef ARDUINO_ARCH_ESP32
  #ifdef CONFIG_IDF_TARGET_ESP32S2
   #define RX_PIN GPIO_NUM_33
+  #define TX_PIN GPIO_NUM_18
  #else
   // Note: GPIO_NUM_22 is also LED pin on Lilygo TTGO T7 V1.3 Mini32
   #define RX_PIN GPIO_NUM_22
+  #define TX_PIN GPIO_NUM_21
  #endif
 #else // ! ARDUINO_ARCH_ESP32
   #if defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
@@ -106,6 +108,7 @@
   //#define RX_PIN D3  // GPIO0 - pulled up - Boot fails
   //#define RX_PIN D4  // GPIO2 - pulled up
   //#define RX_PIN D8  // GPIO15 - pulled to GND - Boot fails
+  #define TX_PIN D3
 #endif // ARDUINO_ARCH_ESP32
 
 // TODO - reduce size of large JSON packets like the ones containing guidance instruction icons
@@ -1082,6 +1085,7 @@ void setup()
   #define STR(x) #x
     Serial.printf_P(PSTR("Setting up VAN bus receiver on pin %s (GPIO%u)\n"), XSTR(RX_PIN), RX_PIN);
     VanBusRx.Setup(RX_PIN, VAN_PACKET_QUEUE_SIZE);
+    VanBusRx.SetTxPinRecessive(TX_PIN);
     Serial.printf_P(PSTR("VanBusRx queue of size %d is set up\n"), VanBusRx.QueueSize());
 
     IrSetup();

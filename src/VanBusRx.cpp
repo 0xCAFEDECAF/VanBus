@@ -1320,6 +1320,13 @@ bool TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
     return true;
 } // TVanPacketRxQueue::Setup
 
+// If the TX pin is connected: make sure it does not affect the bus
+void TVanPacketRxQueue::SetTxPinRecessive(uint8_t txPin)
+{
+    pinMode(txPin, OUTPUT);
+    digitalWrite(txPin, VAN_BIT_RECESSIVE);  // Set bus state to 'recessive' (CANH and CANL: not driven)
+} // TVanPacketRxQueue::SetTxPinRecessive
+
 // Copy a VAN packet out of the receive queue, if available. Otherwise, returns false.
 // If a valid pointer is passed to 'isQueueOverrun', will report then clear any queue overrun condition.
 bool TVanPacketRxQueue::Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun)

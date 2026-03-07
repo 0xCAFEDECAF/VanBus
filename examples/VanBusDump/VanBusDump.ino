@@ -74,9 +74,11 @@
 #ifdef ARDUINO_ARCH_ESP32
  #ifdef CONFIG_IDF_TARGET_ESP32S2
   #define RX_PIN GPIO_NUM_33
+  #define TX_PIN GPIO_NUM_18
  #else
   // Note: GPIO_NUM_22 is also LED pin on Lilygo TTGO T7 V1.3 Mini32
   #define RX_PIN GPIO_NUM_22
+  #define TX_PIN GPIO_NUM_21
  #endif
 #else // ! ARDUINO_ARCH_ESP32
   #if defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
@@ -85,6 +87,7 @@
   #endif // defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
   // For WEMOS D1 mini board we use D2 (GPIO 4)
   #define RX_PIN D2
+  #define TX_PIN D3
 #endif // ARDUINO_ARCH_ESP32
 
 void setup()
@@ -128,6 +131,7 @@ void setup()
   #define STR(x) #x
     Serial.printf_P(PSTR("Setting up VAN bus receiver on pin %s (GPIO%u)\n"), XSTR(RX_PIN), RX_PIN);
     VanBusRx.Setup(RX_PIN);
+    VanBusRx.SetTxPinRecessive(TX_PIN);
     Serial.printf_P(PSTR("VanBusRx queue of size %d is set up\n"), VanBusRx.QueueSize());
 } // setup
 
