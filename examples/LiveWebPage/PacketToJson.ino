@@ -510,7 +510,7 @@ VanPacketParseResult_t ParseVinPkt(TVanPacketRxDesc& pkt, char* buf, const int n
     // - "F" = ES9, EW10: petrol
     // - "H" = XU10, DW10 (HDI): diesel
     //
-    // See also: http://www.peugeotlogic.com/workshop/wshtml/specs/vincode.htm
+    // See also: https://www.peugeotlogic.com/workshop-wshtml-specs-vincode-htm/
     char engineType = data[6];
 
     switch (engineType)
@@ -664,7 +664,7 @@ VanPacketParseResult_t ParseLightsStatusPkt(TVanPacketRxDesc& pkt, char* buf, co
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#4FC
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#4FC_1
-    // https://github.com/morcibacsi/PSAVanCanBridge/blob/master/src/Van/Structs/VanInstrumentClusterV1Structs.h
+    //  https://github.com/morcibacsi/PSAVanCanBridge/blob/v3/src/Protocol/AEE2001/Structs/VAN_4FC.h
 
     int dataLen = pkt.DataLen();
     if (dataLen != 11 && dataLen != 14) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
@@ -1161,8 +1161,7 @@ VanPacketParseResult_t ParseCarStatus2Pkt(TVanPacketRxDesc& pkt, char* buf, cons
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#524
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#524
-    // https://github.com/morcibacsi/PSAVanCanBridge/blob/master/src/Van/Structs/VanDisplayStructsV1.h
-    // https://github.com/morcibacsi/PSAVanCanBridge/blob/master/src/Van/Structs/VanDisplayStructsV2.h
+    // https://github.com/morcibacsi/PSAVanCanBridge/blob/v3/src/Protocol/AEE2001/Structs/VAN_524.h
 
     int dataLen = pkt.DataLen();
     if (dataLen != 14 && dataLen != 16) return VAN_PACKET_PARSE_UNEXPECTED_LENGTH;
@@ -1956,7 +1955,7 @@ VanPacketParseResult_t ParseAudioSettingsPkt(TVanPacketRxDesc& pkt, char* buf, c
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#4D4
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#4D4
-    // https://github.com/morcibacsi/PSAVanCanBridge/blob/master/src/Van/Structs/VanRadioInfoStructs.h
+    // https://github.com/morcibacsi/PSAVanCanBridge/blob/4c0ba71f1c32ac3e54ffe743a263fdd7b92beff4/PSAVanCanBridge/src/Van/Structs/VanRadioInfoStructs.h
 
     const uint8_t* data = pkt.Data();
     bool isHeadUnitPowerOn = data[2] & 0x01;
@@ -2105,7 +2104,7 @@ VanPacketParseResult_t ParseAirCon1Pkt(TVanPacketRxDesc& pkt, char* buf, const i
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#464
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#464
-    // https://github.com/morcibacsi/PSAVanCanBridge/blob/master/src/Van/Structs/VanAirConditioner1Structs.h
+    // https://github.com/morcibacsi/PSAVanCanBridge/blob/v3/src/Protocol/AEE2001/Structs/VAN_464.h
 
     const uint8_t* data = pkt.Data();
 
@@ -2222,7 +2221,7 @@ VanPacketParseResult_t ParseAirCon2Pkt(TVanPacketRxDesc& pkt, char* buf, const i
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#4DC
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#4DC
-    // https://github.com/morcibacsi/PSAVanCanBridge/blob/master/src/Van/Structs/VanAirConditioner2Structs.h
+    // https://github.com/morcibacsi/PSAVanCanBridge/blob/v3/src/Protocol/AEE2001/Structs/VAN_4DC.h
 
     const uint8_t* data = pkt.Data();
 
@@ -2307,7 +2306,7 @@ VanPacketParseResult_t ParseCdChangerPkt(TVanPacketRxDesc& pkt, char* buf, const
 {
     // http://graham.auld.me.uk/projects/vanbus/packets.html#4EC
     // http://pinterpeti.hu/psavanbus/PSA-VAN.html#4EC
-    // https://github.com/morcibacsi/PSAVanCanBridge/blob/master/src/Van/Structs/VanCdChangerStructs.h
+    // https://github.com/morcibacsi/PSAVanCanBridge/blob/4c0ba71f1c32ac3e54ffe743a263fdd7b92beff4/PSAVanCanBridge/src/Van/Structs/VanCdChangerStructs.h
 
     int dataLen = pkt.DataLen();
     if (dataLen == 0) return VAN_PACKET_NO_CONTENT; // "Request" packet; nothing to show

@@ -81,7 +81,7 @@ void IRAM_ATTR SendBitIsr()
     if (txDesc->state == VAN_TX_WAITING)
     {
         // Wait at least 5 (EOF) + 7 (IFS) bits after last media access.
-        // See also Figure 30 of http://ww1.microchip.com/downloads/en/DeviceDoc/doc4205.pdf .
+        // See also Figure 30 of http://ww1.microchip.com/downloads/en/DeviceDoc/doc4205.pdf#page=47 .
         //
         uint32_t nCycles = curr - VanBusRx.GetLastMediaAccessAt();  // Arithmetic has safe roll-over
         if (nCycles < (5 /* EOF */ + 7 /* IFS */ + 1 /* safety */ ) * VAN_TX_BIT_TIMER_TICKS_TO_CPU_CYCLES)

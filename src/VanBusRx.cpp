@@ -15,7 +15,7 @@
 //#define ANALYSE_RX_PIN_CHANGE_ISR
 
 #if defined ANALYSE_WAIT_ACK_ISR && defined ANALYSE_RX_PIN_CHANGE_ISR
-#error "Either #define ANALYSE_WAIT_ACK_ISR or #define ANALYSE_RX_PIN_CHANGE_ISR, but not both"
+  #error "Either #define ANALYSE_WAIT_ACK_ISR or #define ANALYSE_RX_PIN_CHANGE_ISR, but not both"
 #endif
 
 #if defined ANALYSE_WAIT_ACK_ISR || defined ANALYSE_RX_PIN_CHANGE_ISR

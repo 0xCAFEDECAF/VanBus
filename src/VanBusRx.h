@@ -188,7 +188,7 @@ class TVanPacketRxDesc
 
     TVanPacketRxDesc() { Init(); }
     __attribute__((always_inline)) uint16_t Iden() const { return bytes[1] << 4 | bytes[2] >> 4; }
-    uint8_t CommandFlags() const;  // See page 17 of http://ww1.microchip.com/downloads/en/DeviceDoc/doc4205.pdf
+    uint8_t CommandFlags() const;  // See http://ww1.microchip.com/downloads/en/DeviceDoc/doc4205.pdf#page=17
     const uint8_t* Data() const;
     int DataLen() const;
     unsigned long Millis() { return millis_; }  // Packet time stamp in milliseconds
@@ -316,13 +316,13 @@ extern portMUX_TYPE mux;
 
 #ifdef ARDUINO_ARCH_ESP32
 
-    #define NO_INTERRUPTS
-    #define INTERRUPTS
+  #define NO_INTERRUPTS
+  #define INTERRUPTS
 
 #else // ! ARDUINO_ARCH_ESP32
 
-    #define NO_INTERRUPTS noInterrupts()
-    #define INTERRUPTS interrupts()
+  #define NO_INTERRUPTS noInterrupts()
+  #define INTERRUPTS interrupts()
 
 #endif // ARDUINO_ARCH_ESP32
 

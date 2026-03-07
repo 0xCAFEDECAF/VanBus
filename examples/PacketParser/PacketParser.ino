@@ -624,7 +624,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
         {
             // http://graham.auld.me.uk/projects/vanbus/packets.html#4FC
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#4FC_1
-            // https://github.com/morcibacsi/PSAVanCanBridge/blob/master/src/Van/Structs/VanInstrumentClusterV1Structs.h
+            // https://github.com/morcibacsi/PSAVanCanBridge/blob/v3/src/Protocol/AEE2001/Structs/VAN_4FC.h
 
             // Print only if not duplicate of previous packet
             static uint8_t packetData[VAN_MAX_DATA_BYTES] = "";  // Previous packet data
@@ -1073,8 +1073,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
         {
             // http://graham.auld.me.uk/projects/vanbus/packets.html#524
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#524
-            // https://github.com/morcibacsi/PSAVanCanBridge/blob/master/src/Van/Structs/VanDisplayStructsV1.h
-            // https://github.com/morcibacsi/PSAVanCanBridge/blob/master/src/Van/Structs/VanDisplayStructsV2.h
+            // https://github.com/morcibacsi/PSAVanCanBridge/blob/v3/src/Protocol/AEE2001/Structs/VAN_524.h
 
             // Print only if not duplicate of previous packet
             static uint8_t packetData[VAN_MAX_DATA_BYTES] = "";  // Previous packet data
@@ -1505,7 +1504,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
                         // data[8] and data[9]: PI code
                         // See also:
                         // - https://en.wikipedia.org/wiki/Radio_Data_System#Program_Identification_Code_(PI_Code)
-                        // - https://radio-tv-nederland.nl/rds/rds.html
+                        // - https://web.archive.org/web/20210123172039/https://radio-tv-nederland.nl/rds/rds.html
                         // - https://people.uta.fi/~jk54415/dx/pi-codes.html
                         // - http://poupa.cz/rds/countrycodes.htm
                         // - https://www.pira.cz/rds/p232man.pdf
@@ -1763,7 +1762,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
         {
             // http://graham.auld.me.uk/projects/vanbus/packets.html#4D4
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#4D4
-            // https://github.com/morcibacsi/PSAVanCanBridge/blob/master/src/Van/Structs/VanRadioInfoStructs.h
+            // https://github.com/morcibacsi/PSAVanCanBridge/blob/4c0ba71f1c32ac3e54ffe743a263fdd7b92beff4/PSAVanCanBridge/src/Van/Structs/VanRadioInfoStructs.h
 
             // These packets are sent by the head unit
 
@@ -1887,7 +1886,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
         {
             // http://graham.auld.me.uk/projects/vanbus/packets.html#464
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#464
-            // https://github.com/morcibacsi/PSAVanCanBridge/blob/master/src/Van/Structs/VanAirConditioner1Structs.h
+            // https://github.com/morcibacsi/PSAVanCanBridge/blob/v3/src/Protocol/AEE2001/Structs/VAN_464.h
 
             // Examples:
             // Raw: #3147 ( 7/15) 10 0E 464 WA0 00-00-00-00-07-D1-7C ACK OK D17C CRC_OK
@@ -2009,7 +2008,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
         {
             // http://graham.auld.me.uk/projects/vanbus/packets.html#4DC
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#4DC
-            // https://github.com/morcibacsi/PSAVanCanBridge/blob/master/src/Van/Structs/VanAirConditioner2Structs.h
+            // https://github.com/morcibacsi/PSAVanCanBridge/blob/v3/src/Protocol/AEE2001/Structs/VAN_4DC.h
 
             // Evaporator temperature is constantly toggling between 2 values, while the rest of the data is the same.
             // So print only if not duplicate of previous 2 packets.
@@ -2060,7 +2059,7 @@ VanPacketParseResult_t ParseVanPacket(TVanPacketRxDesc* pkt)
         {
             // http://graham.auld.me.uk/projects/vanbus/packets.html#4EC
             // http://pinterpeti.hu/psavanbus/PSA-VAN.html#4EC
-            // https://github.com/morcibacsi/PSAVanCanBridge/blob/master/src/Van/Structs/VanCdChangerStructs.h
+            // https://github.com/morcibacsi/PSAVanCanBridge/blob/4c0ba71f1c32ac3e54ffe743a263fdd7b92beff4/PSAVanCanBridge/src/Van/Structs/VanCdChangerStructs.h
 
             // Example: 0E4ECF9768
 

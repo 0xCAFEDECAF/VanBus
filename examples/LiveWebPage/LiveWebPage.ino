@@ -912,8 +912,8 @@ enum VanPacketFilter_t
 uint16_t serialDumpFilter;
 
 // Set a simple filter on the dumping of packet + JSON data on Serial.
-// Surf to e.g. http://car.lan/dumpOnly?iden=8c4 to have only packets with IDEN 0x8C4 dumped on serial.
-// Surf to http://car.lan/dumpOnly?iden=0 to dump all packets.
+// Surf to e.g. http://MyCarLive/dumpOnly?iden=8c4 to have only packets with IDEN 0x8C4 dumped on serial.
+// Surf to http://MyCarLive/dumpOnly?iden=0 to dump all packets.
 void HandleDumpFilter()
 {
     Serial.print(F("Web server received request from "));
