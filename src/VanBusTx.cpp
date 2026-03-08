@@ -1,5 +1,5 @@
 /*
- * VanBus packet transmitter for ESP8266
+ * VanBus packet transmitter for ESP8266 and ESP32
  *
  * Written by Erik Tromp
  *
@@ -69,11 +69,8 @@ void IRAM_ATTR FinishPacketTransmission(TVanPacketTxDesc* txDesc)
 void IRAM_ATTR SendBitIsr()
 {
     uint32_t curr = ESP.getCycleCount();  // Store CPU cycle counter value as soon as possible
-
     static unsigned int atBit = 9;
-
     static uint16_t* p_stuffedByte;
-
     TVanPacketTxDesc* txDesc = VanBusTx._tail;
 
     //if (txDesc->state == VAN_TX_DONE) return;
@@ -111,11 +108,11 @@ void IRAM_ATTR SendBitIsr()
     {
         // Check if previously transmitted bit has been copied by reading RX pin
 
-    #ifdef ARDUINO_ARCH_ESP32
+      #ifdef ARDUINO_ARCH_ESP32
         int pinLevel = digitalRead(VanBusRx.pin);
-    #else // ! ARDUINO_ARCH_ESP32
+      #else // ! ARDUINO_ARCH_ESP32
         int pinLevel = GPIP(VanBusRx.pin);
-    #endif // ARDUINO_ARCH_ESP32
+      #endif // ARDUINO_ARCH_ESP32
 
         if (pinLevel == VAN_BIT_DOMINANT && lastSetLevel == VAN_BIT_RECESSIVE)
         {
@@ -140,20 +137,20 @@ void IRAM_ATTR SendBitIsr()
     // Write to GPIO pin
     if (bit != 0)
     {
-    #ifdef ARDUINO_ARCH_ESP32
+      #ifdef ARDUINO_ARCH_ESP32
         REG_WRITE(GPIO_OUT_W1TS_REG, 1 << VanBusTx.txPin);
-    #else // ! ARDUINO_ARCH_ESP32
+      #else // ! ARDUINO_ARCH_ESP32
         GPOS = (1 << VanBusTx.txPin);
-    #endif // ARDUINO_ARCH_ESP32
+      #endif // ARDUINO_ARCH_ESP32
         lastSetLevel = VAN_BIT_RECESSIVE;
     }
     else
     {
-    #ifdef ARDUINO_ARCH_ESP32
+      #ifdef ARDUINO_ARCH_ESP32
         REG_WRITE(GPIO_OUT_W1TC_REG, 1 << VanBusTx.txPin);
-    #else // ! ARDUINO_ARCH_ESP32
+      #else // ! ARDUINO_ARCH_ESP32
         GPOC = (1 << VanBusTx.txPin);
-    #endif // ARDUINO_ARCH_ESP32
+      #endif // ARDUINO_ARCH_ESP32
         lastSetLevel = VAN_BIT_DOMINANT;
     } // if
 
@@ -270,18 +267,18 @@ void TVanPacketTxQueue::StartBitSendTimer()
 
     // Transmitting a packet is done completely by interrupt-servicing
 
- #ifdef ARDUINO_ARCH_ESP32
+  #ifdef ARDUINO_ARCH_ESP32
 
-  #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+   #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
     timerAlarm(txTimer, VAN_TX_BIT_TIMER_TICKS, true, 0);
-  #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+   #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
     // Set a repetitive timer
     timerAlarmWrite(txTimer, VAN_TX_BIT_TIMER_TICKS, true);
     timerAlarmEnable(txTimer);
-  #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+   #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
     timerStart(txTimer);
 
- #else // ! ARDUINO_ARCH_ESP32
+  #else // ! ARDUINO_ARCH_ESP32
 
     if (! timer1_enabled())
     {
@@ -295,7 +292,7 @@ void TVanPacketTxQueue::StartBitSendTimer()
         timer1_write(VAN_TX_BIT_TIMER_TICKS);
     } // if
 
-#endif // ARDUINO_ARCH_ESP32
+  #endif // ARDUINO_ARCH_ESP32
 
     INTERRUPTS;
 } // void TVanPacketTxQueue::StartBitSendTimer

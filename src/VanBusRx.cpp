@@ -1,5 +1,5 @@
 /*
- * VanBus packet receiver for ESP8266
+ * VanBus packet receiver for ESP8266 and ESP32
  *
  * Written by Erik Tromp
  *
@@ -21,11 +21,9 @@
 #if defined ANALYSE_WAIT_ACK_ISR || defined ANALYSE_RX_PIN_CHANGE_ISR
 // GPIO pin connected to logic analyser
  #ifdef ARDUINO_ARCH_ESP32
-  // For LilyGO TTGO T7 Mini32 we use IO05 (GPIO 05)
-  const int ANALYSER_PIN = GPIO_NUM_5;
+  const int ANALYSER_PIN = GPIO_NUM_5;  // For LilyGO TTGO T7 Mini32 we use IO05 (GPIO 05)
  #else // ! ARDUINO_ARCH_ESP32
-  // For WEMOS D1 mini board we use D8 (GPIO 15)
-  const int ANALYSER_PIN = D8;
+  const int ANALYSER_PIN = D8;  // For WEMOS D1 mini board we use D8 (GPIO 15)
  #endif // ARDUINO_ARCH_ESP32
 #endif
 
@@ -44,6 +42,7 @@
   #define RELEASE_ANALYSER_RX_PIN_CHANGE_ISR digitalWrite(ANALYSER_PIN, HIGH)
 
 #else
+
   #define TRIGGER_ANALYSER_WAIT_ACK_ISR
   #define RELEASE_ANALYSER_WAIT_ACK_ISR
   #define TRIGGER_ANALYSER_RX_PIN_CHANGE_ISR
@@ -590,7 +589,7 @@ inline __attribute__((always_inline)) unsigned int nBitsTakingIntoAccountJitter(
   extern hw_timer_t* txTimer;
 
   #define RX_TIMER_FREQ (5000000)  // In Hz, must multiple of 1000000
-  #define RX_TIMER_DIVIDER (TIMER_BASE_CLK / RX_TIMER_FREQ)
+  #define RX_TIMER_DIVIDER (TIMER_BASE_CLK / RX_TIMER_FREQ) // TIMER_BASE_CLK = 80000000, regardless of chosen CPU freq
   #define RX_TIMER_TICKS_PER_MICROSECOND (RX_TIMER_FREQ / 1000000)
 
 #endif // ARDUINO_ARCH_ESP32
@@ -1295,21 +1294,27 @@ bool TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
   #ifdef ARDUINO_ARCH_ESP32
 
    #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+
     timer = timerBegin(RX_TIMER_FREQ);
     timerAttachInterrupt(timer, &WaitAckIsr);
     timerAlarm(timer, 40 * RX_TIMER_TICKS_PER_MICROSECOND, false, 0);  // 5 time slots = 5 * 8 us = 40 microseconds
+
    #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+
     // Clock to timer (prescaler) is always 80 MHz, even if F_CPU is 160 or 240 MHz. We want 0.2 microsecond resolution.
     timer = timerBegin(0, RX_TIMER_DIVIDER, true);
     timerAlarmDisable(timer);
     timerDetachInterrupt(timer);
     timerAttachInterrupt(timer, &WaitAckIsr, true);
     timerAlarmWrite(timer, 40 * RX_TIMER_TICKS_PER_MICROSECOND, false); // 5 time slots = 5 * 8 us = 40 us = 200 ticks (0.2 microsecond/tick)
+
    #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
 
   #else // ! ARDUINO_ARCH_ESP32
+
     timer1_isr_init();
     timer1_disable();
+
   #endif // ARDUINO_ARCH_ESP32
 
     pin = rxPin;

@@ -1,5 +1,5 @@
 /*
- * VanBus packet receiver and transmitter for ESP8266
+ * VanBus packet receiver and transmitter for ESP8266 and ESP32
  *
  * Written by Erik Tromp
  *
