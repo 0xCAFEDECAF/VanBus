@@ -288,8 +288,11 @@ bool TVanPacketRxDesc::CheckCrcAndRepair(bool (TVanPacketRxDesc::*wantToCount)()
 
                 if (CheckCrcFix(mustCount, &VanBusRx.nBitDeletionErrors))
                 {
+                  #ifdef ARDUINO_ARCH_ESP8266
+                    // Adapt a bit
                     addToBitTime += CPU_CYCLES(4);
                     if (addToBitTime > CPU_CYCLES(20)) addToBitTime = CPU_CYCLES(20);
+                  #endif
                     return true;
                 } // if
             } // for
