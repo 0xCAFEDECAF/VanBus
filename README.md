@@ -56,7 +56,7 @@ There are various possibilities to hook up a ESP8266/ESP32 based board to your v
    ESP8266/ESP32 board.
 
    A board with the MCP2551 transceiver can be ordered e.g.
-   [here](https://domoticx.net/webshop/can-bus-transceiver-module-5v-mcp2551/) or
+   [here](https://domoticx.net/webshop/can-bus-classic-20b-transceiver-module-5v-uart-mcp2551/) or
    [here](https://nl.aliexpress.com/item/1005004475976642.html).
 
    Example schema using a [Wemos D1 mini] (ESP8266 based):
@@ -85,7 +85,8 @@ There are various possibilities to hook up a ESP8266/ESP32 based board to your v
    CTX / TXD / D pins of the transceiver to a GPIO pin of your ESP8266/ESP32 board.
 
    A board with the SN65HVD230 transceiver can be ordered e.g.
-   [here](https://domoticx.net/webshop/can-bus-transceiver-module-3-3v-sn65hvd230-vp230/) or
+   [here](https://domoticx.net/webshop/can-bus-classic-20b-transceiver-module-33v-uart-sn65hvd230-vp230/),
+   [here](https://domoticx.net/webshop/can-bus-classic-20b-transceiver-module-33v-uart-sit65hvd230dr-tvs-esd-protection-domoticx-experience-ect01-v1/) or
    [here](https://eu.robotshop.com/products/waveshare-can-board-sn65hvd230).
 
 ![schema](extras/Schematics/Schematic%20using%20SN65HVD230_bb.png)
