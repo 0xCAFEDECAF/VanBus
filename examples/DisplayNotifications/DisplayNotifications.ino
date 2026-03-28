@@ -50,15 +50,16 @@
 // Use #defines, not const int, so that the Serial.printf_P in setup() shows the correct pin name on the console.
 #ifdef ARDUINO_ARCH_ESP32
  #ifdef CONFIG_IDF_TARGET_ESP32S2
-  #define TX_PIN GPIO_NUM_18
   #define RX_PIN GPIO_NUM_33
+  #define TX_PIN GPIO_NUM_18
  #else
-  #define TX_PIN GPIO_NUM_21
-  #define RX_PIN GPIO_NUM_22
+  // Note: GPIO_NUM_22 is LED pin on Lilygo TTGO T7 V1.3 Mini32
+  #define RX_PIN GPIO_NUM_21
+  #define TX_PIN GPIO_NUM_16
  #endif
 #else // ! ARDUINO_ARCH_ESP32
-  #define TX_PIN D3
   #define RX_PIN D2
+  #define TX_PIN D3
 #endif // ARDUINO_ARCH_ESP32
 
 // Send an exterior temperature value to the multifunction display (MFD)

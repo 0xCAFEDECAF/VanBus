@@ -61,9 +61,9 @@
   #define RX_PIN GPIO_NUM_33
   #define TX_PIN GPIO_NUM_18
  #else
-  // Note: GPIO_NUM_22 is also LED pin on Lilygo TTGO T7 V1.3 Mini32
-  #define RX_PIN GPIO_NUM_22
-  #define TX_PIN GPIO_NUM_21
+  // Note: GPIO_NUM_22 is LED pin on Lilygo TTGO T7 V1.3 Mini32
+  #define RX_PIN GPIO_NUM_21
+  #define TX_PIN GPIO_NUM_16
  #endif
 #else // ! ARDUINO_ARCH_ESP32
   #if defined ARDUINO_ESP8266_GENERIC || defined ARDUINO_ESP8266_ESP01
