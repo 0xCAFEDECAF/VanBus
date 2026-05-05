@@ -507,6 +507,35 @@ void TVanPacketRxDesc::DumpRaw(Stream& s, char last) const
     s.print(last);
 } // TVanPacketRxDesc::DumpRaw
 
+void TVanPacketRxQueue::ActiveACK(const uint8_t len, const uint16_t array[]={}) //optionnal array for when len==0
+{
+    if (len==0)
+    {
+        ActiveAckStatus = false;
+        idenAckLen = 0;
+        return;
+    }
+    else { //check if the array given by the user has the correct length? :  if(array[len-1] != NULL)
+        ActiveAckStatus = true;
+        idenAckLen = len;
+        for(uint i = 0; i < len; i++){
+            idenAck[i]=array[i];
+        }
+    }
+}
+
+bool TVanPacketRxDesc::decisionActiveACK()
+{
+    if(TVanPacketRxQueue::ActiveAckStatus == false || TVanPacketRxQueue::idenAckLen == 0){return 0;}
+    if((CommandFlags() ^ 0b0100) & 0b0101){return 0;} // (if != 0) do not acknowledge if Request Acknowledge is 0 or if we are receiving an RTR frame.
+    for(int i=0 ; i < TVanPacketRxQueue::idenAckLen ; i++){
+        if(Iden() == TVanPacketRxQueue::idenAck[i]){
+            return 1;
+        }
+    }
+    return 0;
+} // TVanPacketRxDesc::decisionActiveACK
+
 // Normal bit time (8 microseconds), expressed as number of CPU cycles
 #define VAN_NORMAL_BIT_TIME_CPU_CYCLES (CPU_CYCLES(667))
 
@@ -1226,35 +1255,50 @@ void IRAM_ATTR RxPinChangeIsr()
             // Experiment for 3 last "0"-bits: too short means it is not EOD
             && (nBits != 3 || nCycles > CPU_CYCLES(1963)))
         {
+            const unsigned long eodMicrosActiveAck = micros() - 6; //record the time when eod detected, 6us offset on ESP32S3 +-2.5us
+
             rxDesc->state = VAN_RX_WAITING_ACK;
             DEBUG_IFS(toState, VAN_RX_WAITING_ACK);
 
             rxDesc->ack = VAN_NO_ACK;
 
             TRIGGER_ANALYSER_WAIT_ACK_ISR;
-
-            // Set a timeout for the ACK bit
-
-          #ifdef ARDUINO_ARCH_ESP32
-
-           #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-            timerWrite(timer, 0);
-            timerAlarm(timer, 40 * RX_TIMER_TICKS_PER_MICROSECOND, false, 0);  // 5 time slots = 5 * 8 us = 40 microseconds
-           #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-            timerWrite(timer, 0);
-            timerAlarmEnable(timer);
-           #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-
-          #else // ! ARDUINO_ARCH_ESP32
-
-            timer1_disable();
-            timer1_attachInterrupt(WaitAckIsr);
-
-            // Clock to timer (prescaler) is always 80 MHz, even if F_CPU is 160 MHz
-            timer1_enable(TIMER_DIVIDER, TIM_EDGE, TIM_SINGLE);
-            timer1_write(40 * TIMER_TICKS_PER_MICROSECOND); // 5 time slots = 5 * 8 us = 40 us = 200 ticks (0.2 microsecond/tick)
-
-          #endif // ARDUINO_ARCH_ESP32
+            
+            if (VanBusRx.ActiveAckStatus && rxDesc->decisionActiveACK()){ 
+                rxDesc->ack = VAN_ACTIVE_ACK;
+                unsigned long elapsedMicros = micros() - eodMicrosActiveAck;
+                while(elapsedMicros < 18){
+                    if(elapsedMicros > 7){  //target : 7-18us duration 11us  actual(ESP32-S3): 9.0/7.7/6.5-17.7/16.6us duration 8.7/10us
+                        digitalWrite(globalTxPin,VAN_BIT_DOMINANT);
+                    }
+                    elapsedMicros = micros() - eodMicrosActiveAck;
+                }
+                digitalWrite(globalTxPin,VAN_BIT_RECESSIVE); 
+            }
+            else{
+                // Set a timeout for the ACK bit
+        
+                #ifdef ARDUINO_ARCH_ESP32
+        
+                #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+                    timerWrite(timer, 0);
+                    timerAlarm(timer, 40 * RX_TIMER_TICKS_PER_MICROSECOND, false, 0);  // 5 time slots = 5 * 8 us = 40 microseconds
+                #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+                    timerWrite(timer, 0);
+                    timerAlarmEnable(timer);
+                #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+        
+                #else // ! ARDUINO_ARCH_ESP32
+        
+                    timer1_disable();
+                    timer1_attachInterrupt(WaitAckIsr);
+        
+                    // Clock to timer (prescaler) is always 80 MHz, even if F_CPU is 160 MHz
+                    timer1_enable(TIMER_DIVIDER, TIM_EDGE, TIM_SINGLE);
+                    timer1_write(40 * TIMER_TICKS_PER_MICROSECOND); // 5 time slots = 5 * 8 us = 40 us = 200 ticks (0.2 microsecond/tick)
+        
+                #endif // ARDUINO_ARCH_ESP32
+            }
 
         }
         else if (rxDesc->size >= VAN_MAX_PACKET_SIZE)
@@ -1269,10 +1313,15 @@ void IRAM_ATTR RxPinChangeIsr()
     RETURN;
 } // RxPinChangeIsr
 
+bool TVanPacketRxQueue::ActiveAckStatus = false;
+uint8_t TVanPacketRxQueue::idenAckLen = 0;
+uint16_t TVanPacketRxQueue::idenAck[] = {};
+
 // Initializes the VAN packet receiver
 bool TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
 {
     if (pin != VAN_NO_PIN_ASSIGNED) return false; // Already setup
+    ActiveAckStatus = false;
 
   #if defined ANALYSE_WAIT_ACK_ISR || defined ANALYSE_RX_PIN_CHANGE_ISR
     pinMode(ANALYSER_PIN, OUTPUT);
@@ -1334,6 +1383,12 @@ void TVanPacketRxQueue::SetTxPinRecessive(uint8_t txPin)
     pinMode(txPin, OUTPUT);
     digitalWrite(txPin, VAN_BIT_RECESSIVE);  // Set bus state to 'recessive' (CANH and CANL: not driven)
 } // TVanPacketRxQueue::SetTxPinRecessive
+
+void TVanPacketRxQueue::SetTxPinDominant(uint8_t txPin)
+{
+    pinMode(txPin, OUTPUT);
+    digitalWrite(txPin, VAN_BIT_DOMINANT);  // Set bus state to 'dominant' (CANH active high and CANL active low)
+} // TVanPacketRxQueue::SetTxPinDominant
 
 // Copy a VAN packet out of the receive queue, if available. Otherwise, returns false.
 // If a valid pointer is passed to 'isQueueOverrun', will report then clear any queue overrun condition.
