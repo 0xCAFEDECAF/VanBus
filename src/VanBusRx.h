@@ -280,7 +280,7 @@ class TVanPacketRxDesc
         size = 0;
         state = VAN_RX_VACANT;
         result = VAN_RX_PACKET_OK;
-        ack = VAN_NO_ACK;        
+        ack = VAN_NO_ACK;
 
       #define NO_UNCERTAIN_BIT (0)
         uncertainBit1 = NO_UNCERTAIN_BIT;
@@ -410,68 +410,68 @@ class TVanPacketRxQueue
 
   private:
 
-  uint8_t pin;
-  bool enabled;
-  int size;
-  TVanPacketRxDesc* pool;
-  TVanPacketRxDesc* volatile _head;
-  TVanPacketRxDesc* tail;
-  TVanPacketRxDesc* end;
-  volatile bool _overrun;
-  uint32_t txTimerTicks;
-  timercallback txTimerIsr;
-  volatile uint32_t lastMediaAccessAt;  // For carrier sense: CPU cycle counter value when last sensed
-  
-  #ifdef VAN_RX_ISR_DEBUGGING
-  #define N_ISR_DEBUG_PACKETS 3
-  TIsrDebugPacket isrDebugPacketPool[N_ISR_DEBUG_PACKETS];
-  TIsrDebugPacket* isrDebugPacket;
-  #endif // VAN_RX_ISR_DEBUGGING
-  
-  // Some statistics. Numbers can roll over.
-  uint32_t count;
-  uint32_t nCountedForRepair;
-  uint32_t nCorrupt;
-  uint32_t nRepaired;
-  uint32_t nBitDeletionErrors;
-  uint32_t nOneBitErrors;
-  uint32_t nTwoConsecutiveBitErrors;
-  uint32_t nTwoSeparateBitErrors;
-  uint32_t nUncertainBitErrors;
-  volatile int nQueued;
-  volatile int maxQueued;
-  
-  // Drop policy
-  int startDroppingPacketsAt;
-  bool (*isEssentialPacket)(const TVanPacketRxDesc&);
-  
-  void RegisterTxTimerTicks(uint32_t ticks) { txTimerTicks = ticks; };
-  void RegisterTxIsr(timercallback isr) { ISR_SAFE_SET(txTimerIsr, isr); };
-  
-  void SetLastMediaAccessAt(uint32_t at) { ISR_SAFE_SET(lastMediaAccessAt, at); };
-  
-  bool IsQueueOverrun() { NO_INTERRUPTS; bool result = _overrun; _overrun = false; INTERRUPTS; return result; }
-  
-  // Only to be called from ISR, unsafe otherwise
-  void _AdvanceHead();
-  
-  void AdvanceTail()
-  {
-    if (++tail == end) tail = pool;  // Roll over if needed
-    ISR_SAFE_SET(nQueued, nQueued - 1);
-  } // AdvanceTail
-  
-  static bool ActiveAckStatus;
-  static uint8_t idenAckLen;
-  static uint16_t idenAck[];
+    uint8_t pin;
+    bool enabled;
+    int size;
+    TVanPacketRxDesc* pool;
+    TVanPacketRxDesc* volatile _head;
+    TVanPacketRxDesc* tail;
+    TVanPacketRxDesc* end;
+    volatile bool _overrun;
+    uint32_t txTimerTicks;
+    timercallback txTimerIsr;
+    volatile uint32_t lastMediaAccessAt;  // For carrier sense: CPU cycle counter value when last sensed
+    
+    #ifdef VAN_RX_ISR_DEBUGGING
+    #define N_ISR_DEBUG_PACKETS 3
+    TIsrDebugPacket isrDebugPacketPool[N_ISR_DEBUG_PACKETS];
+    TIsrDebugPacket* isrDebugPacket;
+    #endif // VAN_RX_ISR_DEBUGGING
+    
+    // Some statistics. Numbers can roll over.
+    uint32_t count;
+    uint32_t nCountedForRepair;
+    uint32_t nCorrupt;
+    uint32_t nRepaired;
+    uint32_t nBitDeletionErrors;
+    uint32_t nOneBitErrors;
+    uint32_t nTwoConsecutiveBitErrors;
+    uint32_t nTwoSeparateBitErrors;
+    uint32_t nUncertainBitErrors;
+    volatile int nQueued;
+    volatile int maxQueued;
+    
+    // Drop policy
+    int startDroppingPacketsAt;
+    bool (*isEssentialPacket)(const TVanPacketRxDesc&);
+    
+    void RegisterTxTimerTicks(uint32_t ticks) { txTimerTicks = ticks; };
+    void RegisterTxIsr(timercallback isr) { ISR_SAFE_SET(txTimerIsr, isr); };
+    
+    void SetLastMediaAccessAt(uint32_t at) { ISR_SAFE_SET(lastMediaAccessAt, at); };
+    
+    bool IsQueueOverrun() { NO_INTERRUPTS; bool result = _overrun; _overrun = false; INTERRUPTS; return result; }
+    
+    // Only to be called from ISR, unsafe otherwise
+    void _AdvanceHead();
+    
+    void AdvanceTail()
+    {
+      if (++tail == end) tail = pool;  // Roll over if needed
+      ISR_SAFE_SET(nQueued, nQueued - 1);
+    } // AdvanceTail
+    
+    static bool ActiveAckStatus;
+    static uint8_t idenAckLen;
+    static uint16_t idenAck[];
 
-  friend void FinishPacketTransmission(TVanPacketTxDesc* txDesc);
-  friend void SendBitIsr();
-  friend void RxPinChangeIsr();
-  friend void SetTxBitTimer();
-  friend void WaitAckIsr();
-  friend class TVanPacketRxDesc;
-  friend class TVanPacketTxQueue;
+    friend void FinishPacketTransmission(TVanPacketTxDesc* txDesc);
+    friend void SendBitIsr();
+    friend void RxPinChangeIsr();
+    friend void SetTxBitTimer();
+    friend void WaitAckIsr();
+    friend class TVanPacketRxDesc;
+    friend class TVanPacketTxQueue;
 }; // class TVanPacketRxQueue
 
 extern TVanPacketRxQueue VanBusRx;
