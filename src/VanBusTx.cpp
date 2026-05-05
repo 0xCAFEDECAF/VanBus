@@ -32,6 +32,8 @@
 
 #endif // ARDUINO_ARCH_ESP32
 
+uint8_t globalTxPin = VAN_NO_PIN_ASSIGNED;
+
 // Finish packet transmission
 void IRAM_ATTR FinishPacketTransmission(TVanPacketTxDesc* txDesc)
 {
@@ -169,6 +171,7 @@ void IRAM_ATTR SendBitIsr()
 void TVanPacketTxQueue::Setup(uint8_t theRxPin, uint8_t theTxPin)
 {
     txPin = theTxPin;
+    globalTxPin = txPin;
 
     pinMode(theTxPin, OUTPUT);
     digitalWrite(theTxPin, VAN_BIT_RECESSIVE);  // Set bus state to 'recessive' (CANH and CANL: not driven)
