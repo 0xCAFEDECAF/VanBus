@@ -325,7 +325,8 @@ are recognized by ```IsImportantPacket```.
 
 #### 10. ```void ActiveACK(const uint8_t len, const uint16_t array[]={})``` <a id="activeack"></a>
 
-Acknowleges the frames coming from one of the adresses listed in the array. Sends an ACK by pulling down the bus line into dominant state for 1 timeslot.
+Acknowleges the frames coming from adresses listed in the array. Sends an ACK by pulling down the bus line into dominant state for 1 timeslot.
+IMPORTANT : you have to indicate the **lenght** of the array of adresses you are passing.
 
 Example:
 
@@ -333,8 +334,8 @@ Example:
 
 void setup() {
   TVanBus::Setup(RX_PIN, TX_PIN);
-  uint16_t KnownIdens[] = {0x8EC};
-  VanBusRx.ActiveACK(1, KnownIdens);
+  uint16_t KnownIdens[] = {0x8EC, 0x8C4};
+  VanBusRx.ActiveACK(2, KnownIdens);
 }
 ```
 
@@ -507,6 +508,8 @@ Only available when ```#define VAN_RX_IFS_DEBUGGING``` is uncommented (see
 
 Currently the library supports only 125 kbit/s VAN bus. Need to add support for different rate, like 62.5 kbit/s,
 which can be passed as an optional parameter to ```VanBusRx.Setup(...)```.
+
+Some equipments on a VAN bus use a special frame called Remote Transmission Request (RTR). A device interrogates another by sending a "blank" frame, without any data payload. The target device completes the message in real time by inserting its data plus a checksum directly into this request frame, creating one complete message on the bus. The library doesn't support answering to RTR frames yet.
 
 ## 📖 License<a name = "license"></a>
 
