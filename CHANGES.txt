@@ -1,3 +1,13 @@
+0.5.1
+    General:
+    * README.md: fix dead URLs
+
+    src/VanBusRx.cpp, src/VanBusTx.cpp:
+    * Adapt 'addToBitTime' only on ESP8266 (does not work well on ESP32)
+
+    Examples:
+    * On ESP32, change to use GPIO pin 21 for RX and pin 16 for TX
+
 0.5.0
     General:
     * Fixes for ESP32 board package

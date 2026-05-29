@@ -3,7 +3,7 @@
  *
  * Written by Erik Tromp
  *
- * Version 0.5.0 - March, 2026
+ * Version 0.5.1 - May, 2026
  *
  * MIT license, all text above must be included in any redistribution.
  */
@@ -11,13 +11,13 @@
 #ifndef VanBusVersion_h
 #define VanBusVersion_h
 
-#define VAN_BUS_VERSION "0.5.0"
+#define VAN_BUS_VERSION "0.5.1"
 
 #define VAN_BUS_VERSION_MAJOR 0
 #define VAN_BUS_VERSION_MINOR 5
-#define VAN_BUS_VERSION_PATCH 0
+#define VAN_BUS_VERSION_PATCH 1
 
-#define VAN_BUS_VERSION_INT 000005000
+#define VAN_BUS_VERSION_INT 000005001
 
 #define VAN_BUS_RX_VERSION VAN_BUS_VERSION_INT
 
