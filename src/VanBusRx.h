@@ -73,6 +73,7 @@
 
 // Forward declarations
 
+extern uint8_t globalTxPin;
 void WaitAckIsr();
 void RxPinChangeIsr();
 
@@ -166,7 +167,7 @@ class TIfsDebugPacket
 
 enum PacketReadState_t { VAN_RX_VACANT = 2, VAN_RX_SEARCHING, VAN_RX_LOADING, VAN_RX_WAITING_ACK, VAN_RX_DONE };
 enum PacketReadResult_t { VAN_RX_PACKET_OK, VAN_RX_ERROR_NBITS, VAN_RX_ERROR_MANCHESTER, VAN_RX_ERROR_MAX_PACKET };
-enum PacketAck_t { VAN_ACK, VAN_NO_ACK };
+enum PacketAck_t { VAN_ACK, VAN_NO_ACK, VAN_ACTIVE_ACK };
 
 // VAN packet Rx descriptor
 class TVanPacketRxDesc
@@ -212,7 +213,7 @@ class TVanPacketRxDesc
         return result;
     } // CommandFlagsStr
 
-    const char* AckStr() const { return ack == VAN_ACK ? "ACK" : ack == VAN_NO_ACK ? "NO_ACK": "ACK_??"; }
+    const char* AckStr() const { return ack == VAN_ACK ? "ACK" : ack == VAN_NO_ACK ? "NO_ACK": ack == VAN_ACTIVE_ACK ? "ACTIVE_ACK" : "ACK_??"; }
 
     const char* ResultStr() const
     {
@@ -302,6 +303,8 @@ class TVanPacketRxDesc
 
     bool CheckCrcFix(bool mustCount, uint32_t* pCounter1, uint32_t* pCounter2 = nullptr);
 
+    bool decisionActiveACK();
+
     friend void WaitAckIsr();
     friend void RxPinChangeIsr();
     friend class TVanPacketRxQueue;
@@ -382,8 +385,10 @@ class TVanPacketRxQueue
 
     bool Setup(uint8_t rxPin, int queueSize = VAN_DEFAULT_RX_QUEUE_SIZE);
     void SetTxPinRecessive(uint8_t txPin);
+    void SetTxPinDominant(uint8_t txPin);
     bool Available() const { ISR_SAFE_GET(bool, tail->state == VAN_RX_DONE); }
     bool Receive(TVanPacketRxDesc& pkt, bool* isQueueOverrun = NULL);
+    void ActiveACK(const uint8_t len, const uint16_t array[]);
 
     // Disabling the VAN bus receiver is necessary for timer-intensive tasks, like e.g. operations on the SPI Flash
     // File System (SPIFFS), which otherwise cause system crash. Unfortunately, after disabling then enabling the
@@ -455,6 +460,10 @@ class TVanPacketRxQueue
         if (++tail == end) tail = pool;  // Roll over if needed
         ISR_SAFE_SET(nQueued, nQueued - 1);
     } // AdvanceTail
+    
+    static bool ActiveAckStatus;
+    static uint8_t idenAckLen;
+    static uint16_t idenAck[];
 
     friend void FinishPacketTransmission(TVanPacketTxDesc* txDesc);
     friend void SendBitIsr();

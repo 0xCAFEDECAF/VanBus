@@ -249,12 +249,13 @@ Interfaces for receiving packets:
 7. [```int GetNQueued()```](#getnqueued)
 8. [```int GetMaxQueued()```](#getmaxqueued)
 9. [```void SetDropPolicy(int startAt, bool (*isEssential)(const TVanPacketRxDesc&) = 0)```](#setdroppolicy)
+10. [```void ActiveACK(const uint8_t len, const uint16_t array[]={})```](#activeack)
 
 Interfaces for transmitting packets:
 
-10. [```bool SyncSendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)```](#syncsendpacket)
-11. [```bool SendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)```](#sendpacket)
-12. [```uint32_t GetTxCount()```](#gettxcount)
+11. [```bool SyncSendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)```](#syncsendpacket)
+12. [```bool SendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)```](#sendpacket)
+13. [```uint32_t GetTxCount()```](#gettxcount)
 
 ---
 
@@ -322,15 +323,39 @@ VanBusRx.SetDropPolicy(VAN_PACKET_QUEUE_SIZE * 8 / 10, &IsImportantPacket);
 The above example will drop incoming packets if the receive queue contains 48 or more packets, unless they
 are recognized by ```IsImportantPacket```.
 
-#### 10. ```bool SyncSendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)``` <a id="syncsendpacket"></a>
+#### 10. ```void ActiveACK(const uint8_t len, const uint16_t array[]={})``` <a id="activeack"></a>
+
+Acknowleges the frames coming from adresses listed in the array. Sends an ACK by pulling down the bus line into dominant state for 1 timeslot.
+IMPORTANT : you have to indicate the **lenght** of the array of adresses you are passing.
+
+Example:
+
+```cpp
+
+void setup() {
+  TVanBus::Setup(RX_PIN, TX_PIN);
+  uint16_t KnownIdens[] = {0x8EC, 0x8C4};
+  VanBusRx.ActiveACK(2, KnownIdens);
+}
+```
+
+To disable :
+
+```cpp
+void loop() {
+  VanBusRx.ActiveACK(0);
+}
+```
+
+#### 11. ```bool SyncSendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)``` <a id="syncsendpacket"></a>
 
 Sends a packet for transmission. Returns ```true``` if the packet was successfully transmitted.
 
-#### 11. ```bool SendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)``` <a id="sendpacket"></a>
+#### 12. ```bool SendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10)``` <a id="sendpacket"></a>
 
 Queues a packet for transmission. Returns ```true``` if the packet was successfully queued.
 
-#### 12. ```uint32_t GetTxCount()``` <a id="gettxcount"></a>
+#### 13. ```uint32_t GetTxCount()``` <a id="gettxcount"></a>
 
 Returns the number of VAN packets, offered for transmitting, since power-on. Counter may roll over.
 
@@ -483,6 +508,8 @@ Only available when ```#define VAN_RX_IFS_DEBUGGING``` is uncommented (see
 
 Currently the library supports only 125 kbit/s VAN bus. Need to add support for different rate, like 62.5 kbit/s,
 which can be passed as an optional parameter to ```VanBusRx.Setup(...)```.
+
+Some equipments on a VAN bus use a special frame called Remote Transmission Request (RTR). A device interrogates another by sending a "blank" frame, without any data payload. The target device completes the message in real time by inserting its data plus a checksum directly into this request frame, creating one complete message on the bus. The library doesn't support answering to RTR frames yet.
 
 ## 📖 License<a name = "license"></a>
 
