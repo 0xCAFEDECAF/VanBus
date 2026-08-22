@@ -303,7 +303,7 @@ class TVanPacketRxDesc
 
     bool CheckCrcFix(bool mustCount, uint32_t* pCounter1, uint32_t* pCounter2 = nullptr);
 
-    bool decisionActiveACK();
+    bool DecisionActiveACK();
 
     friend void WaitAckIsr();
     friend void RxPinChangeIsr();
@@ -461,9 +461,11 @@ class TVanPacketRxQueue
         ISR_SAFE_SET(nQueued, nQueued - 1);
     } // AdvanceTail
     
-    static bool ActiveAckStatus;
+    static bool activeAckStatus;
     static uint8_t idenAckLen;
-    static uint16_t idenAck[];
+
+    #define MAX_IDEN_ACKS 16
+    static uint16_t idenAck[MAX_IDEN_ACKS];
 
     friend void FinishPacketTransmission(TVanPacketTxDesc* txDesc);
     friend void SendBitIsr();

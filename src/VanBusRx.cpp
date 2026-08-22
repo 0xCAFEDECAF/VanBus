@@ -507,34 +507,37 @@ void TVanPacketRxDesc::DumpRaw(Stream& s, char last) const
     s.print(last);
 } // TVanPacketRxDesc::DumpRaw
 
-void TVanPacketRxQueue::ActiveACK(const uint8_t len, const uint16_t array[]={}) //optionnal array for when len==0
+void TVanPacketRxQueue::ActiveACK(const uint8_t len, const uint16_t array[] = {}) //optional array for when len != 0
 {
-    if (len==0)
+    if (len == 0)
     {
-        ActiveAckStatus = false;
+        activeAckStatus = false;
         idenAckLen = 0;
         return;
     }
-    else { //check if the array given by the user has the correct length? :  if(array[len-1] != NULL)
-        ActiveAckStatus = true;
+    else
+    {
+        // TODO - check if the array given by the user has the correct length? if(array[len-1] != NULL)
+        activeAckStatus = true;
         idenAckLen = len;
-        for(uint i = 0; i < len; i++){
-            idenAck[i]=array[i];
-        }
+        if (idenAckLen > MAX_IDEN_ACKS) idenAckLen = MAX_IDEN_ACKS;
+        for (uint8_t i = 0; i < len; i++) idenAck[i] = array[i];
     }
 }
 
-bool TVanPacketRxDesc::decisionActiveACK()
+bool TVanPacketRxDesc::DecisionActiveACK()
 {
-    if(TVanPacketRxQueue::ActiveAckStatus == false || TVanPacketRxQueue::idenAckLen == 0){return 0;}
-    if((CommandFlags() ^ 0b0100) & 0b0101){return 0;} // (if != 0) do not acknowledge if Request Acknowledge is 0 or if we are receiving an RTR frame.
-    for(int i=0 ; i < TVanPacketRxQueue::idenAckLen ; i++){
-        if(Iden() == TVanPacketRxQueue::idenAck[i]){
-            return 1;
-        }
+    if (TVanPacketRxQueue::activeAckStatus == false || TVanPacketRxQueue::idenAckLen == 0) return false;
+
+    // (if != 0) do not acknowledge if Request Acknowledge is 0 or if we are receiving an RTR frame.
+    if ((CommandFlags() ^ 0b0100) & 0b0101) return false;
+
+    for (uint8_t i = 0; i < TVanPacketRxQueue::idenAckLen ; i++)
+    {
+        if (Iden() == TVanPacketRxQueue::idenAck[i]) return true;
     }
-    return 0;
-} // TVanPacketRxDesc::decisionActiveACK
+    return false;
+} // TVanPacketRxDesc::DecisionActiveACK
 
 // Normal bit time (8 microseconds), expressed as number of CPU cycles
 #define VAN_NORMAL_BIT_TIME_CPU_CYCLES (CPU_CYCLES(667))
@@ -1255,8 +1258,6 @@ void IRAM_ATTR RxPinChangeIsr()
             // Experiment for 3 last "0"-bits: too short means it is not EOD
             && (nBits != 3 || nCycles > CPU_CYCLES(1963)))
         {
-            const unsigned long eodMicrosActiveAck = micros() - 6; //record the time when eod detected, 6us offset on ESP32S3 +-2.5us
-
             rxDesc->state = VAN_RX_WAITING_ACK;
             DEBUG_IFS(toState, VAN_RX_WAITING_ACK);
 
@@ -1264,18 +1265,26 @@ void IRAM_ATTR RxPinChangeIsr()
 
             TRIGGER_ANALYSER_WAIT_ACK_ISR;
             
-            if (VanBusRx.ActiveAckStatus && rxDesc->decisionActiveACK()){ 
+            if (VanBusRx.activeAckStatus && rxDesc->DecisionActiveACK())
+            {
+                // Record the time when EOD detected, 6us offset on ESP32S3 +-2.5us
+                const unsigned long eodMicrosActiveAck = micros() - 6;
+
                 rxDesc->ack = VAN_ACTIVE_ACK;
                 unsigned long elapsedMicros = micros() - eodMicrosActiveAck;
-                while(elapsedMicros < 18){
-                    if(elapsedMicros > 7){  //target : 7-18us duration 11us  actual(ESP32-S3): 9.0/7.7/6.5-17.7/16.6us duration 8.7/10us
-                        digitalWrite(globalTxPin,VAN_BIT_DOMINANT);
-                    }
+
+                while (elapsedMicros < 18)
+                {
+                    // Target: 7-18us duration 11 us actual(ESP32-S3): 9.0/7.7/6.5-17.7/16.6 us duration 8.7/10 us
+                    if(elapsedMicros > 7) digitalWrite(globalTxPin, VAN_BIT_DOMINANT);
+
                     elapsedMicros = micros() - eodMicrosActiveAck;
-                }
-                digitalWrite(globalTxPin,VAN_BIT_RECESSIVE); 
+                } // while
+
+                digitalWrite(globalTxPin, VAN_BIT_RECESSIVE);
             }
-            else{
+            else
+            {
                 // Set a timeout for the ACK bit
         
                 #ifdef ARDUINO_ARCH_ESP32
@@ -1299,7 +1308,6 @@ void IRAM_ATTR RxPinChangeIsr()
         
                 #endif // ARDUINO_ARCH_ESP32
             }
-
         }
         else if (rxDesc->size >= VAN_MAX_PACKET_SIZE)
         {
@@ -1313,15 +1321,15 @@ void IRAM_ATTR RxPinChangeIsr()
     RETURN;
 } // RxPinChangeIsr
 
-bool TVanPacketRxQueue::ActiveAckStatus = false;
+bool TVanPacketRxQueue::activeAckStatus = false;
 uint8_t TVanPacketRxQueue::idenAckLen = 0;
-uint16_t TVanPacketRxQueue::idenAck[] = {};
+uint16_t TVanPacketRxQueue::idenAck[MAX_IDEN_ACKS] = {};
 
 // Initializes the VAN packet receiver
 bool TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
 {
     if (pin != VAN_NO_PIN_ASSIGNED) return false; // Already setup
-    ActiveAckStatus = false;
+    activeAckStatus = false;
 
   #if defined ANALYSE_WAIT_ACK_ISR || defined ANALYSE_RX_PIN_CHANGE_ISR
     pinMode(ANALYSER_PIN, OUTPUT);
