@@ -55,6 +55,8 @@
  #else
   // Note: GPIO_NUM_22 is LED pin on Lilygo TTGO T7 V1.3 Mini32
   #define RX_PIN GPIO_NUM_21
+
+  // Note: some Lilygo TTGO T7 V1.3 Mini32 boards have pins 16 and 17 swapped! Check the silkscreen on the PCB.
   #define TX_PIN GPIO_NUM_16
  #endif
 #else // ! ARDUINO_ARCH_ESP32
