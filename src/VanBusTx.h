@@ -27,6 +27,10 @@
 
 #include "VanBusRx.h"
 
+#ifdef CH32V006
+  #define IRAM_ATTR //the CH32V00x mcus execute ISR from flash directly
+#endif
+
 enum PacketWriteState_t { VAN_TX_WAITING, VAN_TX_SENDING, VAN_TX_DONE };
 
 // VAN packet Tx descriptor
@@ -69,9 +73,52 @@ class TVanPacketTxDesc
     } // Init
 
     friend void FinishPacketTransmission(TVanPacketTxDesc* txDesc);
+    friend void FinishRtrTransmission(TVanPacketRtrDesc* rtrDesc, bool resetRx);
     friend void SendBitIsr();
     friend class TVanPacketTxQueue;
 }; // class TVanPacketTxDesc
+
+// VAN RTR in-frame reply descriptor
+class TVanPacketRtrDesc
+{
+  public:
+    TVanPacketRtrDesc() { Init(); }
+    bool rtrPacket(uint16_t incomingIden, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10); //cmfFlags already known
+    bool rtrAckReceived();
+    bool isBeforeTimeout(){return (state == VAN_TX_WAITING &&  millis() < timeoutStop);}
+    bool isIdle() const { return (state == VAN_TX_DONE  || state == VAN_TX_WAITING); }
+
+    private:
+    
+    void PrepareRtrPacket(uint16_t incomingIden, const uint8_t* data, size_t dataLen); //iden and cmdFlags for computing CRC
+    void Dump() const;
+    uint16_t stuffedBytes[VAN_MAX_PACKET_SIZE + 1];  // 1 extra "byte": 2 ACK bits and 8 EOF bits
+    uint16_t* p_eod;
+    uint16_t* p_last;
+    unsigned int size;
+    unsigned int eodAt;
+    volatile PacketWriteState_t state;
+    volatile PacketAck_t stateRtrAck;
+    uint16_t incomingIden;
+    unsigned int timeoutStop = 0;
+
+    static void StartRtrBitSendTimer();
+
+    void Init()
+    {
+        size = 0;
+        eodAt = 0;
+        state = VAN_TX_WAITING;
+        stateRtrAck = VAN_ACK;
+    } // Init
+
+    friend void FinishRtrTransmission(TVanPacketRtrDesc* rtrDesc, bool resetRx);
+    friend void FinishPacketTransmission(TVanPacketTxDesc* txDesc);
+    friend void SendBitRtrIsr();
+    friend void RxPinChangeIsr();
+}; // class TVanPacketRtrDesc
+
+extern TVanPacketRtrDesc VanBusRtr;
 
 // Circular buffer of VAN packet Tx descriptors
 class TVanPacketTxQueue
@@ -98,6 +145,7 @@ class TVanPacketTxQueue
     bool SendPacket(uint16_t iden, uint8_t cmdFlags, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10);
     uint32_t GetCount() const { ISR_SAFE_GET(uint32_t, count); }
     void DumpStats(Stream& s) const;
+    bool isIdle() const { ISR_SAFE_GET(bool, _tail->state == VAN_TX_DONE); }
 
   private:
 
@@ -134,7 +182,9 @@ class TVanPacketTxQueue
     } // AdvanceHead
 
     friend void FinishPacketTransmission(TVanPacketTxDesc* txDesc);
+    friend void FinishRtrTransmission(TVanPacketRtrDesc* rtrDesc, bool resetRx);
     friend void SendBitIsr();
+    //friend void RxPinChangeIsr();
     friend class TVanPacketTxDesc;
 }; // class TVanPacketTxQueue
 

@@ -31,6 +31,18 @@
 #include "VanBusRx.h"
 #include "VanBusTx.h"
 
+static inline uint32_t GetCpuCycleCount()
+{
+#if defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_ESP8266)
+    return ESP.getCycleCount();
+#elif defined(CH32V006)
+    return SysTick->CNT;
+#else
+    #error "GetCpuCycleCount() not implemented for this architecture"
+#endif
+}
+
+
 // Interface object
 class TVanBus
 {
@@ -55,6 +67,10 @@ class TVanBus
         return VanBusRx.Receive(pkt, isQueueOverrun);
     } // Receive
 
+    static void ActiveACK(const uint8_t len, const uint16_t array[]){
+      return VanBusRx.ActiveACK(len, array);
+    }
+
     static uint32_t GetRxCount() { return VanBusRx.GetCount(); }
     static int QueueSize() { return VanBusRx.QueueSize(); }
     static int GetNQueued() { return VanBusRx.GetNQueued(); }
@@ -77,6 +93,12 @@ class TVanBus
     } // SendPacket
 
     static uint32_t GetTxCount() { return VanBusTx.GetCount(); }
+
+    static bool rtrPacket(uint16_t incomingIden, const uint8_t* data, size_t dataLen, unsigned int timeOutMs = 10){
+      return VanBusRtr.rtrPacket(incomingIden, data, dataLen, timeOutMs);
+    }
+
+    static bool rtrAckReceived() { return VanBusRtr.rtrAckReceived();}
 
 }; // class TVanBus
 

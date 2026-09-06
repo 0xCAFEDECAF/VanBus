@@ -59,23 +59,52 @@
 
 // F_CPU is set by the Arduino IDE option as chosen in menu Tools > CPU Frequency. It is always a multiple of 80000000.
 #ifndef TIMER_BASE_CLK
-  #define TIMER_BASE_CLK (80000000)
+  #ifdef CH32V006
+    #define TIMER_BASE_CLK (48000000)
+    #define CPU_CYCLES(_X) ((_X) /4) // div 4 résultar régulier mais faux
+    //#define CPU_F_FACTOR 0.3 //pbm?
+    #define CPU_CYCLES(_X) ((uint32_t)(((_X) *.3)+0.5))
+    // H2 -> 0.6
+  #else
+    #define TIMER_BASE_CLK (80000000)
+    #define CPU_F_FACTOR (F_CPU / TIMER_BASE_CLK)
+    #define CPU_CYCLES(_X) ((_X) * CPU_F_FACTOR)
+  #endif
 #endif
 #define CPU_F_FACTOR (F_CPU / TIMER_BASE_CLK)
-#define CPU_CYCLES(_X) ((_X) * CPU_F_FACTOR)
+
+/*
+#ifndef TIMER_BASE_CLK
+  #ifdef CH32V006
+    #warning "CH32V006 mcu detected !"
+    #define TIMER_BASE_CLK (48000000)
+    #define F_CPU (48000000) //debug ?
+    #define CPU_CYCLES(_X) ((_X) / 4) //2 3 passable //4 régulier mais faux
+  #else
+    #define TIMER_BASE_CLK (80000000)
+  #endif
+#endif
+#define CPU_F_FACTOR (F_CPU / TIMER_BASE_CLK)
+//#define CPU_CYCLES(_X) ((_X) * CPU_F_FACTOR)
+*/
 
 #ifndef ARDUINO_ARCH_ESP32
-  #define TIMER_DIVIDER TIM_DIV16
-  #define TIMER_TICKS_PER_MICROSECOND (5)  // Must match TIM_DIV16 which is 80 MHz / 16 = 5 MHz = 5 ticks/microsec
+  #ifdef CH32V006
+    #define TIMER_DIVIDER 8
+    #define TIMER_TICKS_PER_MICROSECOND (6)
+  #else
+    #define TIMER_DIVIDER TIM_DIV16
+    #define TIMER_TICKS_PER_MICROSECOND (5)  // Must match TIM_DIV16 which is 80 MHz / 16 = 5 MHz = 5 ticks/microsec
+  #endif
 #endif
 
 #define VAN_NO_PIN_ASSIGNED (0xFF)
 
 // Forward declarations
-
 extern uint8_t globalTxPin;
 void WaitAckIsr();
 void RxPinChangeIsr();
+class TVanPacketRtrDesc;
 
 #define MAX_FLOAT_SIZE 12
 char* FloatToStr(char* buffer, float f, int prec = 1);
@@ -167,7 +196,7 @@ class TIfsDebugPacket
 
 enum PacketReadState_t { VAN_RX_VACANT = 2, VAN_RX_SEARCHING, VAN_RX_LOADING, VAN_RX_WAITING_ACK, VAN_RX_DONE };
 enum PacketReadResult_t { VAN_RX_PACKET_OK, VAN_RX_ERROR_NBITS, VAN_RX_ERROR_MANCHESTER, VAN_RX_ERROR_MAX_PACKET };
-enum PacketAck_t { VAN_ACK, VAN_NO_ACK, VAN_ACTIVE_ACK };
+enum PacketAck_t { VAN_ACK, VAN_NO_ACK, VAN_ACTIVE_ACK, VAN_PASSIVE_ACK };
 
 // VAN packet Rx descriptor
 class TVanPacketRxDesc
@@ -305,6 +334,7 @@ class TVanPacketRxDesc
 
     bool DecisionActiveACK();
 
+    friend void FinishRtrTransmission(TVanPacketRtrDesc* rtrDesc, bool resetRx);
     friend void WaitAckIsr();
     friend void RxPinChangeIsr();
     friend class TVanPacketRxQueue;
@@ -348,6 +378,8 @@ extern portMUX_TYPE mux;
 class TVanPacketTxDesc;
 
 #ifdef ARDUINO_ARCH_ESP32
+typedef void(*timercallback)(void);
+#elif defined(CH32V006)
 typedef void(*timercallback)(void);
 #endif // ARDUINO_ARCH_ESP32
 
@@ -405,6 +437,7 @@ class TVanPacketRxQueue
     int QueueSize() const { return size; }
     int GetNQueued() const { return nQueued; }
     int GetMaxQueued() const { return maxQueued; }
+    bool isIdle() const { ISR_SAFE_GET(bool, _head->state == VAN_RX_VACANT || _head->state == VAN_RX_SEARCHING || _head->state == VAN_RX_DONE);}
 
     uint32_t GetLastMediaAccessAt() { ISR_SAFE_GET(uint32_t, lastMediaAccessAt); };
 
@@ -463,15 +496,18 @@ class TVanPacketRxQueue
     
     static bool activeAckStatus;
     static uint8_t idenAckLen;
-
+    
     #define MAX_IDEN_ACKS 16
     static uint16_t idenAck[MAX_IDEN_ACKS];
 
+    friend void FinishRtrTransmission(TVanPacketRtrDesc* rtrDesc, bool resetRx);
     friend void FinishPacketTransmission(TVanPacketTxDesc* txDesc);
     friend void SendBitIsr();
+    friend void SendBitRtrIsr();
     friend void RxPinChangeIsr();
     friend void SetTxBitTimer();
     friend void WaitAckIsr();
+    friend class TVanPacketRtrDesc;
     friend class TVanPacketRxDesc;
     friend class TVanPacketTxQueue;
 }; // class TVanPacketRxQueue

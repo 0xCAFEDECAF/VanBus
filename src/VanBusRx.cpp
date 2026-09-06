@@ -8,6 +8,13 @@
 
 #include <limits.h>
 #include "VanBusRx.h"
+#include "VanBusTx.h"
+#include "VanBus.h"
+
+#ifdef CH32V006
+  #define IRAM_ATTR //the CH32V00x mcus execute ISR from flash directly
+  #define _min min
+#endif
 
 // #defines to drive an analyzer pin, for use with e.g. Saleae USB Logic Analyzer.
 // What would we want to analyse? Uncomment either or none of the #defines below.
@@ -25,6 +32,12 @@
  #else // ! ARDUINO_ARCH_ESP32
   const int ANALYSER_PIN = D8;  // For WEMOS D1 mini board we use D8 (GPIO 15)
  #endif // ARDUINO_ARCH_ESP32
+#endif
+
+//CH32V006 RxPinChangeIsr() optimisation 
+#ifdef CH32V006
+  static GPIO_TypeDef* globalRxPort = nullptr;
+  static uint32_t      globalRxMask = 0;
 #endif
 
 #if defined ANALYSE_WAIT_ACK_ISR
@@ -515,7 +528,7 @@ void TVanPacketRxQueue::ActiveACK(const uint8_t len, const uint16_t array[] = {}
         idenAckLen = 0;
         return;
     }
-    else
+    else 
     {
         // TODO - check if the array given by the user has the correct length? if(array[len-1] != NULL)
         activeAckStatus = true;
@@ -639,9 +652,13 @@ void IRAM_ATTR SetTxBitTimer()
     {
         // Turn on the Tx bit timer
 
-      #ifdef ARDUINO_ARCH_ESP32
+      #ifdef ARDUINO_ARCH_ESP32 //
 
-       #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+       #if defined CONFIG_IDF_TARGET_ESP32C3 || defined CONFIG_IDF_TARGET_ESP32C6 || defined CONFIG_IDF_TARGET_ESP32H2 //only 2 timers
+        //if(VanBusRx.txTimerIsr) setTimerRouter(1); //C3
+        #warning "SetTxBitTimer() in not implemented for 2 timers mcu yet"
+        Serial.println("SetTxBitTimer() in not implemented for 2 timers mcus yet");
+       #elif ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
         timerAlarm(txTimer, VanBusRx.txTimerTicks, true, 0);
        #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
        #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(2, 0, 0)
@@ -655,6 +672,8 @@ void IRAM_ATTR SetTxBitTimer()
        #endif
        #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
         timerStart(txTimer);
+        #elif defined(CH32V006)
+            #warning "SetTxBitTimer() in not implemented for CH32V006 mcu yet"
 
       #else // ! ARDUINO_ARCH_ESP32
 
@@ -694,6 +713,8 @@ void IRAM_ATTR RxPinChangeIsr()
 
   #ifdef ARDUINO_ARCH_ESP32
     #define GPIP(X_) digitalRead(X_)
+  #elif defined(CH32V006)
+    #define GPIP(X_) (globalRxPort->INDR & globalRxMask) ? HIGH : LOW;
   #endif // ARDUINO_ARCH_ESP32
 
     const int pinLevel = GPIP(VanBusRx.pin);
@@ -703,7 +724,7 @@ void IRAM_ATTR RxPinChangeIsr()
 
     // Number of elapsed CPU cycles
     static uint32_t prev = 0;
-    const uint32_t curr = ESP.getCycleCount();  // Store CPU cycle counter value as soon as possible
+    const uint32_t curr = GetCpuCycleCount();  // Store CPU cycle counter value as soon as possible
 
     TRIGGER_ANALYSER_RX_PIN_CHANGE_ISR;
 
@@ -1252,6 +1273,11 @@ void IRAM_ATTR RxPinChangeIsr()
 
         rxDesc->bytes[rxDesc->size++] = readByte;
 
+        if (rxDesc->size == 2 && VanBusRtr.state == VAN_TX_WAITING && VanBusRtr.isBeforeTimeout() && rxDesc->Iden() == VanBusRtr.incomingIden) {  // IDEN
+                //CH32V006 : RTR not detected for now
+            VanBusRtr.StartRtrBitSendTimer();
+        }
+
         // EOD detected if last two bits are 0 followed by a 1, but never in bytes 0...4
         if ((currentByte & 0x003) == 0 && atBit == 0 && rxDesc->size >= 5
 
@@ -1289,14 +1315,17 @@ void IRAM_ATTR RxPinChangeIsr()
         
                 #ifdef ARDUINO_ARCH_ESP32
         
-                #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+                #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0) // C3 doit utiliser timerRouter() pour TX et RTR ou commenter ces 2 lignes
                     timerWrite(timer, 0);
                     timerAlarm(timer, 40 * RX_TIMER_TICKS_PER_MICROSECOND, false, 0);  // 5 time slots = 5 * 8 us = 40 microseconds
                 #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
                     timerWrite(timer, 0);
                     timerAlarmEnable(timer);
                 #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-        
+                
+                #elif defined(CH32V006)
+                    #warning "CH32V006 mcu, no WaitAckIsr() for now"
+
                 #else // ! ARDUINO_ARCH_ESP32
         
                     timer1_disable();
@@ -1308,6 +1337,8 @@ void IRAM_ATTR RxPinChangeIsr()
         
                 #endif // ARDUINO_ARCH_ESP32
             }
+            VanBusRx._AdvanceHead();
+
         }
         else if (rxDesc->size >= VAN_MAX_PACKET_SIZE)
         {
@@ -1353,12 +1384,10 @@ bool TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
 
   #ifdef ARDUINO_ARCH_ESP32
 
-   #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-
+   #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0) // C3 doit utiliser timerRouter() pour TX et RTR ou commenter ces 2 lignes
     timer = timerBegin(RX_TIMER_FREQ);
     timerAttachInterrupt(timer, &WaitAckIsr);
     timerAlarm(timer, 40 * RX_TIMER_TICKS_PER_MICROSECOND, false, 0);  // 5 time slots = 5 * 8 us = 40 microseconds
-
    #else // ESP_ARDUINO_VERSION < ESP_ARDUINO_VERSION_VAL(3, 0, 0)
 
     // Clock to timer (prescaler) is always 80 MHz, even if F_CPU is 160 or 240 MHz. We want 0.2 microsecond resolution.
@@ -1370,7 +1399,12 @@ bool TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
 
    #endif // ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
 
-  #else // ! ARDUINO_ARCH_ESP32
+    #elif defined(CH32V006)
+        #warning "CH32V006 mcu, no WaitAckIsr() for now"
+        globalRxPort = digitalPinToPort(rxPin);
+        globalRxMask = digitalPinToBitMask(rxPin);
+  
+   #else // ! ARDUINO_ARCH_ESP32
 
     timer1_isr_init();
     timer1_disable();
@@ -1379,7 +1413,11 @@ bool TVanPacketRxQueue::Setup(uint8_t rxPin, int queueSize)
 
     pin = rxPin;
 
-    attachInterrupt(digitalPinToInterrupt(rxPin), RxPinChangeIsr, CHANGE);
+    #if defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_ESP8266)
+        attachInterrupt(digitalPinToInterrupt(rxPin), RxPinChangeIsr, CHANGE);
+    #elif defined(CH32V006)
+        attachInterrupt(rxPin, GPIO_Mode_IPU, &RxPinChangeIsr, EXTI_Mode_Interrupt, EXTI_Trigger_Rising_Falling);
+    #endif
     enabled = true;
 
     return true;
@@ -1441,7 +1479,11 @@ void TVanPacketRxQueue::Disable()
 void TVanPacketRxQueue::Enable()
 {
     if (pin == VAN_NO_PIN_ASSIGNED) return; // Call Setup first!
-    attachInterrupt(digitalPinToInterrupt(VanBusRx.pin), RxPinChangeIsr, CHANGE);
+    #if defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_ESP8266)
+        attachInterrupt(digitalPinToInterrupt(VanBusRx.pin), RxPinChangeIsr, CHANGE);
+    #elif defined(CH32V006)
+        attachInterrupt(digitalPinToInterrupt(VanBusRx.pin), GPIO_Mode_IPD, &RxPinChangeIsr, EXTI_Mode_Interrupt, EXTI_Trigger_Rising_Falling);
+    #endif
     enabled = true;
 } // TVanPacketRxQueue::Enable
 
